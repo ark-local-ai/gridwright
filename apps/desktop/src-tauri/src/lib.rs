@@ -10,12 +10,10 @@
 //   4. 退出时清理后端子进程；
 //   5. 单实例：再次打开聚焦既有窗口。
 //
-// ⚠️ 需 Rust 工具链编译验证：本机无 cargo/rustc/MSVC，此文件**无法在此编译**。
-//    在有 Rust (stable + x86_64-pc-windows-msvc + VS Build Tools) 的机器上运行
-//    `npm --prefix apps/desktop run desktop:build` 之前，请先：
-//      a) 构建后端 exe：node apps/backend/scripts/build-sea.mjs
-//      b) 复制为 sidecar：apps/desktop/src-tauri/binaries/ark-backend-x86_64-pc-windows-msvc.exe
-//     （tauri.conf.json 的 externalBin: ["binaries/ark-backend"] 会按平台后缀寻找）。
+// ⚠️ 本机已装 Rust/MSVC，可 `cargo tauri build` 直接编译；首次构建前需：
+//    a) 构建后端 exe：node apps/backend/scripts/build-sea.mjs
+//    b) 复制为 sidecar：apps/desktop/src-tauri/binaries/ark-backend-x86_64-pc-windows-msvc.exe
+//   （tauri.conf.json 的 externalBin: ["binaries/ark-backend"] 会按平台后缀寻找）。
 // =====================================================================
 
 use std::io::{Read, Write};
@@ -24,11 +22,15 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use tauri::Manager;
-use tauri_plugin_shell::process::CommandChild;
+use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_single_instance::init as single_instance;
 
-struct BackendProcess(Mutex<Option<CommandChild>>);
+// tauri-plugin-shell 的 Command::spawn() 返回 (事件接收器, 子进程句柄) 元组；
+// 事件接收器驱动 shell 事件（回调日志/stdin），子进程句柄用于退出清理。
+type Spawned = (tauri::async_runtime::Receiver<CommandEvent>, CommandChild);
+
+struct BackendProcess(Mutex<Option<Spawned>>);
 
 /// 探测本地后端是否已就绪（TCP 到 127.0.0.1:4000 发 /health 请求，看是否 200）
 fn backend_up() -> bool {
@@ -45,7 +47,7 @@ fn backend_up() -> bool {
 
 /// 拉起随包分发、单文件打包的后端可执行文件（sidecar `ark-backend`），
 /// 并把数据目录重定向到 per-user 应用数据目录。
-fn spawn_backend(app: &tauri::App) -> Option<CommandChild> {
+fn spawn_backend(app: &tauri::App) -> Option<Spawned> {
     let data_dir = app.path().app_data_dir().ok()?;
     let ws_dir = data_dir.join("workspace");
     let skill_dir = data_dir.join("skills");
@@ -108,7 +110,7 @@ pub fn run() {
                 .unwrap()
                 .take()
             {
-                let _ = child.kill();
+                let _ = child.1.kill();
             }
         }
     });
