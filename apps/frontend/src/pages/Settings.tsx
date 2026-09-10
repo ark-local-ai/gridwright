@@ -4,10 +4,14 @@ import {
   getSearchSource, setSearchSourceEnabled, setSearchProvider, setSearchQuota, webSearch,
   type ChannelDto, type SearchSourceStatus,
 } from "../api";
+import Stats from "./Stats";
+import Memories from "./Memories";
+import SettingsUsers from "./SettingsUsers";
 
 const GROUPS: { label?: string; items: string[] }[] = [
   { items: ["应用", "通用", "外观", "通知"] },
   { label: "能力", items: ["模型", "联网搜索", "技能", "连接器", "专家", "Agent"] },
+  { label: "工具", items: ["统计", "记忆", "用户管理"] },
   { label: "智能", items: ["长期记忆", "自进化", "回归评测"] },
   { label: "系统", items: ["工作目录", "快捷键", "备份", "安全"] },
 ];
@@ -293,6 +297,12 @@ export default function Settings() {
                 </div>
               </div>
             </>
+          ) : sec === "统计" ? (
+            <div className="sec-embed"><Stats /></div>
+          ) : sec === "记忆" ? (
+            <div className="sec-embed"><Memories /></div>
+          ) : sec === "用户管理" ? (
+            <div className="sec-embed"><SettingsUsers /></div>
           ) : (
             <div className="hint-wrap">
               <span style={{ fontSize: 13.5 }}>「{sec}」设置将在后续接入 —— 这里先占好坑位。</span>

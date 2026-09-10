@@ -256,9 +256,9 @@
 .sb-ctx-item + .sb-ctx-item { margin-top: 1px; }
 
 /* ---------- 底部用户区 + 头像菜单 ---------- */
-.sb-user-wrap { position: relative; margin-top: 8px; }
+.sb-user-wrap { position: relative; margin-top: 8px; display: flex; align-items: center; gap: 4px; }
 .sb-user {
-  display: flex; width: 100%; align-items: center; gap: 9px; padding: 6px 8px;
+  display: flex; flex: 1; min-width: 0; align-items: center; gap: 9px; padding: 6px 8px;
   border-radius: var(--radius-sm); border: none; background: none;
   transition: background 0.16s var(--ease-out);
 }
@@ -271,6 +271,12 @@
 .sb-user-t { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.2; min-width: 0; }
 .sb-user-t b { font-size: 12.5px; color: var(--text-1); white-space: nowrap; }
 .sb-user-t span { font-size: 10.5px; color: var(--text-3); }
+.sb-gear {
+  flex: none; width: 30px; height: 30px; display: grid; place-items: center;
+  border-radius: var(--radius-sm); border: none; background: none; color: var(--text-3);
+  cursor: pointer; transition: background 0.16s var(--ease-out), color 0.16s var(--ease-out);
+}
+.sb-gear:hover { background: var(--surface-2); color: var(--text-1); }
 .sb-menu {
   position: absolute; bottom: calc(100% + 8px); left: 4px; right: 4px; z-index: 70;
   background: var(--surface); border: 1px solid var(--line); border-radius: 12px;

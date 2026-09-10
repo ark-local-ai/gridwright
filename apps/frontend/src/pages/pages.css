@@ -367,3 +367,8 @@
 .im-field input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
 .im-secret { letter-spacing: 0.5px; }
 .im-hint { font-size: 12px; color: var(--text-3); line-height: 1.6; margin-top: 4px; }
+
+/* M68：设置面板内嵌子视图（统计/记忆/用户管理）——中和其 `.page` 的外边距/滚动 */
+.sec-embed { min-width: 0; }
+.sec-embed .page { padding: 0; overflow: visible; flex: none; }
+.sec-embed .page-h1 { display: none; }

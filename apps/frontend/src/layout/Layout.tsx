@@ -16,9 +16,6 @@ const TITLES: Record<string, string> = {
   "/app/workspace": "资料库",
   "/app/settings": "设置",
   "/app/stats": "统计",
-  "/app/admin": "管理",
-  "/app/admin/audit": "管理 · 审计",
-  "/app/admin/ops": "管理 · 运维",
   "/app/task": "任务",
   "/app/memories": "记忆",
     "/app/im": "IM 消息桥",
@@ -32,7 +29,7 @@ export default function Layout() {
   const nav = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const title = TITLES[loc.pathname] ?? "任务";
-  const hasTabBar = TAB_BARED.includes(loc.pathname) || loc.pathname.startsWith("/app/admin");
+  const hasTabBar = TAB_BARED.includes(loc.pathname);
 
   // M21：浏览器通知——任务完成/失败时提醒（需用户授权），覆盖所有 /app 页
   useEffect(() => {
