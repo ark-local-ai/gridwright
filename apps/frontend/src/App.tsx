@@ -15,6 +15,7 @@ import TaskPage from "./pages/TaskPage";
 import Stats from "./pages/Stats";
 import Memories from "./pages/Memories";
 import ImBridge from "./pages/ImBridge";
+import Admin from "./pages/Admin";
 
 import "./index.css";
 import "./layout/shell.css";
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="settings" element={<Settings />} />
           <Route path="workspace" element={<Workspace />} />
           <Route path="stats" element={<Stats />} />
+          <Route path="admin" element={<Admin />} />
           <Route path="memories" element={<Memories />} />
             <Route path="im" element={<ImBridge />} />
           <Route path="task" element={<TaskPage />} />

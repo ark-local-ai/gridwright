@@ -1094,3 +1094,57 @@ export async function saveDistilledFacts(
   if (!res.ok) throw new Error(`保存记忆失败: ${res.status}`);
   return res.json();
 }
+
+// ===== 管理端（M67）：用户 + 审计 + 运维 =====
+
+export interface AdminUserDto {
+  id: string;
+  username: string;
+  displayName: string;
+  created: string;
+  isAdmin: boolean;
+  disabled: boolean;
+  tasks: number;
+  memories: number;
+  sessions: number;
+  lastActive: string | null;
+}
+
+export interface AuditEntryDto {
+  id: number;
+  ts: string;
+  userId?: string | null;
+  userName?: string | null;
+  action: string;
+  target?: string | null;
+  detail?: string | null;
+}
+
+export async function listUsers(): Promise<AdminUserDto[]> {
+  const res = await fetch(`${BASE}/api/users`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(`获取用户失败: ${res.status}`);
+  const data = (await res.json()) as { users: AdminUserDto[] };
+  return data.users;
+}
+
+export async function setUserDisabled(id: string, disabled: boolean): Promise<void> {
+  const res = await authFetch(`/api/users/${encodeURIComponent(id)}/${disabled ? "disable" : "enable"}`, { method: "POST" });
+  if (!res.ok) throw new Error(disabled ? `禁用失败: ${res.status}` : `启用失败: ${res.status}`);
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  const res = await authFetch(`/api/users/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`删除失败: ${res.status}`);
+}
+
+export async function listAudit(limit = 200): Promise<AuditEntryDto[]> {
+  const res = await fetch(`${BASE}/api/audit?limit=${limit}`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(`获取审计失败: ${res.status}`);
+  return res.json();
+}
+
+export async function runCleanup(): Promise<{ ok: boolean; cleaned?: number; summary?: string }> {
+  const res = await authFetch("/api/maintenance/cleanup", { method: "POST" });
+  if (!res.ok) throw new Error(`清理失败: ${res.status}`);
+  return res.json();
+}

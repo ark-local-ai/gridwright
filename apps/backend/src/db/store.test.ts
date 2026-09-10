@@ -198,6 +198,46 @@ describe("auth", () => {
   });
 });
 
+describe("管理端用户（M67 store）", () => {
+  it("首个注册用户自动成为管理员；后续用户为普通", () => {
+    const admin = store.createUser("root1", "p1", "Root");
+    expect(admin.isAdmin).toBe(true);
+    const normal = store.createUser("u1", "p2", "U");
+    expect(normal.isAdmin).toBe(false);
+    expect(store.countAdmins()).toBe(1);
+  });
+
+  it("listUsers 返回用量汇总（任务/记忆/会话）与最近活跃", () => {
+    const u = store.createUser("lu_admin", "p", "LU");
+    const rows = store.listUsers();
+    const row = rows.find((r) => r.username === "lu_admin")!;
+    expect(row.id).toBe(u.id);
+    expect(row.isAdmin).toBe(true);
+    // 至少字段齐全（任务/记忆/会话计数非负、最近活跃可空）
+    expect(typeof row.tasks).toBe("number");
+    expect(typeof row.sessions).toBe("number");
+    expect("lastActive" in row).toBe(true);
+  });
+
+  it("禁用后 resolveSession 返回空（会话失效）；启用恢复", () => {
+    const u = store.createUser("dis_admin", "p", "Dis");
+    const token = store.createSession(u.id);
+    expect(store.resolveSession(token)?.id).toBe(u.id);
+    store.setUserDisabled(u.id, true);
+    expect(store.resolveSession(token)).toBeUndefined();
+    store.setUserDisabled(u.id, false);
+    expect(store.resolveSession(token)?.id).toBe(u.id);
+  });
+
+  it("deleteUserWithData 连带清该用户的会话与 token", () => {
+    const u = store.createUser("del_admin", "p", "Del");
+    const token = store.createSession(u.id);
+    store.deleteUserWithData(u.id);
+    expect(store.findUserById(u.id)).toBeUndefined();
+    expect(store.resolveSession(token)).toBeUndefined();
+  });
+});
+
 describe("audit", () => {
   it("appendAudit 写入 + listAudit 按倒序返回", () => {
     store.clearAudit();

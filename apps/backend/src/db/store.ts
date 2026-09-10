@@ -605,6 +605,8 @@ export interface User {
   username: string;
   displayName: string;
   created: string;
+  isAdmin: boolean;
+  disabled: boolean;
 }
 
 export interface SessionRow {
@@ -631,7 +633,17 @@ db.exec(`
 
 export type UserRow = {
   id: string; username: string; password_hash: string; display_name: string; created: string;
+  is_admin?: number; disabled?: number;
 };
+
+// 迁移：给 users 表补管理员/禁用标记（老库没有这两列，PRAGMA 检测后 ALTER 补上）
+const userCols = db.prepare(`PRAGMA table_info(users)`).all() as { name: string }[];
+if (!userCols.some((c) => c.name === "is_admin")) {
+  db.exec(`ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`);
+}
+if (!userCols.some((c) => c.name === "disabled")) {
+  db.exec(`ALTER TABLE users ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0`);
+}
 
 // ---- 密码哈希（scrypt：随机盐 + 时间成本）----
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
@@ -657,24 +669,108 @@ export function findUserByUsername(username: string): UserRow | undefined {
 }
 
 export function findUserById(id: string): User | undefined {
-  const r = db.prepare(`SELECT id, username, display_name, created FROM users WHERE id = ?`).get(id) as
-    | { id: string; username: string; display_name: string; created: string }
+  const r = db.prepare(`SELECT id, username, display_name, created, is_admin, disabled FROM users WHERE id = ?`).get(id) as
+    | { id: string; username: string; display_name: string; created: string; is_admin: number; disabled: number }
     | undefined;
-  return r ? { id: r.id, username: r.username, displayName: r.display_name, created: r.created } : undefined;
+  return r ? { id: r.id, username: r.username, displayName: r.display_name, created: r.created, isAdmin: r.is_admin === 1, disabled: r.disabled === 1 } : undefined;
 }
 
 export function createUser(username: string, password: string, displayName: string): User {
   const id = `u-${randomBytes(6).toString("hex")}`;
   const created = new Date().toLocaleString("zh-CN", { hour12: false });
   const hash = hashPassword(password);
-  db.prepare(`INSERT INTO users (id, username, password_hash, display_name, created) VALUES (?, ?, ?, ?, ?)`)
-    .run(id, username, hash, displayName || username, created);
-  return { id, username, displayName: displayName || username, created };
+  // 首个注册用户自动成为管理员（自托管多人服务端的合理默认）
+  const isAdmin = countUsers() === 0 ? 1 : 0;
+  db.prepare(`INSERT INTO users (id, username, password_hash, display_name, created, is_admin) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(id, username, hash, displayName || username, created, isAdmin);
+  return { id, username, displayName: displayName || username, created, isAdmin: isAdmin === 1, disabled: false };
 }
 
 export function countUsers(): number {
   const r = db.prepare(`SELECT COUNT(*) AS n FROM users`).get() as { n: number };
   return r.n;
+}
+
+// ---- 管理端（M67）：用户列表 + 用量 + 禁用 ----
+
+export interface AdminUserRow {
+  id: string;
+  username: string;
+  displayName: string;
+  created: string;
+  isAdmin: boolean;
+  disabled: boolean;
+  tasks: number;
+  memories: number;
+  sessions: number;
+  lastActive: string | null;
+}
+
+export function listUsers(): AdminUserRow[] {
+  const rows = db.prepare(`
+    SELECT u.id, u.username, u.display_name AS displayName, u.created, u.is_admin AS isAdmin,
+           u.disabled,
+           (SELECT COUNT(*) FROM tasks t WHERE t.user_id = u.id) AS tasks,
+           (SELECT COUNT(*) FROM memories m WHERE m.user_id = u.id) AS memories,
+           (SELECT COUNT(*) FROM chat_sessions s WHERE s.user_id = u.id) AS sessions,
+           (SELECT MAX(ts) FROM audit_log a WHERE a.user_id = u.id) AS lastActive
+    FROM users u ORDER BY u.created
+  `).all() as {
+    id: string; username: string; displayName: string; created: string; isAdmin: number; disabled: number;
+    tasks: number; memories: number; sessions: number; lastActive: string | null;
+  }[];
+  return rows.map((r) => ({
+    id: r.id, username: r.username, displayName: r.displayName, created: r.created,
+    isAdmin: r.isAdmin === 1, disabled: r.disabled === 1,
+    tasks: r.tasks, memories: r.memories, sessions: r.sessions, lastActive: r.lastActive,
+  }));
+}
+
+/** 设置用户的禁用/启用状态；返回是否成功（用户不存在返回 false） */
+export function setUserDisabled(id: string, disabled: boolean): boolean {
+  const r = db.prepare(`UPDATE users SET disabled = ? WHERE id = ?`).run(disabled ? 1 : 0, id);
+  return r.changes > 0;
+}
+
+/** 统计当前有多少管理员——用于防止把最后一个管理员禁用/删掉 */
+export function countAdmins(): number {
+  const r = db.prepare(`SELECT COUNT(*) AS n FROM users WHERE is_admin = 1`).get() as { n: number };
+  return r.n;
+}
+
+/** 删除用户及其全部归属数据（任务/步骤/记忆/会话/会话消息），并清其会话 token */
+export function deleteUserWithData(userId: string): void {
+  db.exec("BEGIN");
+  try {
+    const tids = (db.prepare(`SELECT id FROM tasks WHERE user_id = ?`).all(userId) as { id: string }[]).map((r) => r.id);
+    for (const tid of tids) {
+      db.prepare(`DELETE FROM steps WHERE task_id = ?`).run(tid);
+      db.prepare(`DELETE FROM artifacts WHERE task_id = ?`).run(tid);
+    }
+    db.prepare(`DELETE FROM tasks WHERE user_id = ?`).run(userId);
+    db.prepare(`DELETE FROM memories WHERE user_id = ?`).run(userId);
+    const sids = (db.prepare(`SELECT id FROM chat_sessions WHERE user_id = ?`).all(userId) as { id: string }[]).map((r) => r.id);
+    for (const sid of sids) {
+      db.prepare(`DELETE FROM chat_messages WHERE session_id = ?`).run(sid);
+      db.prepare(`DELETE FROM chat_messages_fts WHERE session_id = ?`).run(sid);
+    }
+    db.prepare(`DELETE FROM chat_sessions WHERE user_id = ?`).run(userId);
+    db.prepare(`DELETE FROM sessions WHERE user_id = ?`).run(userId);
+    db.prepare(`DELETE FROM users WHERE id = ?`).run(userId);
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+}
+
+/** 用户维度任务计数：{userId: 正在进行的数量}，用于并发治理提示 */
+export function countRunningTasksByUser(): Record<string, number> {
+  const rows = db.prepare(`
+    SELECT user_id AS userId, COUNT(*) AS n FROM tasks
+    WHERE status IN ('queue', 'running') GROUP BY user_id
+  `).all() as { userId: string | null; n: number }[];
+  return Object.fromEntries(rows.map((r) => [r.userId ?? "", r.n]));
 }
 
 // ---- 会话 ----
@@ -694,7 +790,9 @@ export function resolveSession(token: string): User | undefined {
     | undefined;
   if (!row) return undefined;
   if (Date.now() > row.expires) return undefined; // 过期即失效
-  return findUserById(row.user_id);
+  const user = findUserById(row.user_id);
+  if (!user || user.disabled) return undefined; // 禁用用户拒绝其会话
+  return user;
 }
 
 export function destroySession(token: string): void {

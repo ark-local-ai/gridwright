@@ -68,6 +68,11 @@ function labelFor(method: string, url: string): string {
   if (u.startsWith("/api/templates") && m === "POST") return "创建任务模板";
   if (u.startsWith("/api/templates") && m === "PUT") return "编辑任务模板";
   if (u.startsWith("/api/templates") && m === "DELETE") return "删除任务模板";
+  // 管理端（M67）
+  if (u.startsWith("/api/users") && m === "DELETE") return "删除用户";
+  if (u.startsWith("/api/users") && u.endsWith("/disable")) return "禁用用户";
+  if (u.startsWith("/api/users") && u.endsWith("/enable")) return "启用用户";
+  if (u.startsWith("/api/maintenance") && m === "POST" && u.includes("/cleanup")) return "手动清理";
   return `${m} ${u}`;
 }
 

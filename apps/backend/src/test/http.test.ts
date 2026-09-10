@@ -139,6 +139,76 @@ describe("审计 API", () => {
   });
 });
 
+describe("管理端用户 API（M67）", () => {
+  // alice 是本文件首个注册用户 → 自动成为管理员；bob_admin 是新注册的普通用户
+  it("仅管理员可访问用户清单；普通用户 403", async () => {
+    const admin = await post("/api/auth/login", { username: "alice", password: "secret1" });
+    const adminToken: string = admin.json().token;
+    const r = await get("/api/users", adminToken);
+    expect(r.statusCode).toBe(200);
+    const { users } = r.json() as { users: { username: string; isAdmin: boolean }[] };
+    expect(users.some((u) => u.username === "alice" && u.isAdmin)).toBe(true);
+
+    // 普通用户访问 → 403
+    const normal = await post("/api/auth/register", { username: "bob_admin", password: "secret2" });
+    expect(normal.statusCode).toBe(201);
+    const bobToken: string = normal.json().token;
+    const forbidden = await get("/api/users", bobToken);
+    expect(forbidden.statusCode).toBe(403);
+  });
+
+  it("禁用用户后其会话失效；不能禁自己/最后一个管理员", async () => {
+    const admin = await post("/api/auth/login", { username: "alice", password: "secret1" });
+    const adminToken: string = admin.json().token;
+
+    // 注册一个将被禁用的用户，拿到其 id 与 token
+    const victim = await post("/api/auth/register", { username: "bob_disabled", password: "secret3" });
+    const victimToken: string = victim.json().token;
+    const victimId: string = victim.json().user.id;
+
+    // 禁用它
+    const dis = await post(`/api/users/${victimId}/disable`, {}, adminToken);
+    expect(dis.statusCode).toBe(200);
+
+    // 禁用后其会话应立即失效：GET /api/auth/me → 401
+    const meAfter = await get("/api/auth/me", victimToken);
+    expect(meAfter.statusCode).toBe(401);
+
+    // 普通用户不能操作其他用户（非管理员对 disable 也是 403）
+    const normal = await post("/api/auth/register", { username: "bob_snoop", password: "secret4" });
+    const snoopToken: string = normal.json().token;
+    const viaNormal = await post(`/api/users/${victimId}/enable`, {}, snoopToken);
+    expect(viaNormal.statusCode).toBe(403);
+
+    // 管理员重新启用它，会话恢复（重新登录产生新 token）
+    const en = await post(`/api/users/${victimId}/enable`, {}, adminToken);
+    expect(en.statusCode).toBe(200);
+  });
+
+  it("不能删除最后一个管理员（自护）；管理员可删除普通用户", async () => {
+    const admin = await post("/api/auth/login", { username: "alice", password: "secret1" });
+    const adminToken: string = admin.json().token;
+    const { users } = (await get("/api/users", adminToken)).json() as { users: { id: string; isAdmin: boolean }[] };
+    const alice = users.find((u) => u.isAdmin)!;
+
+    // 删最后一个管理员（alice 是唯一 admin）→ 400 拒绝
+    const delLastAdmin = await app.inject({
+      method: "DELETE", url: `/api/users/${alice.id}`, headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(delLastAdmin.statusCode).toBe(400);
+
+    // 管理员删除一个普通用户 → 200，且用户清单里不再有它
+    const tmp = await post("/api/auth/register", { username: "bob_del", password: "secret5" });
+    const tmpId: string = tmp.json().user.id;
+    const del = await app.inject({
+      method: "DELETE", url: `/api/users/${tmpId}`, headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(del.statusCode).toBe(200);
+    const after = (await get("/api/users", adminToken)).json() as { users: { username: string }[] };
+    expect(after.users.some((u) => u.username === "bob_del")).toBe(false);
+  });
+});
+
 describe("对话搜索路由", () => {
   it("发消息后 /api/chat/search 命中", async () => {
     const sid = store.createChatSession("会话1", undefined);

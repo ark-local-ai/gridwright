@@ -12,6 +12,7 @@ import Automation from '../../frontend/src/pages/Automation'
 import Settings from '../../frontend/src/pages/Settings'
 import Workspace from '../../frontend/src/pages/Workspace'
 import TaskPage from '../../frontend/src/pages/TaskPage'
+import Admin from '../../frontend/src/pages/Admin'
 import TitleBar from './TitleBar'
 
 // Tauri loads via a custom protocol (not a server), so BrowserRouter's History API
@@ -47,6 +48,7 @@ function Shell() {
             <Route path="automation" element={<Automation />} />
             <Route path="settings" element={<Settings />} />
             <Route path="workspace" element={<Workspace />} />
+            <Route path="admin" element={<Admin />} />
             <Route path="task" element={<TaskPage />} />
           </Route>
           <Route path="/" element={<Site />} />

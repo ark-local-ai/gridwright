@@ -16,6 +16,7 @@ const TITLES: Record<string, string> = {
   "/app/workspace": "资料库",
   "/app/settings": "设置",
   "/app/stats": "统计",
+  "/app/admin": "管理",
   "/app/task": "任务",
   "/app/memories": "记忆",
     "/app/im": "IM 消息桥",
