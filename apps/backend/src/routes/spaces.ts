@@ -7,14 +7,18 @@
 
 import type { FastifyInstance } from "fastify";
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { scanWorkspace } from "../tools/workspace";
 import { currentUser } from "./auth.js";
 import {
   listSpaces, getSpace, createSpace, updateSpace, deleteSpace, getActiveSpace, getSpaceByDir,
 } from "../db/store";
 
-const workRoot = join(process.cwd(), "..", "frontend", "public", "workspace");
+// 用 __dirname 定位（与 server.ts 一致），不依赖 process.cwd()：
+// 保证无论后端从哪个目录启动，web 与桌面版都读写同一个工作空间目录，存档保持同步。
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const workRoot = join(__dirname, "..", "..", "..", "frontend", "public", "workspace");
 
 /** 空间工作目录：dir 为空串 → 根目录（默认工作空间，兼容既有平铺文件） */
 export function spaceDir(dir: string): string {

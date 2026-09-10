@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArkLogo, IconArrowUp, IconChevD, IconFolder,
-  IconShield, IconSpark, IconPlus, IconX,
+  IconLibrary, IconSpark, IconPlus, IconX,
 } from "../components/icons";
 import { scenarios as mockScenarios } from "../data/mock";
 import { createTask, listScenarios, type ScenarioDto } from "../api";
@@ -49,31 +49,34 @@ export default function Home() {
         <p className="sub">说出需求，专家团队自主规划，在本地工作空间交付可验收的成果</p>
 
         {/* 场景胶囊行：点开下拉该场景的参考提示词（WorkBuddy 式封装） */}
-        <div className="chips">
-          {scenarios.map((s) => (
-            <div className="chip-wrap" key={s.id}>
-              <button
-                className={`chip${openId === s.id ? " on" : ""}`}
-                onClick={() => setOpenId(openId === s.id ? null : s.id)}
-              >
-                {s.name}<IconChevD size={11} />
-              </button>
-              {openId === s.id && (
-                <div className="chip-menu">
-                  <div className="chip-menu-h">{s.desc}</div>
-                  {s.prompts.map((p, i) => (
-                    <button key={i} className="chip-menu-item"
-                      onClick={() => applyPrompt(s.name, p.text)}>
-                      <span className="cm-note">{p.note}</span>
-                      <span className="cm-text">{p.text}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-          <button className="chip" onClick={() => nav("/app/prompts")}>
-            全部场景<IconChevD size={11} className="rot" />
+        <div className="chips-row">
+          <div className="chips">
+            {scenarios.map((s) => (
+              <div className="chip-wrap" key={s.id}>
+                <button
+                  className={`chip${openId === s.id ? " on" : ""}`}
+                  onClick={() => setOpenId(openId === s.id ? null : s.id)}
+                >
+                  {s.name}<IconChevD size={11} />
+                </button>
+                {openId === s.id && (
+                  <div className="chip-menu">
+                    <div className="chip-menu-h">{s.desc}</div>
+                    {s.prompts.map((p, i) => (
+                      <button key={i} className="chip-menu-item"
+                        onClick={() => applyPrompt(s.name, p.text)}>
+                        <span className="cm-note">{p.note}</span>
+                        <span className="cm-text">{p.text}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          {/* 全部场景：挪到最右、只留图标 */}
+          <button className="chip-all" title="全部场景" aria-label="全部场景" onClick={() => nav("/app/prompts")}>
+            <IconLibrary size={15} />
           </button>
         </div>
         {openId && <div className="menu-overlay" onClick={() => setOpenId(null)} />}
@@ -99,7 +102,6 @@ export default function Home() {
           </div>
           <div className="foot">
             <button className="foot-chip"><IconFolder size={13} />选择工作空间 ▾</button>
-            <button className="foot-chip"><IconShield size={13} />默认权限 ▾</button>
             <span className="pill ghost auto-pill"><IconSpark size={12} />Auto ▾</span>
           </div>
         </div>

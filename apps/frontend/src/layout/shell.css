@@ -333,6 +333,19 @@
 .home .sub { color: var(--text-2); margin: 8px 0 0; text-align: center; max-width: 480px; font-size: 12.5px; }
 
 .chips { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 18px 0 14px; }
+/* 场景行容器：场景胶囊居中，右侧钉一个「全部场景」图标钮 */
+.chips-row { position: relative; width: 100%; max-width: 700px; }
+.chips-row .chips { width: 100%; padding-right: 40px; }
+.chip-all {
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  display: grid; place-items: center; width: 32px; height: 32px;
+  border-radius: 999px; background: var(--surface); border: 1px solid var(--line);
+  color: var(--brand); box-shadow: var(--shadow-sm); cursor: pointer;
+  transition: background 0.16s var(--ease-out), border-color 0.16s var(--ease-out),
+    color 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out), transform 0.1s var(--ease-out);
+}
+.chip-all:hover { border-color: var(--brand-line); color: var(--brand-strong); box-shadow: var(--shadow-md); transform: translateY(-50%) scale(1.03); }
+.chip-all:active { transform: translateY(-50%) scale(0.96); background: var(--surface-2); }
 .chip {
   display: inline-flex; align-items: center; gap: 6px; padding: 5.5px 12px;
   border-radius: 999px; background: var(--surface); border: 1px solid var(--line);
