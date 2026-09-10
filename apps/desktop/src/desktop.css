@@ -116,3 +116,36 @@
 .tb-about p { font-size: var(--fs-sm); color: var(--text-2); line-height: var(--lh-body); margin: 0; }
 .tb-about p.tb-about-meta { font-size: var(--fs-xs); color: var(--text-3); }
 .tb-about .btn { align-self: flex-end; }
+
+/* ---------------- 本地后端未运行恢复面板 ---------------- */
+.be-rec-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 32px;
+  background: var(--bg);
+}
+.be-rec-logo {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--brand);
+  margin-bottom: 6px;
+}
+.be-rec-panel h1 { font-size: var(--fs-h); color: var(--text-1); margin: 0; }
+.be-rec-panel p { font-size: var(--fs-sm); color: var(--text-2); margin: 0; line-height: var(--lh-body); max-width: 460px; }
+.be-rec-panel code {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  font-size: 0.9em;
+  color: var(--text-1);
+}
+.be-rec-panel p.be-rec-wait { font-size: var(--fs-xs); color: var(--text-3); margin-top: 8px; }
+

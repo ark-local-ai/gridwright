@@ -20,12 +20,19 @@
 aiWork/
 ├─ apps/
 │  ├─ frontend/   # Web 前端：React 19 + TS + Vite（已实现 11 页 + 场景库）
-│  └─ backend/    # 后端 API + Agent 编排层（本次新加，Fastify + TS + SQLite）
+│  ├─ backend/    # 后端 API + Agent 编排层（Fastify + TS + SQLite）
+│  └─ desktop/    # Tauri 桌面壳：复用 frontend/src，加自绘标题栏/窗口控制
 ├─ AGENTS/        # 本文档目录（本仓库的路标）
-├─ docs/          # 早期产品/规划文档（KylinWork 规划、规格书、路线图）
+├─ docs/          # 早期产品/规划文档 + agent-architecture 工作副本（gitignored）
 ├─ ARCHITECTURE.md
 └─ README.md
 ```
+
+**【网页 / 桌面边界】** 同一套前端 UI、两个入口：
+- **网页版（`frontend`）= 轻端**：新建任务 + 助理对话 + 专家·技能·连接器 + 场景库（`/app` 落 Home 输入台；侧栏显这四项）。适合部署到服务器由多人访问（登录在那里有意义）。
+- **桌面版（`desktop`）= 完整工作台**：另含 自动化 / 资料库 / 设置 等完整能力，`scope="desktop"`。`VITE_API_BASE` 由 `desktop/vite.config.ts` 的 `define` 钉死为本地后端 `http://127.0.0.1:4000`；前端启动时 `main.tsx` 探测后端，未运行显示「后端未运行」恢复面板。数据不出本机。
+
+实现要点：共享 `Layout/Sidebar` 接受 `scope: "web" | "desktop"`（默认 `desktop`），由 `scope` 决定侧栏显哪些项——是**一套代码两入口**，不是维护两份独立前端。
 
 ---
 

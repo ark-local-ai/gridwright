@@ -9,6 +9,11 @@ export default defineConfig({
   plugins: [react()],
   clearScreen: false,
   base: './',
+  // Desktop 通过 Tauri 自定义协议加载（非 HTTP 服务），没有 Vite 代理可用，
+  // 必须把后端地址在构建时钉死，否则 API 会打到相对 /api 打不到 127.0.0.1:4000。
+  define: {
+    'import.meta.env.VITE_API_BASE': JSON.stringify('http://127.0.0.1:4000'),
+  },
   server: {
     port: 5174,
     strictPort: true,

@@ -37,7 +37,7 @@ function Shell() {
       <TitleBar />
       <div className="desktop-body">
         <Routes>
-          <Route path="/app" element={<Layout />}>
+          <Route path="/app" element={<Layout scope="desktop" />}>
             <Route index element={<Home />} />
             <Route path="chat" element={<Chat />} />
             <Route path="experts" element={<Experts />} />
