@@ -6,12 +6,11 @@
 
 import type { FastifyInstance } from "fastify";
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
 import {
   listSkills, getSkill, writeSkillMeta, toggleSkill,
 } from "../tools/skills";
+import { skillsDir } from "../config/paths";
 
-const skillsDir = join(process.cwd(), "skills");
 mkdirSync(skillsDir, { recursive: true });
 
 export async function skillRoutes(app: FastifyInstance) {

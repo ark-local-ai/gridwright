@@ -6,7 +6,7 @@
   "description": "Ark · 方舟 后端 API 与 Agent 编排层（本地优先）",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/fix-esm.mjs",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "postject": "^1.0.0-alpha.6",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }

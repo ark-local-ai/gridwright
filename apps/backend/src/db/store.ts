@@ -1,11 +1,9 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import type { Artifact, Task, TaskStep, StepStatus, TaskStatus } from "../types";
+import { dataDir } from "../config/paths";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const dataDir = join(__dirname, "..", "..", "data");
 mkdirSync(dataDir, { recursive: true });
 const dbPath = join(dataDir, "ark.db");
 

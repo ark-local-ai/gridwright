@@ -1,8 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { createReadStream } from "node:fs";
-import { dirname, join, normalize } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, normalize } from "node:path";
 import { taskRoutes } from "./routes/tasks.js";
 import { channelRoutes } from "./routes/channels.js";
 import { chatRoutes } from "./routes/chat.js";
@@ -16,9 +15,7 @@ import { authRoutes } from "./routes/auth.js";
 import { scanWorkspace } from "./tools/workspace.js";
 import { startScheduler } from "./scheduler/jobs.js";
 import { pruneSessions } from "./db/store.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const workDir = join(__dirname, "..", "..", "frontend", "public", "workspace");
+import { workspaceRoot as workDir } from "./config/paths.js";
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -64,8 +61,12 @@ export async function buildApp() {
   return app;
 }
 
-// 直接运行时监听启动（tsx src/server.ts）
-const port = Number(process.env.PORT ?? 4000);
-pruneSessions(); // 启动时清理过期会话
-startScheduler(); // 启动本地定时任务调度器
-await buildApp().then((app) => app.listen({ port, host: "127.0.0.1" }));
+// 直接运行时监听启动（tsx src/server.ts）。用函数包裹（避免顶层 await）：
+// 使 esbuild 能以 CJS 打包成桌面单文件 exe（fastify 是 CJS 运行时 require，CJS 打包才兼容）。
+async function boot() {
+  const port = Number(process.env.PORT ?? 4000);
+  pruneSessions(); // 启动时清理过期会话
+  startScheduler(); // 启动本地定时任务调度器
+  await buildApp().then((app) => app.listen({ port, host: "127.0.0.1" }));
+}
+void boot();
