@@ -19,7 +19,7 @@ const TITLES: Record<string, string> = {
 // 这些页面自带顶部 tab 导行（pn-tabs），不再重复渲染页头标题
 const TAB_BARED = ["/app/experts", "/app/skills", "/app/connectors"];
 
-export default function Layout({ scope = "desktop" }: { scope?: "web" | "desktop" }) {
+export default function Layout() {
   const loc = useLocation();
   const nav = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
@@ -28,7 +28,7 @@ export default function Layout({ scope = "desktop" }: { scope?: "web" | "desktop
 
   return (
     <div className="app">
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} scope={scope} />
+      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
       <main className="main">
         {/* 顶栏：只有收起态才放工具（展开/新建），展开态是纯虚线分隔 */}
         <header className={`top${collapsed ? " collapsed" : ""}`}>

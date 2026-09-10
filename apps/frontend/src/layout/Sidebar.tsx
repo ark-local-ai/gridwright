@@ -11,31 +11,14 @@ import { listTasks, deleteTask, retryTask, listSpaces, createSpace, setActiveSpa
 import AuthModal from "../components/AuthModal";
 
 type Mode = "task" | "space";
-type Scope = "web" | "desktop";
 
 type NavItem = {
   to: string; label: string; icon: React.ReactNode; end?: boolean;
   sub: { label: string; to: string; icon: React.ReactNode }[] | null;
 };
 
-// 桌面版 = 完整工作台；网页版 = 轻端（新建任务 + 助理 + 专家·技能·连接器 + 场景库）
-// 场景库 Prompts 原本不在侧栏里，网页轻端需要显式露出它；自动化/资料库/设置留在桌面。
-const NAV_DESKTOP: NavItem[] = [
-  { to: "/app", label: "新建任务", icon: <IconNote size={15} />, end: true, sub: null },
-  { to: "/app/chat", label: "助理", icon: <IconAssistant size={15} />, sub: null },
-  {
-    to: "/app/experts", label: "专家 · 技能 · 连接器", icon: <IconUsers size={15} />,
-    sub: [
-      { label: "专家", to: "/app/experts", icon: <IconUsers size={13} /> },
-      { label: "技能", to: "/app/skills", icon: <IconSpark size={13} /> },
-      { label: "连接器", to: "/app/connectors", icon: <IconLink size={13} /> },
-    ],
-  },
-  { to: "/app/automation", label: "自动化", icon: <IconClock size={15} />, sub: null },
-  { to: "/app/workspace", label: "资料库", icon: <IconLibrary size={15} />, sub: null },
-];
-
-const NAV_WEB: NavItem[] = [
+// 网页版与桌面版共用同一完整工作台导航。
+const NAV: NavItem[] = [
   { to: "/app", label: "新建任务", icon: <IconNote size={15} />, end: true, sub: null },
   { to: "/app/chat", label: "助理", icon: <IconAssistant size={15} />, sub: null },
   {
@@ -47,10 +30,11 @@ const NAV_WEB: NavItem[] = [
     ],
   },
   { to: "/app/prompts", label: "场景库", icon: <IconNote size={15} />, sub: null },
+  { to: "/app/automation", label: "自动化", icon: <IconClock size={15} />, sub: null },
+  { to: "/app/workspace", label: "资料库", icon: <IconLibrary size={15} />, sub: null },
 ];
 
-export default function Sidebar({ collapsed, onToggle, scope = "desktop" }: { collapsed: boolean; onToggle: () => void; scope?: Scope }) {
-  const NAV = scope === "web" ? NAV_WEB : NAV_DESKTOP;
+export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const nav = useNavigate();
   const [mode, setMode] = useState<Mode>("task");
   const [findOpen, setFindOpen] = useState(false);
@@ -306,12 +290,10 @@ export default function Sidebar({ collapsed, onToggle, scope = "desktop" }: { co
               <>
                 <div className="sb-overlay" onClick={() => setMenuOpen(false)} />
                 <div className="sb-menu">
-                  {scope === "desktop" && (
-                    <button className="sb-menu-item" onClick={() => { setMenuOpen(false); nav("/app/settings"); }}>
-                      <IconGear size={14} /> 设置
-                    </button>
-                  )}
-                  {scope === "desktop" && <div className="sb-menu-meta">Ark v0.1.0 · 本地运行 · 数据不出本机</div>}
+                  <button className="sb-menu-item" onClick={() => { setMenuOpen(false); nav("/app/settings"); }}>
+                    <IconGear size={14} /> 设置
+                  </button>
+                  <div className="sb-menu-meta">Ark v0.1.0 · 本地运行 · 数据不出本机</div>
                 </div>
               </>
             )}
