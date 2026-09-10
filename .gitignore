@@ -13,6 +13,8 @@ apps/backend/data/
 # Rust (Tauri) 编译产物
 **/src-tauri/target/
 **/src-tauri/gen/schemas/
+# 桌面安装包产物（本地交付，不进仓库）
+dist-desktop/
 
 # 环境/本地
 .env
