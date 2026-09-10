@@ -49,6 +49,8 @@ function Shell() {
             <Route path="settings" element={<Settings />} />
             <Route path="workspace" element={<Workspace />} />
             <Route path="admin" element={<Admin />} />
+            <Route path="admin/audit" element={<Admin />} />
+            <Route path="admin/ops" element={<Admin />} />
             <Route path="task" element={<TaskPage />} />
           </Route>
           <Route path="/" element={<Site />} />

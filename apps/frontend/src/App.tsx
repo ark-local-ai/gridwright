@@ -42,6 +42,8 @@ export default function App() {
           <Route path="workspace" element={<Workspace />} />
           <Route path="stats" element={<Stats />} />
           <Route path="admin" element={<Admin />} />
+          <Route path="admin/audit" element={<Admin />} />
+          <Route path="admin/ops" element={<Admin />} />
           <Route path="memories" element={<Memories />} />
             <Route path="im" element={<ImBridge />} />
           <Route path="task" element={<TaskPage />} />
