@@ -1,5 +1,12 @@
 /* ===== Ark 官网落地页（冷调 · 交付优先） ===== */
-.site { min-height: 100vh; background: var(--bg); overflow-y: auto; }
+/* 落地页是整个视口的滚动容器：body 是 overflow:hidden 的工作台布局，
+   这里必须给「受约束的高度」(100vh) 而非 min-height，overflow-y:auto 才会生效，
+   同时 .site-nav 的 position:sticky 才有可吸附的滚动口。
+   scroll-padding-top=60px 让 #锚点 跳转时给吸顶导航留空，标题不被遮住。 */
+.site {
+  height: 100vh; background: var(--bg); overflow-y: auto;
+  scroll-behavior: smooth; scroll-padding-top: 60px;
+}
 
 .site-nav {
   position: sticky; top: 0; z-index: 50; height: 60px; display: flex; align-items: center;
