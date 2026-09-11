@@ -4,11 +4,10 @@ import {
   type ChannelDto,
 } from "../api";
 
+// 交付主线只保留 模型渠道 + 基础；其余入口收进「更多」（功能保留，未接入的先占坑位）
 const GROUPS: { label?: string; items: string[] }[] = [
-  { items: ["应用", "通用", "外观", "通知"] },
-  { label: "能力", items: ["模型", "联网搜索", "技能", "连接器", "专家", "Agent"] },
-  { label: "智能", items: ["长期记忆", "自进化", "回归评测"] },
-  { label: "系统", items: ["工作目录", "快捷键", "备份", "安全"] },
+  { items: ["模型", "应用"] },
+  { label: "更多", items: ["联网搜索", "长期记忆", "自动化", "专家·技能", "安全"] },
 ];
 
 const EMPTY: { name: string; proto: "openai" | "anthropic"; model: string; baseUrl: string; apiKey: string; priority: string; cost: string } =

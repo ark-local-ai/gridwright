@@ -75,9 +75,23 @@ export default function TaskPage() {
 
   const badge =
     task.status === "done" ? <span className="badge done">已完成</span>
-    : task.status === "running" ? <span className="badge run">执行中</span>
+    : task.status === "running" ? <span className="badge run"><span className="live-pulse" style={{ width: 6, height: 6, borderRadius: 999, background: "currentColor", display: "inline-block" }} />执行中</span>
     : task.status === "failed" ? <span className="badge warn">失败</span>
     : <span className="badge queue">排队中</span>;
+
+  // 管道四阶段：输入 → 处理 → 校验 → 交付（映射当前任务状态）
+  const stages = (() => {
+    const running = task.status === "running";
+    const done = task.status === "done";
+    const hasChecks = task.checks.length > 0;
+    const allChecked = task.checks.length > 0 && task.checks.every((c) => c.ok);
+    return [
+      { label: "输入", s: "done" as const },
+      { label: "处理", s: done ? ("done" as const) : running ? ("run" as const) : ("wait" as const) },
+      { label: "校验", s: done || (allChecked && running) ? ("done" as const) : running && hasChecks ? ("run" as const) : ("wait" as const) },
+      { label: "交付", s: done ? ("done" as const) : running ? ("wait" as const) : ("wait" as const) },
+    ];
+  })();
 
   const doRetry = async () => {
     if (!taskId || busy) return;
@@ -107,6 +121,18 @@ export default function TaskPage() {
     <div className="page">
       <div className="taskwrap">
         <div className="task-col">
+          <div className="pipe-stages">
+            {stages.map((st, i) => (
+              <span key={st.label} style={{ display: "contents" }}>
+                <span className={`ps ${st.s}`}>
+                  <span className="ps-n">{st.s === "done" ? <IconCheck size={11} /> : i + 1}</span>{st.label}
+                </span>
+                {i < stages.length - 1 && (
+                  <span className={`ps-line ${stages[i + 1].s === "done" ? "done" : stages[i + 1].s === "run" ? "run" : ""}`} />
+                )}
+              </span>
+            ))}
+          </div>
           <div className="tcard">
             <div className="t-h">
               <b>{task.title}</b>{badge}

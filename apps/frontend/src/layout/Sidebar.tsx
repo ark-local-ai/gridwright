@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   IconAssistant, IconChevD, IconChevD2, IconChevU2, IconClock, IconDoc,
-  IconFolder, IconFolderOpen, IconGear, IconLibrary, IconLink, IconNote, IconSearch,
-  IconShare, IconRename, IconDots, IconSpark, IconTrash, IconUsers,
+  IconFolder, IconFolderOpen, IconGear, IconLink, IconNote, IconSearch,
+  IconShare, IconRename, IconDots, IconSpark, IconTable, IconTrash, IconUsers,
   ArkLogo, IconCollapse,
 } from "../components/icons";
 import { recentTasks as mockRecentTasks } from "../data/mock";
@@ -15,12 +15,16 @@ type Mode = "task" | "space";
 type NavItem = {
   to: string; label: string; icon: React.ReactNode; end?: boolean;
   sub: { label: string; to: string; icon: React.ReactNode }[] | null;
+  hidden?: boolean; // 交付主线外的入口：代码保留，只不渲染（恢复=置 false）
 };
 
-// 网页版与桌面版共用同一完整工作台导航。
+// 交付主线：新建任务 → 数据 → 场景 → 设置。
+// 助理 / 专家·技能·连接器 / 自动化 为隐藏项（路由与页面仍在，导航不显示）。
 const NAV: NavItem[] = [
   { to: "/app", label: "新建任务", icon: <IconNote size={15} />, end: true, sub: null },
-  { to: "/app/chat", label: "助理", icon: <IconAssistant size={15} />, sub: null },
+  { to: "/app/workspace", label: "数据", icon: <IconTable size={15} />, sub: null },
+  { to: "/app/prompts", label: "场景", icon: <IconSpark size={15} />, sub: null },
+  { to: "/app/chat", label: "助理", icon: <IconAssistant size={15} />, sub: null, hidden: true },
   {
     to: "/app/experts", label: "专家 · 技能 · 连接器", icon: <IconUsers size={15} />,
     sub: [
@@ -28,10 +32,9 @@ const NAV: NavItem[] = [
       { label: "技能", to: "/app/skills", icon: <IconSpark size={13} /> },
       { label: "连接器", to: "/app/connectors", icon: <IconLink size={13} /> },
     ],
+    hidden: true,
   },
-  { to: "/app/prompts", label: "场景库", icon: <IconNote size={15} />, sub: null },
-  { to: "/app/automation", label: "自动化", icon: <IconClock size={15} />, sub: null },
-  { to: "/app/workspace", label: "资料库", icon: <IconLibrary size={15} />, sub: null },
+  { to: "/app/automation", label: "自动化", icon: <IconClock size={15} />, sub: null, hidden: true },
 ];
 
 export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
@@ -147,7 +150,7 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
                 <ArkLogo h={15} />
                 <span className="brand-name">方舟</span>
               </div>
-              <span className="brand-ver">管理 · v0.1.0</span>
+              <span className="brand-ver">交付工作台 · v0.1.0</span>
             </div>
             <button
               className="sb-collapse"
@@ -160,7 +163,7 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
 
           {/* 导航队列 */}
           <nav className="sb-nav">
-            {NAV.map((n) => (
+            {NAV.filter((n) => !n.hidden).map((n) => (
               <div className="sb-item-group" key={n.to}>
                 <NavLink to={n.to} end={n.end}
                   className={({ isActive }) => `sb-item${isActive ? " on" : ""}`}>
@@ -186,7 +189,7 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
             <div className="sb-switch">
               <div className={`seg${mode === "space" ? " space" : ""}`}>
                 <button className={`seg-btn${mode === "task" ? " on" : ""}`} onClick={() => setMode("task")}>
-                  <IconDoc size={10} /> 对话
+                  <IconDoc size={10} /> 任务
                 </button>
                 <button className={`seg-btn${mode === "space" ? " on" : ""}`} onClick={() => setMode("space")}>
                   <IconFolder size={10} /> 空间
@@ -218,7 +221,7 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
                   <Row key={t.id} title={t.title} time={t.time} onClick={openTask}
                     onMenu={(e) => openCtx("task", t.id, t.title, e)} />
                 ))}
-                {tasks.length === 0 && <div className="sb-empty">暂无对话</div>}
+                {tasks.length === 0 && <div className="sb-empty">暂无任务</div>}
               </div>
             ) : (
               /* 空间：按空间分类，未命名/默认对话放进「任务」抽屉 */
@@ -278,7 +281,7 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
                     <Row key={t.id} title={t.title} time={t.time} onClick={openTask}
                       onMenu={(e) => openCtx("task", t.id, t.title, e)} />
                   ))}
-                  {taskList.length === 0 && <div className="sb-empty">暂无对话</div>}
+                  {taskList.length === 0 && <div className="sb-empty">暂无任务</div>}
                 </div>
               </>
             )}
@@ -386,7 +389,7 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
         <>
           <div className="sb-overlay" style={{ zIndex: 85 }} onClick={() => setDelTarget(null)} />
           <div className="sb-confirm">
-            <p>{delTarget.kind === "space" ? "删除这个工作空间？" : "删除这条对话？"}</p>
+            <p>{delTarget.kind === "space" ? "删除这个工作空间？" : "删除这条任务？"}</p>
             <span className="confirm-sub">此操作不可撤销</span>
             <div className="confirm-actions">
               <button className="btn ghost sm" onClick={() => setDelTarget(null)}>取消</button>

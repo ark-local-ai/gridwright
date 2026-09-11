@@ -68,6 +68,12 @@ export default function Workspace() {
 
   // 成果网格：官方交付文件（Office/pdf/md/html）按类型分组
   const grid = useMemo(() => (files ?? []).filter((f) => f.kind !== "other"), [files]);
+  // 类型归组摘要：XLS / DOC / PPT / PDF 各多少
+  const kindCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    grid.forEach((f) => m.set(f.kind, (m.get(f.kind) ?? 0) + 1));
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [grid]);
 
   return (
     <div className="page">
@@ -126,6 +132,16 @@ export default function Workspace() {
             <span style={{ fontSize: 12, color: "var(--text-3)" }}>真实落盘 · 可直接在 Office 打开继续编辑</span>
             <button className="btn ghost sm" style={{ marginLeft: "auto" }} onClick={() => loadFiles(activeId)}>刷新</button>
           </div>
+          {kindCounts.length > 0 && (
+            <div className="kind-summary">
+              {kindCounts.map(([k, n]) => (
+                <span className="kind-pill" key={k}>
+                  <span className="kd" style={{ background: ftColor[k] }} />
+                  {ftLabel(k)} <b>{n}</b>
+                </span>
+              ))}
+            </div>
+          )}
           {err ? (
             <div className="empty" style={{ color: "var(--warn)" }}>
               无法连接后端（127.0.0.1:4000），请先启动 apps/backend

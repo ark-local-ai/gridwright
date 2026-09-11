@@ -4,16 +4,16 @@ import Sidebar from "./Sidebar";
 import { IconNote, IconExpand } from "../components/icons";
 
 const TITLES: Record<string, string> = {
-  "/app": "新会话",
-  "/app/chat": "助理对话",
+  "/app": "新建任务",
+  "/app/chat": "助理",
   "/app/experts": "专家",
   "/app/skills": "技能",
   "/app/connectors": "连接器",
-  "/app/prompts": "场景库",
+  "/app/prompts": "场景",
   "/app/automation": "自动化",
-  "/app/workspace": "资料库",
+  "/app/workspace": "数据",
   "/app/settings": "设置",
-  "/app/task": "任务",
+  "/app/task": "任务执行",
 };
 
 // 这些页面自带顶部 tab 导行（pn-tabs），不再重复渲染页头标题
