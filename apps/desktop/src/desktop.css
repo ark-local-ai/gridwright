@@ -84,7 +84,7 @@
 .tb-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(43, 40, 32, 0.28);
+  background: rgba(20, 24, 30, 0.35);
   z-index: 200;
 }
 .tb-about {

@@ -74,7 +74,7 @@ export default function TitleBar() {
                 <span>v0.1.0</span>
               </div>
             </div>
-            <p>本地优先的 AI Agent 生产力工作台 —— 把一句话需求做成可编辑的成果文件，数据不出本机。</p>
+            <p>本地运行的 AI 交付工作台 —— 把一句话需求，做成能直接打开、可编辑的交付物，数据不出本机。</p>
             <p className="tb-about-meta">方舟承载你的工作与数据，安全独立、自主可控、成果归你。</p>
             <button className="btn ghost sm" onClick={() => setAboutOpen(false)}>关闭</button>
           </div>
