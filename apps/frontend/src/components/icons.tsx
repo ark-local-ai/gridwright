@@ -170,6 +170,28 @@ export const IconChart = (p: P) => (
     <path d="M8.5 16v-4.3M12.5 16V8.2M16.5 16v-6.4" />
   </svg>
 );
+export const IconXls = (p: P) => (
+  <svg {...base(p.size, p.className)}>
+    <rect x="4" y="4" width="16" height="16" rx="1.6" />
+    <path d="M4 9.3h16M4 14.7h16M9.3 9.3V20" />
+    <path d="M9.3 14.7l5.4 5.3" />
+  </svg>
+);
+export const IconTable = (p: P) => (
+  <svg {...base(p.size, p.className)}>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="1.4" />
+    <path d="M3.5 9.3h17M3.5 14.1h17" />
+    <path d="M9.8 4.5v15M15 4.5v15" />
+  </svg>
+);
+export const IconPipe = (p: P) => (
+  <svg {...base(p.size, p.className)}>
+    <circle cx="5" cy="12" r="2.1" />
+    <circle cx="12" cy="12" r="2.1" />
+    <circle cx="19" cy="12" r="2.1" />
+    <path d="M7.1 12h2.8M12.1 12h2.8" />
+  </svg>
+);
 export const IconSlides = (p: P) => (
   <svg {...base(p.size, p.className)}>
     <rect x="3.5" y="4.5" width="17" height="11.5" rx="1.6" />

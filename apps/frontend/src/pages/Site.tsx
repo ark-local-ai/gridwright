@@ -1,176 +1,204 @@
 import { Link } from "react-router-dom";
 import "./site.css";
 import {
-  IconSpark, IconClock, IconFolder, IconDoc, IconSearch, IconCheck, IconLink,
+  ArkLogo, IconCheck, IconClock, IconDoc, IconDown, IconFolder,
+  IconLink, IconSearch, IconSpark, IconSlides, IconXls,
 } from "../components/icons";
+
+/* 下载入口：桌面客户端发布页（安装包由 Tauri 构建产出） */
+const DOWNLOAD_URL = "https://github.com/ark-local-ai/ark/releases";
 
 export default function Site() {
   return (
     <div className="site">
-      {/* 顶部导航（官网共用） */}
+      {/* 顶部导航 */}
       <nav className="site-nav">
         <div className="left">
-          <div className="site-logo">
-            <div className="mark">A</div>
-            <div style={{ display: "flex", alignItems: "baseline" }}><b>Ark</b><span>方舟</span></div>
-          </div>
+          <div className="site-logo"><ArkLogo h={16} /></div>
           <div className="site-menu">
-            <a href="#skills">技能</a>
-            <a href="#mobile">移动端</a>
-            <a href="#local">本地操作</a>
-            <a href="#deliver">持续交付</a>
-            <a href="#expert">专家</a>
+            <a href="#deliver">交付</a>
+            <a href="#data">数据</a>
+            <a href="#pipeline">管道</a>
+            <a href="#continuous">持续交付</a>
+            <a href="#local">本地安全</a>
           </div>
         </div>
         <div className="site-cta">
-          <Link className="btn ghost" to="/app">打开应用</Link>
-          <Link className="btn primary" to="/app">下载客户端</Link>
+          <a className="btn primary" href={DOWNLOAD_URL} target="_blank" rel="noreferrer">下载客户端</a>
         </div>
       </nav>
 
-      {/* Hero（对应整体定位） */}
+      {/* Hero：主题特征物 = 输入 → 管道 → 交付物 的活体示意 */}
       <header className="site-hero">
-        <h1>工作新习惯，<em>先让 Ark 干</em></h1>
-        <p className="sub">
-          从汇报 PPT、数据表格，到深度调研、定时任务，统统交给 Ark。它把任务拆成步骤、
-          调用技能和工具一步步完成，最后交付能直接打开验收的文件。
-        </p>
-        <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-          <Link className="btn primary" to="/app" style={{ padding: "12px 24px", fontSize: 15 }}>免费下载</Link>
-          <Link className="btn ghost" to="/app" style={{ padding: "12px 24px", fontSize: 15 }}>打开演示</Link>
+        <div className="hero-copy">
+          <h1>把一句话需求，<br />做成能直接打开的<em>交付物</em></h1>
+          <p className="sub">
+            方舟是本地运行的 AI 交付工作台：说出需求，它拆成步骤、跑完管道，
+            交付 Excel、Word、PPT 等可编辑文件 —— 数据不出本机。
+          </p>
+          <div className="hero-cta">
+            <a className="btn primary lg" href={DOWNLOAD_URL} target="_blank" rel="noreferrer">下载客户端</a>
+            <a className="btn ghost lg" href="#pipeline">看它怎么交付</a>
+          </div>
+          <p className="hero-meta">Windows / macOS · 本地运行 · 多模型切换</p>
         </div>
-        <p style={{ marginTop: 20, fontSize: 13, color: "var(--text-3)" }}>数据不出本机 · 支持 macOS / Windows · 免费开源</p>
+
+        <div className="hero-pipe" aria-label="任务管道示意">
+          <div className="hp-in">
+            <span className="hp-label">需求</span>
+            <p>汇总各门店本月销售，出一份带透视的 Excel 报表</p>
+          </div>
+          <svg className="hp-flow" viewBox="0 0 120 8" aria-hidden="true">
+            <line className="flow-line" x1="0" y1="4" x2="120" y2="4" />
+          </svg>
+          <div className="hp-stages">
+            <div className="hp-stage done"><span className="st-ic"><IconCheck size={13} /></span>拆解任务</div>
+            <div className="hp-stage done"><span className="st-ic"><IconCheck size={13} /></span>读取数据</div>
+            <div className="hp-stage run"><span className="st-ic live-pulse"><IconSpark size={13} /></span>整编校验</div>
+            <div className="hp-stage wait"><span className="st-ic">4</span>生成文件</div>
+          </div>
+          <svg className="hp-flow" viewBox="0 0 120 8" aria-hidden="true">
+            <line className="flow-line" x1="0" y1="4" x2="120" y2="4" />
+          </svg>
+          <div className="hp-out">
+            <span className="hp-label">交付物</span>
+            <div className="hp-file"><span className="ftext" style={{ background: "var(--ft-xls)" }}>XLS</span>
+              <div><b>门店销售报表.xlsx</b><span>4 个工作表 · 原生公式</span></div>
+              <button className="btn ghost sm hp-dl" aria-label="下载"><IconDown size={12} /></button>
+            </div>
+          </div>
+        </div>
       </header>
 
-      {/* 图3 · 技能 */}
-      <section id="skills" className="site-section">
-        <h2 className="sec-title">丰富的技能，覆盖多种工作场景</h2>
-        <p className="sec-sub">从深度调研、竞品分析，到公众号推文、小红书卡片、数据可视化。一个 Markdown 文件就是一个技能，改完下一条任务就生效。</p>
-        <div className="site-grid cols-2">
-          {[
-            { k: "PPT 设计", d: "这份大纲做成 15 页项目路演 PPT，数据用表格。" },
-            { k: "Excel 报表", d: "汇总各门店销售数据，出一份带透视表的月度报表。" },
-            { k: "数据可视化", d: "读取这个 Excel，画出上线三个月以来的转化漏斗。" },
-            { k: "公众号推文", d: "把这篇周报改写成公众号推文，配好标题和排版。" },
-          ].map((s) => (
-            <div className="site-card" key={s.k}>
-              <div className="k"><span className="kic"><IconSpark /></span>{s.k}</div>
-              <p>{s.d}</p>
-              <span className="site-tag">复制提示词</span>
-            </div>
-          ))}
+      {/* 交付：Office 成果即文件 */}
+      <section id="deliver" className="site-section">
+        <h2 className="sec-title">交付的不是聊天记录，是文件</h2>
+        <p className="sec-sub">成果真实写入磁盘，交付即打开可编辑 —— 在 Word / Excel / PPT 里继续改，而不是截图粘贴。</p>
+        <div className="site-grid cols-3">
+          <div className="site-card">
+            <div className="k"><span className="kic"><IconXls /></span>Excel</div>
+            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>多工作表结构</div>
+            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>公式原生可编辑</div>
+            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>执行清单自动编号</div>
+          </div>
+          <div className="site-card">
+            <div className="k"><span className="kic"><IconDoc /></span>Word</div>
+            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>图文混排</div>
+            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>目录可更新</div>
+            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>按场景结构化</div>
+          </div>
+          <div className="site-card">
+            <div className="k"><span className="kic"><IconSlides /></span>PPT</div>
+            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>大纲转成页</div>
+            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>数据用表格</div>
+            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>版式自动排版</div>
+          </div>
         </div>
       </section>
 
-      {/* 图4 · 移动端远程指挥 */}
-      <section id="mobile" className="site-section site-white">
+      {/* 数据：文件与工作空间 */}
+      <section id="data" className="site-section site-alt">
         <div className="site-grid cols-2" style={{ alignItems: "center" }}>
           <div>
-            <h2 className="sec-title">不在电脑旁，也能远程派活</h2>
-            <p className="sec-sub">接入微信、飞书、QQ 或企业微信，外出时发一条消息就能指挥这台电脑，干完把文件推回聊天里。</p>
-            <div style={{ marginBottom: 20 }}>
-              {["微信 · 扫码即连 · 无需公网", "飞书 · 应用凭证 · 长连接", "QQ · 填入凭证即用", "企业微信 · 回调接入"].map((t) => (
+            <h2 className="sec-title">文件数据，落在自己的空间</h2>
+            <p className="sec-sub">
+              每一项任务的产出都归档进本机工作空间：按空间分组、按类型识别，
+              随取随下。工作空间就是一个普通文件夹 —— 你能用资源管理器打开它。
+            </p>
+            <div style={{ marginBottom: 6 }}>
+              {["空间分组", "类型识别", "交付物归档", "一键下载"].map((t) => (
                 <span className="site-tag" key={t}>{t}</span>
               ))}
             </div>
           </div>
-          <div className="site-phone">
-            <div style={{ marginBottom: 14, fontSize: 12, color: "var(--text-3)" }}>Ark 在线 · 本机执行中</div>
-            <div className="site-mentions">
-              <div className="site-msg u">把刚才那份周报的数据更新下，再发我一份</div>
-              <div className="site-msg a">已读取工作空间的周报文件，更新 3 处数据并重新生成图表。
-                <div className="att">📄 项目周报-更新版.docx</div>
-              </div>
-              <div className="site-msg a">另外按昨天的约定，9 点的晨报已经发到群里了。</div>
-              <div className="site-msg u">收到，晚上记得把官网落地页也改一版</div>
-              <div className="site-msg a">好的，任务已加入队列，完成后会推给你。</div>
-            </div>
+          <div className="site-card file-demo">
+            <div className="fd-row"><span className="ftext" style={{ background: "var(--ft-xls)" }}>XLS</span>
+              <b>门店销售报表.xlsx</b><span className="fd-m">128 KB · 今天</span></div>
+            <div className="fd-row"><span className="ftext" style={{ background: "var(--ft-doc)" }}>DOC</span>
+              <b>项目周报-更新版.docx</b><span className="fd-m">86 KB · 今天</span></div>
+            <div className="fd-row"><span className="ftext" style={{ background: "var(--ft-ppt)" }}>PPT</span>
+              <b>项目路演.pptx</b><span className="fd-m">2.4 MB · 昨天</span></div>
+            <div className="fd-row"><span className="ftext" style={{ background: "var(--ft-pdf)" }}>PDF</span>
+              <b>调研报告.pdf</b><span className="fd-m">1.1 MB · 昨天</span></div>
           </div>
         </div>
       </section>
 
-      {/* 图5 · 操作电脑（本地文件 + 内置浏览器） */}
-      <section id="local" className="site-section">
-        <h2 className="sec-title">操作电脑，完成复杂任务</h2>
-        <p className="sec-sub">Ark 可以读取、创建和修改电脑里的本地文件，自动打开网页、填写信息、完成跨页面操作。你的数据始终留在本机。</p>
+      {/* 管道：任务如何跑完 */}
+      <section id="pipeline" className="site-section">
+        <h2 className="sec-title">一条看得见的管道</h2>
+        <p className="sec-sub">
+          每个任务被拆成有序步骤：拆解 → 处理 → 校验 → 生成。哪一步在跑、
+          哪一步已完、交付物何时落盘，全程可见、可验收。
+        </p>
         <div className="site-grid cols-2">
           <div className="site-card">
-            <div className="k"><span className="kic"><IconFolder /></span>工作空间 · 本机文件夹</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>数据分析及可视化.xlsx · 已落盘</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>项目周报.docx · 任务_月日_标题 归档</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>架构图.png · 本机离线渲染</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>落地页.html · 本机起服务，手机扫码可看</div>
-            <p style={{ marginTop: 14 }}><b>数据不出本机</b> · 默认只监听 127.0.0.1，不主动外发。</p>
-          </div>
-          <div className="site-card">
-            <div className="k"><span className="kic"><IconLink /></span>内置浏览器 · 真渲染再读取</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>登录页自动填写表单</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>跨页面操作，动态页真渲染读取</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>能爬取登录后的数据</div>
-            <p style={{ marginTop: 14 }}>配合技能脚本，把复杂的网页操作固化、复用。</p>
-          </div>
-        </div>
-      </section>
-
-      {/* 图6 · 持续交付（Office + 调研 + 定时） */}
-      <section id="deliver" className="site-section site-white">
-        <h2 className="sec-title">从复杂任务，到持续交付</h2>
-        <p className="sec-sub">深入研究、生成专业工作成果，并让重复工作自动完成。</p>
-        <div className="site-grid cols-2">
-          <div className="site-card">
-            <div className="k"><span className="kic"><IconDoc /></span>Office 成果 · 交付即打开可编辑</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>PPT · 12 页 · 图表 6 处 · 已排版</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>Excel · 6 个 Sheet · 公式原生可编辑</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>Word · 图文混排 · 目录可更新</div>
-            <p style={{ marginTop: 14 }}>全部真实写入磁盘，可直接在 Word / Excel / PPT 中继续编辑。</p>
-          </div>
-          <div className="site-card">
-            <div className="k"><span className="kic"><IconSearch /></span>深入调研 · 带引用</div>
-            <p>检索多方信息来源，产出带引用的研究报告。</p>
-            <div className="k" style={{ marginTop: 18 }}><span className="kic"><IconClock /></span>定时任务 · 自动执行</div>
-            <p>按预设时间自动执行，把日报晨报推到 IM。</p>
-          </div>
-        </div>
-      </section>
-
-      {/* 图7 · 专家系统 */}
-      <section id="expert" className="site-section">
-        <h2 className="sec-title">专业技能，让复杂工作更简单</h2>
-        <p className="sec-sub">内置 12 位专家与技能库 —— 按专业流程拆解任务、逐项执行，交付的是能直接打开验收的成果，而不是聊天记录。</p>
-        <div className="site-grid cols-2">
-          <div className="site-card">
-            <div className="k">选一个专家，把任务交给它</div>
-            {["调研专家", "数据分析师", "写作专家", "设计专家"].map((e) => (
-              <div className="site-check" key={e}><span className="ch"><IconCheck size={15} /></span>{e}</div>
-            ))}
-            <p style={{ marginTop: 12 }}>＋ 创建专属专家（流程 + 验收清单 + 绑定技能）</p>
-          </div>
-          <div className="site-card">
-            <div className="k">调研专家 · 正在执行</div>
+            <div className="k">执行过程 · 逐步推进</div>
             <div className="site-steps">
-              {["问题拆解", "多源检索", "原文精读", "引用标注", "报告排版"].map((s, i) => (
-                <div className="site-step" key={s}>
-                  <span className="n">{i + 1}</span>{s}
+              {[
+                { t: "拆解任务", s: "done", d: "3 个阶段 · 11 个步骤" },
+                { t: "读取与整编", s: "done", d: "4 个数据源" },
+                { t: "生成文件", s: "run", d: "正在写入工作空间" },
+                { t: "验收", s: "wait", d: "3 项检查清单" },
+              ].map((s) => (
+                <div className={`site-step ${s.s}`} key={s.t}>
+                  <span className="n">{s.s === "done" ? <IconCheck size={12} /> : s.t}</span>
+                  <div><b>{s.t}</b><span>{s.d}</span></div>
                 </div>
               ))}
             </div>
           </div>
+          <div className="site-card">
+            <div className="k">验收清单 · 交付前自查</div>
+            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>结构符合场景模板</div>
+            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>数据项无缺失</div>
+            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>文件可在 Office 中打开</div>
+            <p style={{ marginTop: 14 }}>检查不过关，就不会标记为交付。</p>
+          </div>
         </div>
       </section>
 
-      {/* 结尾 CTA（图9） */}
-      <section className="site-cta-end">
-        <h2>把 Ark 引入你的日常办公</h2>
-        <p>本地运行、多模型自由切换，让每一项工作都更轻松。</p>
-        <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-          <Link className="btn primary" to="/app" style={{ padding: "12px 24px", fontSize: 15 }}>立即下载</Link>
-          <Link className="btn ghost" to="/app" style={{ padding: "12px 24px", fontSize: 15 }}>打开应用</Link>
+      {/* 持续交付：调研 + 定时 */}
+      <section id="continuous" className="site-section site-alt">
+        <h2 className="sec-title">从一次交付，到持续交付</h2>
+        <p className="sec-sub">重复的工作交给方舟自动完成：定期出报告，按点推送。</p>
+        <div className="site-grid cols-2">
+          <div className="site-card">
+            <div className="k"><span className="kic"><IconSearch /></span>深入调研 · 带引用</div>
+            <p>内置联网搜索与真渲染浏览器，检索多方来源、读取正文，产出带引用的报告 —— 搜到的资料自动归档进工作空间。</p>
+            <div className="site-check" style={{ marginTop: 12 }}><span className="ch"><IconLink size={15} /></span>引用可回源</div>
+            <div className="site-check"><span className="ch"><IconFolder size={15} /></span>资料即归档</div>
+          </div>
+          <div className="site-card">
+            <div className="k"><span className="kic"><IconClock /></span>定时任务 · 自动执行</div>
+            <p>按预设时间自动执行：晨报、周报、日报，到点产出文件。</p>
+            <div className="site-check" style={{ marginTop: 12 }}><span className="ch"><IconCheck size={15} /></span>计划可视化</div>
+            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>执行留痕</div>
+          </div>
         </div>
+      </section>
+
+      {/* 本地安全 */}
+      <section id="local" className="site-section">
+        <h2 className="sec-title">数据不出本机</h2>
+        <p className="sec-sub">方舟在你的电脑本地运行：工作空间是本机文件夹，默认只监听 127.0.0.1，不主动外发。模型可自由切换 —— 云端或本地，你决定。</p>
+        <div className="site-grid cols-3">
+          <div className="site-card"><div className="k">本地工作空间</div><p>文件就在你的磁盘上，资源管理器直接打开。</p></div>
+          <div className="site-card"><div className="k">只监听本机</div><p>默认 127.0.0.1，不主动外发任何数据。</p></div>
+          <div className="site-card"><div className="k">模型可切换</div><p>云端 API 或本地 Ollama，多渠道自由切换。</p></div>
+        </div>
+      </section>
+
+      {/* 结尾 CTA */}
+      <section className="site-cta-end">
+        <h2>把交付，交给方舟</h2>
+        <p>本地运行、数据自主，让每一项工作都有文件落地。</p>
+        <a className="btn primary lg" href={DOWNLOAD_URL} target="_blank" rel="noreferrer">下载客户端</a>
       </section>
 
       <footer className="site-foot">
-        <span>Ark · 方舟 — 免费开源 · 数据不出本机</span>
-        <span>支持 macOS（Apple Silicon / Intel）· Windows</span>
+        <span>Ark · 方舟 — 数据不出本机</span>
+        <span>Windows / macOS · 免费开源</span>
       </footer>
     </div>
   );
