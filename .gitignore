@@ -40,3 +40,4 @@ ark-app/
 # 内部文档（保存在本地，不推送到仓库）
 docs/
 apps/data/
+gui-test-screenshots/

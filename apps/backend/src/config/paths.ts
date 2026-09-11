@@ -18,9 +18,9 @@ function backendRoot(): string {
   }
   const entry = process.argv[1];
   if (entry) {
-    // 入口真实路径：apps/backend/dist/server.js（dev / node dist）或 bundle 文件
-    const here = dirname(resolve(entry));
-    return join(here, "..", ".."); // .../dist -> apps/backend
+    // 入口真实路径：.../apps/backend/dist/server.js（node dist）或 .../apps/backend/src/server.ts（tsx dev）
+    const here = dirname(resolve(entry)); // .../apps/backend/dist 或 .../apps/backend/src
+    return join(here, ".."); // 上取一层 → apps/backend（修正：原先 ../.. 会多跳一层到 apps）
   }
   return process.cwd();
 }

@@ -11,12 +11,12 @@ import { genOffice, detectKind, type StepContent } from "../tools/office";
 import { defaultTool } from "../tools/registry";
 import { runContentPipeline } from "./pipeline";
 import { verifyWithRetry } from "./verifier";
+import { workspaceRoot as workRoot } from "../config/paths";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** 工作空间根目录 */
-const workRoot = join(process.cwd(), "..", "frontend", "public", "workspace");
-mkdirSync(workRoot, { recursive: true });
+/** 工作空间根目录（统一取自 config/paths.ts，与 /api/workspace 读端一致）
+ *  workRoot 已在上方 import */
 
 /** 解析当前活动空间的交付目录（默认空间 dir 为空 → 根目录） */
 function resolveWorkDir(): string {

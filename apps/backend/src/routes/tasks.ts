@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { enqueueTask } from "../agent/runner.js";
-import { getTask, listTasks, deleteTask } from "../db/store.js";
+import { getTask, listTasks, deleteTask, insertTask } from "../db/store.js";
 import { subscribe } from "../agent/events.js";
 import { currentUser } from "./auth.js";
 
@@ -14,6 +14,18 @@ export async function taskRoutes(app: FastifyInstance) {
     }
     const id = randomUUID().slice(0, 8);
     const userId = currentUser(req)?.id; // 归属当前登录用户；未登录 → 全局
+    // 同步先落一条「排队中」任务行，避免前端立刻 GET /:id 撞 404 竞态
+    // （TA-1：原实现 POST 入队后立即返回，任务行要等后台真正开跑才有，详情页首次加载必然 404）
+    const created = new Date().toLocaleString("zh-CN", { hour12: false });
+    insertTask(
+      {
+        id, title: prompt.slice(0, 20), prompt, status: "queue", model: "内置计划器",
+        expert: "数据分析师", skills: ["文件生成"], workspace: "默认工作空间",
+        checks: [], timeline: [{ time: "00:00", label: "创建任务" }], created,
+        steps: [], artifacts: [], deliverable: null,
+      } as never,
+      userId,
+    );
     // 立即返回任务 id；编排入队后台串行执行（队列 + 失败兜底 + 超时，见 runner）
     enqueueTask(id, prompt, userId);
     return reply.code(201).send({ taskId: id });
