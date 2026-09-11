@@ -1,23 +1,39 @@
 import { useEffect, useState } from 'react'
-import { getCurrentWindow } from '@tauri-apps/api/window'
+import { getCurrentWindow, type Window } from '@tauri-apps/api/window'
 import { ArkLogo } from '../../frontend/src/components/icons'
+
+// 仅在 Tauri 宿主内可用 getCurrentWindow；纯浏览器预览（无 Tauri IPC）时返回 null，
+// 使同一套前端也能在浏览器里预览工作台（窗口控制自动 no-op，Tauri 内行为不变）。
+const isTauri = () =>
+  typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+
+const safeWindow = (): Window | null => {
+  if (!isTauri()) return null
+  try {
+    return getCurrentWindow()
+  } catch {
+    return null
+  }
+}
 
 // Custom title bar for the frameless window: drag region + app brand + min/max/close.
 export default function TitleBar() {
   const [maximized, setMaximized] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
 
-  useEffect(() => {
-    const win = getCurrentWindow()
-    const sync = () => win.isMaximized().then(setMaximized)
-    win.onResized(sync)
-    win.onMoved(sync)
-    sync()
-  }, [])
+  const win = safeWindow()
 
-  const win = getCurrentWindow()
+  useEffect(() => {
+    if (!win) return
+    const sync = () => win.isMaximized().then(setMaximized).catch(() => {})
+    const u1 = win.onResized(sync)
+    const u2 = win.onMoved(sync)
+    sync()
+    return () => { u1.then((u) => u()).catch(() => {}); u2.then((u) => u()).catch(() => {}) }
+  }, [win])
 
   const toggleMax = () => {
+    if (!win) return
     if (maximized) win.unmaximize()
     else win.maximize()
   }
@@ -39,7 +55,7 @@ export default function TitleBar() {
         <button
           className="tb-btn"
           aria-label="最小化"
-          onClick={() => win.minimize()}
+          onClick={() => win?.minimize()}
         >
           <svg width="10" height="10" viewBox="0 0 10 10"><path d="M0 5h10" stroke="currentColor" strokeWidth="1.1" /></svg>
         </button>
@@ -57,7 +73,7 @@ export default function TitleBar() {
         <button
           className="tb-btn tb-close"
           aria-label="关闭"
-          onClick={() => win.close()}
+          onClick={() => win?.close()}
         >
           <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" strokeWidth="1.1" /></svg>
         </button>
