@@ -13,15 +13,15 @@
 }
 .sb.collapsed { width: 0; padding-left: 0; padding-right: 0; }
 
-/* 侧栏头部：左上 ARK·方舟 品牌(+版本行) + 右侧收起按钮 */
+/* 侧栏头部：左上 Gridwright 品牌(+版本行) + 右侧收起按钮 */
 .sb-head {
   display: flex; align-items: flex-start; justify-content: space-between;
   padding: 2px 1px 10px 2px;
 }
 .brandl { display: flex; flex-direction: column; align-items: flex-start; user-select: none; min-width: 0; }
-.brandrow { display: inline-flex; align-items: center; gap: 7px; color: var(--text-1); }
+.brandrow { display: inline-flex; align-items: center; gap: 8px; color: var(--text-1); }
 .brandrow svg { display: block; margin-top: 1px; }
-.brand-name { font-size: 14px; font-weight: 700; letter-spacing: 0.12em; margin-top: 1px; }
+.brand-name { font-size: 15.5px; font-weight: var(--fw-title); letter-spacing: -0.2px; margin-top: 1px; }
 .brand-ver { font-size: 10px; color: var(--text-3); letter-spacing: 0.02em; margin-top: 1px; }
 .sb-collapse {
   width: 26px; height: 26px; border-radius: var(--radius-sm); display: grid; place-items: center;

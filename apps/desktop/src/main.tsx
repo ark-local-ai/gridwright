@@ -39,7 +39,7 @@ function BackendGate() {
   return (
     <div className="desktop-root">
       <div className="be-rec-panel">
-        <div className="be-rec-logo">方舟</div>
+        <div className="be-rec-logo">gridwright</div>
         <h1>本地后端未运行</h1>
         <p>桌面版需要一个本地后端服务（127.0.0.1:4000）来读写你的数据。</p>
         <p className="be-rec-cmd">请先启动后端：<code>node apps/backend/dist/server.js</code></p>

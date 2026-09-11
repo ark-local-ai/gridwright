@@ -5,7 +5,7 @@ import { sendChat, type ChatMsg } from "../api";
 interface Msg { role: "user" | "ai"; text: string }
 
 const INITIAL: Msg[] = [
-  { role: "ai", text: "你好，我是方舟助理。我可以帮你做调研、写文档、做 PPT、分析数据等。告诉我你想做什么？" },
+  { role: "ai", text: "你好，我是 Gridwright。我可以帮你做调研、写文档、做 PPT、分析数据等。告诉我你想做什么？" },
 ];
 
 export default function Chat() {

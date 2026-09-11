@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getCurrentWindow, type Window } from '@tauri-apps/api/window'
-import { ArkLogo } from '../../frontend/src/components/icons'
+import { GridwrightLogo } from '../../frontend/src/components/icons'
 
 // 仅在 Tauri 宿主内可用 getCurrentWindow；纯浏览器预览（无 Tauri IPC）时返回 null，
 // 使同一套前端也能在浏览器里预览工作台（窗口控制自动 no-op，Tauri 内行为不变）。
@@ -43,12 +43,11 @@ export default function TitleBar() {
       <button
         className="tb-brand"
         data-tauri-drag-region
-        aria-label="关于 Ark · 方舟"
-        title="关于 Ark · 方舟"
+        aria-label="关于 gridwright"
+        title="关于 gridwright"
         onClick={() => setAboutOpen(true)}
       >
-        <ArkLogo h={13} />
-        <span className="tb-title" data-tauri-drag-region>Ark · 方舟</span>
+        <span className="tb-title" data-tauri-drag-region><GridwrightLogo h={14} /></span>
       </button>
 
       <div className="tb-controls">
@@ -82,16 +81,13 @@ export default function TitleBar() {
       {aboutOpen && (
         <>
           <div className="tb-overlay" onClick={() => setAboutOpen(false)} />
-          <div className="tb-about card" role="dialog" aria-label="关于 Ark · 方舟">
+          <div className="tb-about card" role="dialog" aria-label="关于 gridwright">
             <div className="tb-about-head">
-              <ArkLogo h={30} thin />
-              <div>
-                <b>Ark · 方舟</b>
-                <span>v0.1.0</span>
-              </div>
+              <GridwrightLogo h={28} thin />
+              <span>v0.1.0</span>
             </div>
             <p>本地运行的 AI 交付工作台 —— 把一句话需求，做成能直接打开、可编辑的交付物，数据不出本机。</p>
-            <p className="tb-about-meta">方舟承载你的工作与数据，安全独立、自主可控、成果归你。</p>
+            <p className="tb-about-meta">gridwright 承载你的工作与数据，安全独立、自主可控、成果归你。</p>
             <button className="btn ghost sm" onClick={() => setAboutOpen(false)}>关闭</button>
           </div>
         </>

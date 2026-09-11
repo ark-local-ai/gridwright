@@ -272,36 +272,26 @@ export const IconShare = (p: P) => (
   </svg>
 );
 
-/* ---------- ARK 线条 Logo（裸线条字标 · 可作水印） ---------- */
-export const ArkLogo = ({ h = 18, thin = false, className }: { h?: number; thin?: boolean; className?: string }) => (
-  <svg
-    viewBox="0 0 106 52"
-    height={h}
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={thin ? 1.2 : 3.4}
-    strokeLinecap="round"
-    strokeLinejoin="round"
+/* ---------- Gridwright 字标 Logo（纯文字 wordmark · 可作水印） ----------
+   小写 "gridwright"，强字重 + 紧字距，纯 currentColor，任意背景自适应。
+   h = 字号（px）。thin 用于大水印 / 关于面板（字重略降、字距略松）。 */
+export const GridwrightLogo = ({ h = 16, thin = false, className }: { h?: number; thin?: boolean; className?: string }) => (
+  <span
+    className={className ? `gw-logo ${className}` : "gw-logo"}
+    style={{
+      fontSize: h,
+      lineHeight: 1,
+      fontWeight: thin ? 600 : 700,
+      letterSpacing: thin ? "-0.02em" : "-0.04em",
+      color: "currentColor",
+      whiteSpace: "nowrap",
+      userSelect: "none",
+      display: "inline-block",
+      fontFamily: "var(--font)",
+    }}
     role="img"
-    aria-label="ARK"
+    aria-label="gridwright"
   >
-    {/* A */}
-    <path d="M4 40 18 4l14 36" />
-    <path d="M10.5 27h15" />
-    {/* R */}
-    <path d="M42 40V4h16a9 9 0 0 1 0 18H42" />
-    <path d="M55 22l13 18" />
-    {/* K */}
-    <path d="M78 4v36" />
-    <path d="M101 4 84 21l17 19" />
-    {/* 白色波浪线从字母正中穿过（击穿 ARK */}
-    <path
-      d="M4 31.5q6.4-5.5 12.8 0t12.8 0t12.8 0t12.8 0t12.8 0t12.8 0t12.8 0t12.8 0"
-      stroke="#ffffff"
-      strokeWidth={thin ? 1.2 : 2.6}
-      fill="none"
-      strokeLinecap="round"
-    />
-  </svg>
+    gridwright
+  </span>
 );

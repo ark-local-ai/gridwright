@@ -48,7 +48,7 @@ export default function AuthModal({ open, me, hasUsers, onClose, onChanged }: Pr
     <>
       <div className="sb-overlay" style={{ zIndex: 120 }} onClick={onClose} />
       <div className="auth-modal">
-        <div className="auth-brand" style={{ fontWeight: 700, fontSize: 15, marginBottom: 2 }}>Ark · 方舟</div>
+        <div className="auth-brand" style={{ fontWeight: 700, fontSize: 15, marginBottom: 2 }}>Gridwright</div>
         <div className="auth-sub" style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 14 }}>
           {mode === "login" ? "登录你的本地工作区" : "创建一个本地账号"}
         </div>

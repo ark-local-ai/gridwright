@@ -1,6 +1,6 @@
 import "./site.css";
 import {
-  ArkLogo, IconCheck, IconClock, IconDoc, IconDown, IconFolder,
+  GridwrightLogo, IconCheck, IconClock, IconDoc, IconDown, IconFolder,
   IconLink, IconSearch, IconSpark, IconSlides, IconXls,
 } from "../components/icons";
 
@@ -13,7 +13,9 @@ export default function Site() {
       {/* 顶部导航 */}
       <nav className="site-nav">
         <div className="left">
-          <div className="site-logo"><ArkLogo h={16} /></div>
+          <div className="site-logo">
+            <GridwrightLogo h={21} />
+          </div>
           <div className="site-menu">
             <a href="#deliver">交付</a>
             <a href="#data">数据</a>
@@ -32,7 +34,7 @@ export default function Site() {
         <div className="hero-copy">
           <h1>把一句话需求，<br />做成能直接打开的<em>交付物</em></h1>
           <p className="sub">
-            方舟是本地运行的 AI 交付工作台：说出需求，它拆成步骤、跑完管道，
+            Gridwright 是本地运行的 AI 交付工作台：说出需求，它拆成步骤、跑完管道，
             交付 Excel、Word、PPT 等可编辑文件 —— 数据不出本机。
           </p>
           <div className="hero-cta">
@@ -160,7 +162,7 @@ export default function Site() {
       {/* 持续交付：调研 + 定时 */}
       <section id="continuous" className="site-section site-alt">
         <h2 className="sec-title">从一次交付，到持续交付</h2>
-        <p className="sec-sub">重复的工作交给方舟自动完成：定期出报告，按点推送。</p>
+        <p className="sec-sub">重复的工作交给 Gridwright 自动完成：定期出报告，按点推送。</p>
         <div className="site-grid cols-2">
           <div className="site-card">
             <div className="k"><span className="kic"><IconSearch /></span>深入调研 · 带引用</div>
@@ -180,7 +182,7 @@ export default function Site() {
       {/* 本地安全 */}
       <section id="local" className="site-section">
         <h2 className="sec-title">数据不出本机</h2>
-        <p className="sec-sub">方舟在你的电脑本地运行：工作空间是本机文件夹，默认只监听 127.0.0.1，不主动外发。模型可自由切换 —— 云端或本地，你决定。</p>
+        <p className="sec-sub">Gridwright 在你的电脑本地运行：工作空间是本机文件夹，默认只监听 127.0.0.1，不主动外发。模型可自由切换 —— 云端或本地，你决定。</p>
         <div className="site-grid cols-3">
           <div className="site-card"><div className="k">本地工作空间</div><p>文件就在你的磁盘上，资源管理器直接打开。</p></div>
           <div className="site-card"><div className="k">只监听本机</div><p>默认 127.0.0.1，不主动外发任何数据。</p></div>
@@ -190,13 +192,13 @@ export default function Site() {
 
       {/* 结尾 CTA */}
       <section className="site-cta-end">
-        <h2>把交付，交给方舟</h2>
+        <h2>把交付，交给 Gridwright</h2>
         <p>本地运行、数据自主，让每一项工作都有文件落地。</p>
         <a className="btn primary lg" href={DOWNLOAD_URL} target="_blank" rel="noreferrer">下载客户端</a>
       </section>
 
       <footer className="site-foot">
-        <span>Ark · 方舟 — 数据不出本机</span>
+        <span>Gridwright — 数据不出本机</span>
         <span>Windows / macOS · 免费开源</span>
       </footer>
     </div>

@@ -1,11 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 106 52" fill="none">
-  <!-- ARK 裸线条字标（浏览器标签页图标） -->
-  <g stroke="#2b2820" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M4 40 18 4l14 36" />
-    <path d="M10.5 27h15" />
-    <path d="M42 40V4h16a9 9 0 0 1 0 18H42" />
-    <path d="M55 22l13 18" />
-    <path d="M78 4v36" />
-    <path d="M101 4 84 21l17 19" />
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 38">
+  <!-- gridwright 字标（浏览器标签页图标），品牌钢蓝，重字重 + 紧字距 -->
+  <text x="2" y="30" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+        font-size="30" font-weight="700" letter-spacing="-1"
+        fill="#3d5a80">gridwright</text>
 </svg>

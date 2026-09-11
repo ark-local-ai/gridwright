@@ -1,5 +1,5 @@
 /* =====================================================================
-   Ark · 方舟 桌面壳
+   gridwright 桌面壳
    仅做两件事：自绘标题栏样式 + 把工作台高度降出标题栏。
    颜色全部复用 frontend/src/index.css 的设计令牌。
    ===================================================================== */
@@ -131,9 +131,9 @@
   background: var(--bg);
 }
 .be-rec-logo {
-  font-size: 40px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-size: 30px;
+  font-weight: var(--fw-title);
+  letter-spacing: -0.4px;
   color: var(--brand);
   margin-bottom: 6px;
 }

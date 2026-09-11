@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  ArkLogo, IconArrowUp, IconChevD, IconFolder,
+  GridwrightLogo, IconArrowUp, IconChevD, IconFolder,
   IconLibrary, IconSpark, IconPlus, IconX,
 } from "../components/icons";
 import { scenarios as mockScenarios } from "../data/mock";
@@ -43,8 +43,8 @@ export default function Home() {
   return (
     <div className="page">
       <div className="home">
-        {/* ARK 线条水印（替代原 A 图标） */}
-        <div className="home-mark"><ArkLogo h={86} thin /></div>
+        {/* gridwright 字标水印（替代原 A 图标） */}
+        <div className="home-mark"><GridwrightLogo h={34} thin /></div>
         <h2>今天帮你做些什么？</h2>
         <p className="sub">说出需求，专家团队自主规划，在本地工作空间交付可验收的成果</p>
 

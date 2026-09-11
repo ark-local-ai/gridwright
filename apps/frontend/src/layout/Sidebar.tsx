@@ -4,7 +4,7 @@ import {
   IconAssistant, IconChevD, IconChevD2, IconChevU2, IconClock, IconDoc,
   IconFolder, IconFolderOpen, IconGear, IconLink, IconNote, IconSearch,
   IconShare, IconRename, IconDots, IconSpark, IconTable, IconTrash, IconUsers,
-  ArkLogo, IconCollapse,
+  GridwrightLogo, IconCollapse,
 } from "../components/icons";
 import { recentTasks as mockRecentTasks } from "../data/mock";
 import { listTasks, deleteTask, retryTask, listSpaces, createSpace, setActiveSpace, deleteSpace, getAuthStatus, type SpaceDto, type AuthUser } from "../api";
@@ -143,12 +143,11 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
     <aside className={`sb${collapsed ? " collapsed" : ""}`}>
       {!collapsed && (
         <>
-          {/* 侧栏头部：左上 ARK·方舟 品牌 + 右侧收起按钮 */}
+          {/* 侧栏头部：左上 Gridwright 品牌 + 右侧收起按钮 */}
           <div className="sb-head">
             <div className="brandl">
               <div className="brandrow">
-                <ArkLogo h={15} />
-                <span className="brand-name">方舟</span>
+                <GridwrightLogo h={19} />
               </div>
               <span className="brand-ver">交付工作台 · v0.1.0</span>
             </div>
@@ -296,7 +295,7 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
                   <button className="sb-menu-item" onClick={() => { setMenuOpen(false); nav("/app/settings"); }}>
                     <IconGear size={14} /> 设置
                   </button>
-                  <div className="sb-menu-meta">Ark v0.1.0 · 本地运行 · 数据不出本机</div>
+                  <div className="sb-menu-meta">Gridwright v0.1.0 · 本地运行 · 数据不出本机</div>
                 </div>
               </>
             )}
