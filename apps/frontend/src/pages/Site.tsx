@@ -1,25 +1,27 @@
 import { useState } from "react";
 import "./site.css";
 import {
-  GridwrightLogo, IconCheck, IconClock, IconDoc, IconDown, IconFolder,
-  IconLink, IconSearch, IconSpark, IconSlides, IconXls,
+  GridwrightLogo, IconCheck, IconFolder,
+  IconLink, IconNote, IconRefresh, IconShield, IconTable, IconXls,
 } from "../components/icons";
 
 /* 下载发布页 */
 const RELEASES = "https://github.com/ark-local-ai/ark/releases";
+const DL = `${RELEASES}/download/v0.1.0`;
 
-/* 按系统版本提供不同构建（Go 单文件 exe，放到办公机即可运行，无需安装）。
-   每个 OS 一个独立 release asset，选哪个下哪个。 */
-type DownloadOS = { os: string; label: string; file: string; url: string };
+/* 按系统版本提供不同构建：
+   Win10/11 = 完整客户端（Tauri 图形界面，全功能）；
+   Win7/8   = 单文件版（无 WebView2，跑 Go 内核，盯表/改表/记账/通知）。 */
+type DownloadOS = { os: string; label: string; kind: string; note: string; file: string; url: string };
 const DOWNLOADS: DownloadOS[] = [
-  { os: "win7",  label: "Windows 7",     file: "gridwright-win7.exe",  url: `${RELEASES}/download/v0.1.0/gridwright-win7.exe` },
-  { os: "win8",  label: "Windows 8 / 8.1", file: "gridwright-win8.exe",  url: `${RELEASES}/download/v0.1.0/gridwright-win8.exe` },
-  { os: "win10", label: "Windows 10 / 11", file: "gridwright-win10.exe", url: `${RELEASES}/download/v0.1.0/gridwright-win10.exe` },
+  { os: "win10", label: "Windows 10 / 11", kind: "完整客户端", note: "图形界面 · 全功能", file: "gridwright-setup-x64.exe", url: `${DL}/gridwright-setup-x64.exe` },
+  { os: "win7",  label: "Windows 7",        kind: "单文件版",   note: "老机器 · 无界面依赖", file: "gridwright-win7.exe",  url: `${DL}/gridwright-win7.exe` },
+  { os: "win8",  label: "Windows 8 / 8.1",  kind: "单文件版",   note: "老机器 · 无界面依赖", file: "gridwright-win8.exe",  url: `${DL}/gridwright-win8.exe` },
 ];
 
 export default function Site() {
   const [os, setOs] = useState("win10");
-  const sel = DOWNLOADS.find((d) => d.os === os) ?? DOWNLOADS[2];
+  const sel = DOWNLOADS.find((d) => d.os === os) ?? DOWNLOADS[0];
 
   return (
     <div className="site">
@@ -30,184 +32,152 @@ export default function Site() {
             <GridwrightLogo h={21} />
           </div>
           <div className="site-menu">
-            <a href="#deliver">交付</a>
-            <a href="#data">数据</a>
-            <a href="#pipeline">管道</a>
-            <a href="#continuous">持续交付</a>
-            <a href="#local">本地安全</a>
+            <a href="#watch">盯表</a>
+            <a href="#rules">规则</a>
+            <a href="#ledger">账目</a>
+            <a href="#legacy">老机器</a>
             <a href="#download">下载</a>
           </div>
         </div>
         <div className="site-cta">
-          <a className="btn primary" href="#download">下载客户端</a>
+          <a className="btn primary" href="#download">下载</a>
         </div>
       </nav>
 
-      {/* Hero：主题特征物 = 输入 → 管道 → 交付物 的活体示意 */}
+      {/* Hero：主题特征物 = 新数据 → 决策 → 改表 → 记账/通知 的活体示意 */}
       <header className="site-hero">
         <div className="hero-copy">
-          <h1>把一句话需求，<br />做成能直接打开的<em>交付物</em></h1>
+          <h1>你的表，<br />有人替你<em>看着</em></h1>
           <p className="sub">
-            Gridwright 是本地运行的 AI 交付工作台：说出需求，它拆成步骤、跑完管道，
-            交付 Excel、Word、PPT 等可编辑文件 —— 数据不出本机。
+            Gridwright 是跑在办公机上的数据管家：新数据一进 inbox，它按你定的规矩
+            自动改表 —— 每一格改动都留账目、能回滚、改完就通知你。
           </p>
           <div className="hero-cta">
-            <a className="btn primary lg" href="#download">下载客户端</a>
-            <a className="btn ghost lg" href="#pipeline">看它怎么交付</a>
+            <a className="btn primary lg" href="#download">下载 Gridwright</a>
+            <a className="btn ghost lg" href="#watch">看它怎么守表</a>
           </div>
-          <p className="hero-meta">Windows 7 / 8 / 10 · 单文件免安装 · 数据不出本机</p>
+          <p className="hero-meta">Windows 7 / 8 / 10 · 单文件免安装 · 规矩你定、账你看得见</p>
         </div>
 
-        <div className="hero-pipe" aria-label="任务管道示意">
+        <div className="hero-pipe" aria-label="数据管家运行示意">
           <div className="hp-in">
-            <span className="hp-label">需求</span>
-            <p>汇总各门店本月销售，出一份带透视的 Excel 报表</p>
+            <span className="hp-label">新数据</span>
+            <p>报价单 quote.csv 丢进 inbox</p>
           </div>
           <svg className="hp-flow" viewBox="0 0 120 8" aria-hidden="true">
             <line className="flow-line" x1="0" y1="4" x2="120" y2="4" />
           </svg>
           <div className="hp-stages">
-            <div className="hp-stage done"><span className="st-ic"><IconCheck size={13} /></span>拆解任务</div>
-            <div className="hp-stage done"><span className="st-ic"><IconCheck size={13} /></span>读取数据</div>
-            <div className="hp-stage run"><span className="st-ic live-pulse"><IconSpark size={13} /></span>整编校验</div>
-            <div className="hp-stage wait"><span className="st-ic">4</span>生成文件</div>
+            <div className="hp-stage done"><span className="st-ic"><IconCheck size={13} /></span>读懂数据</div>
+            <div className="hp-stage done"><span className="st-ic"><IconCheck size={13} /></span>按规矩改表</div>
+            <div className="hp-stage run"><span className="st-ic live-pulse"><IconRefresh size={13} /></span>记账留痕</div>
+            <div className="hp-stage wait"><span className="st-ic">4</span>微信通知</div>
           </div>
           <svg className="hp-flow" viewBox="0 0 120 8" aria-hidden="true">
             <line className="flow-line" x1="0" y1="4" x2="120" y2="4" />
           </svg>
           <div className="hp-out">
-            <span className="hp-label">交付物</span>
+            <span className="hp-label">结果</span>
             <div className="hp-file"><span className="ftext" style={{ background: "var(--ft-xls)" }}>XLS</span>
-              <div><b>门店销售报表.xlsx</b><span>4 个工作表 · 原生公式</span></div>
-              <button className="btn ghost sm hp-dl" aria-label="下载"><IconDown size={12} /></button>
+              <div><b>销售.xlsx 已更新</b><span>价格 ×1 · 新增 ×1 · 账目 +1 行</span></div>
             </div>
+            <div className="hp-ledger"><IconNote size={12} /><code>2026-09-11 10:32 · 销售 · A12 · 320→455 · 报价#14 · ok</code></div>
           </div>
         </div>
       </header>
 
-      {/* 交付：Office 成果即文件 */}
-      <section id="deliver" className="site-section">
-        <h2 className="sec-title">交付的不是聊天记录，是文件</h2>
-        <p className="sec-sub">成果真实写入磁盘，交付即打开可编辑 —— 在 Word / Excel / PPT 里继续改，而不是截图粘贴。</p>
+      {/* 盯表：新数据进来，它自己会动 */}
+      <section id="watch" className="site-section">
+        <h2 className="sec-title">新数据进来，它自己会动</h2>
+        <p className="sec-sub">
+          不用盯着。把新表、新数据丢进工作区的 inbox，Gridwright 自己接住：
+          读懂表头和新数据，交给"脑"决定怎么改，改完写回 Excel。
+        </p>
         <div className="site-grid cols-3">
           <div className="site-card">
-            <div className="k"><span className="kic"><IconXls /></span>Excel</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>多工作表结构</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>公式原生可编辑</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>执行清单自动编号</div>
+            <div className="k"><span className="kic"><IconFolder /></span>盯住一个文件夹</div>
+            <p>工作区就是一个普通文件夹。新数据进 inbox、处理后自动归档到 done，资源管理器随时能看。</p>
           </div>
           <div className="site-card">
-            <div className="k"><span className="kic"><IconDoc /></span>Word</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>图文混排</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>目录可更新</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>按场景结构化</div>
+            <div className="k"><span className="kic"><IconTable /></span>读懂你的表</div>
+            <p>表头每次实时读，不缓存——你怎么改列它都跟得上。新数据该进哪张表，它自己分诊。</p>
           </div>
           <div className="site-card">
-            <div className="k"><span className="kic"><IconSlides /></span>PPT</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>大纲转成页</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>数据用表格</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>版式自动排版</div>
+            <div className="k"><span className="kic"><IconXls /></span>改完就落盘</div>
+            <p>原生 Excel 公式可继续编辑，不是截图粘贴。目标表正被 Excel 打开时自动跳过、等下次。</p>
           </div>
         </div>
       </section>
 
-      {/* 数据：文件与工作空间 */}
-      <section id="data" className="site-section site-alt">
-        <div className="site-grid cols-2" style={{ alignItems: "center" }}>
-          <div>
-            <h2 className="sec-title">文件数据，落在自己的空间</h2>
-            <p className="sec-sub">
-              每一项任务的产出都归档进本机工作空间：按空间分组、按类型识别，
-              随取随下。工作空间就是一个普通文件夹 —— 你能用资源管理器打开它。
-            </p>
-            <div style={{ marginBottom: 6 }}>
-              {["空间分组", "类型识别", "交付物归档", "一键下载"].map((t) => (
-                <span className="site-tag" key={t}>{t}</span>
-              ))}
-            </div>
-          </div>
-          <div className="site-card file-demo">
-            <div className="fd-row"><span className="ftext" style={{ background: "var(--ft-xls)" }}>XLS</span>
-              <b>门店销售报表.xlsx</b><span className="fd-m">128 KB · 今天</span></div>
-            <div className="fd-row"><span className="ftext" style={{ background: "var(--ft-doc)" }}>DOC</span>
-              <b>项目周报-更新版.docx</b><span className="fd-m">86 KB · 今天</span></div>
-            <div className="fd-row"><span className="ftext" style={{ background: "var(--ft-ppt)" }}>PPT</span>
-              <b>项目路演.pptx</b><span className="fd-m">2.4 MB · 昨天</span></div>
-            <div className="fd-row"><span className="ftext" style={{ background: "var(--ft-pdf)" }}>PDF</span>
-              <b>调研报告.pdf</b><span className="fd-m">1.1 MB · 昨天</span></div>
-          </div>
-        </div>
-      </section>
-
-      {/* 管道：任务如何跑完 */}
-      <section id="pipeline" className="site-section">
-        <h2 className="sec-title">一条看得见的管道</h2>
+      {/* 规则：规矩你定，它不敢越线 */}
+      <section id="rules" className="site-section site-alt">
+        <h2 className="sec-title">规矩你定，它不敢越线</h2>
         <p className="sec-sub">
-          每个任务被拆成有序步骤：拆解 → 处理 → 校验 → 生成。哪一步在跑、
-          哪一步已完、交付物何时落盘，全程可见、可验收。
+          怎么改，是规则说了算，不是模型拍脑袋。规则是个人能读懂的 yaml，记事本就能改。
         </p>
         <div className="site-grid cols-2">
           <div className="site-card">
-            <div className="k">执行过程 · 逐步推进</div>
-            <div className="site-steps">
-              {[
-                { t: "拆解任务", s: "done", d: "3 个阶段 · 11 个步骤" },
-                { t: "读取与整编", s: "done", d: "4 个数据源" },
-                { t: "生成文件", s: "run", d: "正在写入工作空间" },
-                { t: "验收", s: "wait", d: "3 项检查清单" },
-              ].map((s) => (
-                <div className={`site-step ${s.s}`} key={s.t}>
-                  <span className="n">{s.s === "done" ? <IconCheck size={12} /> : s.t}</span>
-                  <div><b>{s.t}</b><span>{s.d}</span></div>
-                </div>
-              ))}
-            </div>
+            <div className="k"><span className="kic"><IconShield /></span>禁止列 = 硬护栏</div>
+            <p>
+              <code>forbid</code> 里写死的列——成本、结算日期——连大模型都动不了。
+              它真想改，也会被拦下、单独记账成"已跳过"，而不是偷偷改。
+            </p>
+            <div className="site-check" style={{ marginTop: 12 }}><span className="ch"><IconCheck size={15} /></span>越界的改动，看得见</div>
           </div>
           <div className="site-card">
-            <div className="k">验收清单 · 交付前自查</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>结构符合场景模板</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>数据项无缺失</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>文件可在 Office 中打开</div>
-            <p style={{ marginTop: 14 }}>检查不过关，就不会标记为交付。</p>
+            <div className="k"><span className="kic"><IconNote /></span>样板化 = 花得起的算力</div>
+            <p>
+              规则命中就短路：固定列映射这种简单改法直接执行，不花 token。
+              只有真正需要"理解"的部分才交给脑——发送量恒定，不随次数膨胀。
+            </p>
+            <div className="site-check" style={{ marginTop: 12 }}><span className="ch"><IconCheck size={15} /></span>人看得懂、可版本化</div>
           </div>
         </div>
       </section>
 
-      {/* 持续交付：调研 + 定时 */}
-      <section id="continuous" className="site-section site-alt">
-        <h2 className="sec-title">从一次交付，到持续交付</h2>
-        <p className="sec-sub">重复的工作交给 Gridwright 自动完成：定期出报告，按点推送。</p>
+      {/* 账目：每一格改动，都留有账 */}
+      <section id="ledger" className="site-section">
+        <h2 className="sec-title">每一格改动，都留有账</h2>
+        <p className="sec-sub">
+          不是"改完了"三个字就完事。ledger 是 append-only 的流水，每一格一条，
+          旧值留着——改错了能回滚，审计时翻得出。
+        </p>
         <div className="site-grid cols-2">
           <div className="site-card">
-            <div className="k"><span className="kic"><IconSearch /></span>深入调研 · 带引用</div>
-            <p>内置联网搜索与真渲染浏览器，检索多方来源、读取正文，产出带引用的报告 —— 搜到的资料自动归档进工作空间。</p>
-            <div className="site-check" style={{ marginTop: 12 }}><span className="ch"><IconLink size={15} /></span>引用可回源</div>
-            <div className="site-check"><span className="ch"><IconFolder size={15} /></span>资料即归档</div>
+            <div className="k"><span className="kic"><IconRefresh /></span>可回滚</div>
+            <p>
+              账目记着每格的旧值。哪一次改坏了，按账目逆向执行就能还原——
+              这是"过程样板化"的底气：每一步都有据可查。
+            </p>
           </div>
           <div className="site-card">
-            <div className="k"><span className="kic"><IconClock /></span>定时任务 · 自动执行</div>
-            <p>按预设时间自动执行：晨报、周报、日报，到点产出文件。</p>
-            <div className="site-check" style={{ marginTop: 12 }}><span className="ch"><IconCheck size={15} /></span>计划可视化</div>
-            <div className="site-check"><span className="ch"><IconCheck size={15} /></span>执行留痕</div>
+            <div className="k"><span className="kic"><IconLink /></span>改完就通知</div>
+            <p>
+              改完表 30 秒内，微信推一条：哪张表、改了几处、跳过了几处。
+              被拒的改动必须报出来，不装没发生。
+            </p>
           </div>
         </div>
       </section>
 
-      {/* 本地安全 */}
-      <section id="local" className="site-section">
-        <h2 className="sec-title">数据不出本机</h2>
-        <p className="sec-sub">Gridwright 在你的电脑本地运行：工作空间是本机文件夹，默认只监听 127.0.0.1，不主动外发。模型可自由切换 —— 云端或本地，你决定。</p>
+      {/* 老机器 + 脑手分离 */}
+      <section id="legacy" className="site-section site-alt">
+        <h2 className="sec-title">老机器也能跑，脑可以换</h2>
+        <p className="sec-sub">
+          手脑分离：办公机只当"手"，"脑"放云端（OpenAI 兼容接口，换模型只改一个 baseUrl，
+          将来想换本地也照样接）。发什么给脑你看得见——表结构、新数据、账目、规则，表本体不打包上传。
+        </p>
         <div className="site-grid cols-3">
-          <div className="site-card"><div className="k">本地工作空间</div><p>文件就在你的磁盘上，资源管理器直接打开。</p></div>
-          <div className="site-card"><div className="k">只监听本机</div><p>默认 127.0.0.1，不主动外发任何数据。</p></div>
-          <div className="site-card"><div className="k">模型可切换</div><p>云端 API 或本地 Ollama，多渠道自由切换。</p></div>
+          <div className="site-card"><div className="k">Win7 / 8 单文件版</div><p>老机器没有 WebView2，跑 Go 内核的单文件程序，盯表、改表、记账、通知一样不少。</p></div>
+          <div className="site-card"><div className="k">Win10 / 11 完整客户端</div><p>新机器用图形界面完整客户端，账目流水、运行状态、开关一屏看全。</p></div>
+          <div className="site-card"><div className="k">脑是替换件</div><p>默认云端 API；接口统一，换本地模型只改配置。手永远在本机。</p></div>
         </div>
       </section>
 
       {/* 下载：按系统版本选构建 */}
       <section id="download" className="site-cta-end">
-        <h2>把交付，交给 Gridwright</h2>
-        <p>单文件可执行程序，拷进办公机就能用，无需安装。选你的系统版本：</p>
+        <h2>把看表的活，交给 Gridwright</h2>
+        <p>选你的系统版本。Win10/11 推荐完整客户端（图形界面）；Win7/8 用单文件版（老机器无界面依赖）。</p>
         <div className="dl-picker" role="group" aria-label="选择系统版本">
           {DOWNLOADS.map((d) => (
             <button
@@ -222,13 +192,13 @@ export default function Site() {
           ))}
         </div>
         <a className="btn primary lg dl-btn" href={sel.url} target="_blank" rel="noreferrer">
-          下载 {sel.file}
+          下载 {sel.kind} · {sel.file}
         </a>
-        <p className="dl-meta">单文件 · 无依赖 · 数据不出本机 <a href={RELEASES} target="_blank" rel="noreferrer">查看全部版本</a></p>
+        <p className="dl-meta">{sel.note} · 免安装 · 规矩你定 · <a href={RELEASES} target="_blank" rel="noreferrer">查看全部版本</a></p>
       </section>
 
       <footer className="site-foot">
-        <span>Gridwright — 数据不出本机</span>
+        <span>Gridwright — 你的表，有人替你看着</span>
         <span>Windows 7 / 8 / 10 · 单文件免安装 · 免费开源</span>
       </footer>
     </div>
