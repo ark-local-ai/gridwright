@@ -1,13 +1,26 @@
+import { useState } from "react";
 import "./site.css";
 import {
   GridwrightLogo, IconCheck, IconClock, IconDoc, IconDown, IconFolder,
   IconLink, IconSearch, IconSpark, IconSlides, IconXls,
 } from "../components/icons";
 
-/* 下载入口：桌面客户端发布页（安装包由 Tauri 构建产出） */
-const DOWNLOAD_URL = "https://github.com/ark-local-ai/ark/releases";
+/* 下载发布页 */
+const RELEASES = "https://github.com/ark-local-ai/ark/releases";
+
+/* 按系统版本提供不同构建（Go 单文件 exe，放到办公机即可运行，无需安装）。
+   每个 OS 一个独立 release asset，选哪个下哪个。 */
+type DownloadOS = { os: string; label: string; file: string; url: string };
+const DOWNLOADS: DownloadOS[] = [
+  { os: "win7",  label: "Windows 7",     file: "gridwright-win7.exe",  url: `${RELEASES}/download/v0.1.0/gridwright-win7.exe` },
+  { os: "win8",  label: "Windows 8 / 8.1", file: "gridwright-win8.exe",  url: `${RELEASES}/download/v0.1.0/gridwright-win8.exe` },
+  { os: "win10", label: "Windows 10 / 11", file: "gridwright-win10.exe", url: `${RELEASES}/download/v0.1.0/gridwright-win10.exe` },
+];
 
 export default function Site() {
+  const [os, setOs] = useState("win10");
+  const sel = DOWNLOADS.find((d) => d.os === os) ?? DOWNLOADS[2];
+
   return (
     <div className="site">
       {/* 顶部导航 */}
@@ -22,10 +35,11 @@ export default function Site() {
             <a href="#pipeline">管道</a>
             <a href="#continuous">持续交付</a>
             <a href="#local">本地安全</a>
+            <a href="#download">下载</a>
           </div>
         </div>
         <div className="site-cta">
-          <a className="btn primary" href={DOWNLOAD_URL} target="_blank" rel="noreferrer">下载客户端</a>
+          <a className="btn primary" href="#download">下载客户端</a>
         </div>
       </nav>
 
@@ -38,10 +52,10 @@ export default function Site() {
             交付 Excel、Word、PPT 等可编辑文件 —— 数据不出本机。
           </p>
           <div className="hero-cta">
-            <a className="btn primary lg" href={DOWNLOAD_URL} target="_blank" rel="noreferrer">下载客户端</a>
+            <a className="btn primary lg" href="#download">下载客户端</a>
             <a className="btn ghost lg" href="#pipeline">看它怎么交付</a>
           </div>
-          <p className="hero-meta">Windows / macOS · 本地运行 · 多模型切换</p>
+          <p className="hero-meta">Windows 7 / 8 / 10 · 单文件免安装 · 数据不出本机</p>
         </div>
 
         <div className="hero-pipe" aria-label="任务管道示意">
@@ -190,16 +204,32 @@ export default function Site() {
         </div>
       </section>
 
-      {/* 结尾 CTA */}
-      <section className="site-cta-end">
+      {/* 下载：按系统版本选构建 */}
+      <section id="download" className="site-cta-end">
         <h2>把交付，交给 Gridwright</h2>
-        <p>本地运行、数据自主，让每一项工作都有文件落地。</p>
-        <a className="btn primary lg" href={DOWNLOAD_URL} target="_blank" rel="noreferrer">下载客户端</a>
+        <p>单文件可执行程序，拷进办公机就能用，无需安装。选你的系统版本：</p>
+        <div className="dl-picker" role="group" aria-label="选择系统版本">
+          {DOWNLOADS.map((d) => (
+            <button
+              key={d.os}
+              type="button"
+              className={`dl-opt ${d.os === os ? "on" : ""}`}
+              onClick={() => setOs(d.os)}
+              aria-pressed={d.os === os}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+        <a className="btn primary lg dl-btn" href={sel.url} target="_blank" rel="noreferrer">
+          下载 {sel.file}
+        </a>
+        <p className="dl-meta">单文件 · 无依赖 · 数据不出本机 <a href={RELEASES} target="_blank" rel="noreferrer">查看全部版本</a></p>
       </section>
 
       <footer className="site-foot">
         <span>Gridwright — 数据不出本机</span>
-        <span>Windows / macOS · 免费开源</span>
+        <span>Windows 7 / 8 / 10 · 单文件免安装 · 免费开源</span>
       </footer>
     </div>
   );
