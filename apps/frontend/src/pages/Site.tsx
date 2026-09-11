@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import "./site.css";
 import {
   ArkLogo, IconCheck, IconClock, IconDoc, IconDown, IconFolder,
