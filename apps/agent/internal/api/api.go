@@ -140,6 +140,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/terms/delete", s.handleTermsDelete)
 	mux.HandleFunc("/api/v1/selfcheck", s.handleSelfCheck)
 	mux.HandleFunc("/api/v1/new-tables", s.handleNewTables)
+	mux.HandleFunc("/api/v1/generate", s.handleGenerate)
 	mux.HandleFunc("/api/v1/graph", s.handleGraph)
 	mux.HandleFunc("/api/v1/scan", s.handleScan)
 	mux.HandleFunc("/api/v1/scan/run", s.handleScanRun)

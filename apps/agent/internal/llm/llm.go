@@ -192,3 +192,52 @@ func truncate(s string, n int) string {
 	}
 	return s[:n] + "…"
 }
+
+// ChatText 要一段**纯文本**回复（不加 JSON 约束）。
+// 用于文书生成：模型组织语言，数字由代码喂进去。
+func (c *Client) ChatText(ctx context.Context, prompt string) (string, error) {
+	if !c.Ready() {
+		return "", fmt.Errorf("还没配置模型（脑）：请在设置里填 base_url 与 api_key")
+	}
+	body := map[string]any{
+		"model":       c.model,
+		"temperature": 0.3,
+		"messages": []map[string]string{
+			{"role": "user", "content": prompt},
+		},
+	}
+	bs, err := json.Marshal(body)
+	if err != nil {
+		return "", err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(bs))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("调用 LLM: %w", err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("LLM 返回 %d: %s", resp.StatusCode, truncate(string(raw), 500))
+	}
+	var out struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return "", fmt.Errorf("解析 LLM 响应: %w", err)
+	}
+	if len(out.Choices) == 0 {
+		return "", fmt.Errorf("LLM 无返回内容")
+	}
+	// 纯文本模式**不做 JSON 截取**（文书本身就是文本）
+	return strings.TrimSpace(out.Choices[0].Message.Content), nil
+}
