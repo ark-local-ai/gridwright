@@ -32,6 +32,7 @@ const (
 type Issue struct {
 	Kind     string `json:"kind"`     // bad_value | bad_ref | mismatch | ...
 	Severity string `json:"severity"` // error | warn | info
+	File     string `json:"file"`     // 文件名（跨文件体检时定位用）
 	Sheet    string `json:"sheet"`
 	Ref      string `json:"ref"`   // A1 形式（可空）
 	Row      int    `json:"row"`   // 1 基，0=不适用
@@ -93,12 +94,14 @@ func Run(path string, opt Options) (*Report, error) {
 
 	sheets := f.GetSheetList()
 	rep := &Report{File: path, Sheets: len(sheets)}
+	// 给每条发现补上文件名（跨文件体检时界面靠它定位到具体表）
+	base := filepathBase(path)
 
 	for _, sh := range sheets {
 		if err := scanSheetErrors(f, sh, rep); err != nil {
 			// 单表出错不中断整体扫描
 			rep.Issues = append(rep.Issues, Issue{
-				Kind: "scan_error", Severity: SevWarn, Sheet: sh,
+				Kind: "scan_error", Severity: SevWarn, File: base, Sheet: sh,
 				Message: "扫描该表时出错：" + err.Error(),
 			})
 		}
@@ -107,7 +110,20 @@ func Run(path string, opt Options) (*Report, error) {
 	if opt.CrossMonthCheck && len(opt.MonthSheets) > 1 {
 		scanCrossMonth(f, opt, rep)
 	}
+	for i := range rep.Issues {
+		if rep.Issues[i].File == "" {
+			rep.Issues[i].File = base
+		}
+	}
 	return rep, nil
+}
+
+func filepathBase(p string) string {
+	p = strings.ReplaceAll(p, "\\", "/")
+	if i := strings.LastIndex(p, "/"); i >= 0 {
+		return p[i+1:]
+	}
+	return p
 }
 
 // scanSheetErrors 找错误值和坏引用（只读）。

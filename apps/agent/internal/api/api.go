@@ -51,6 +51,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/scan", s.handleScan)
 	mux.HandleFunc("/api/v1/scan/run", s.handleScanRun)
 	mux.HandleFunc("/api/v1/ledger", s.handleLedger)
+	mux.HandleFunc("/api/v1/sheets", s.handleListSheets)
+	mux.HandleFunc("/api/v1/sheets/preview", s.handleSheetPreview)
 	mux.HandleFunc("/api/v1/health", s.handleHealth)
 	return withCommon(mux)
 }
@@ -339,7 +341,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "workspace": s.Layout.Root})
 }
 
-// pickTable 选取一张表：给了名字就用它（校验存在），否则用工作区第一张。
+// pickTable 选取一张表：给了文件名就用它（校验存在），否则用工作区第一张。
 func (s *Server) pickTable(name string) (string, error) {
 	tables, err := s.Layout.DataFiles()
 	if err != nil {
