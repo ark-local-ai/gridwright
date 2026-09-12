@@ -53,6 +53,15 @@ func main() {
 	// 本地 API（界面用的通用契约，见 docs/agent-architecture/13-接口契约.md）
 	if *apiAddr != "" {
 		srv := api.New(cfg, layout, led, *apiAddr)
+		// 工作区注册表放在引擎同目录（桌面壳会把它指向应用数据目录），
+		// 记住用过的工作区，供界面切换。
+		regPath := filepath.Join(filepath.Dir(layout.Root), "gridwright-workspaces.json")
+		if reg, rerr := workspace.OpenRegistry(regPath); rerr == nil {
+			srv = srv.WithRegistry(reg)
+			log.Printf("工作区注册表: %s", regPath)
+		} else {
+			log.Printf("工作区注册表不可用（切换功能将禁用）: %v", rerr)
+		}
 		go func() {
 			if err := srv.ListenAndServe(); err != nil {
 				log.Printf("API 服务退出: %v", err)

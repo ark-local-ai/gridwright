@@ -4,7 +4,18 @@ import (
 	"testing"
 
 	"github.com/xuri/excelize/v2"
+
+	"github.com/ark-local-ai/ark/apps/agent/internal/config"
+	"github.com/ark-local-ai/ark/apps/agent/internal/ledger"
 )
+
+// ledgerOpen 是 ledger.Open 的薄封装，供测试用。
+func ledgerOpen(path string) (*ledger.Ledger, error) { return ledger.Open(path) }
+
+// configForTest 造一个最小配置（只需工作区）。
+func configForTest(workspace string) *config.Config {
+	return &config.Config{Workspace: workspace, PollSeconds: 5, SampleRows: 10}
+}
 
 // writeMinimalXlsx 写一张最小可用的表，供 API 测试用（表头 + 一行数据 + 一个公式）。
 func writeMinimalXlsx(t *testing.T, path string) {

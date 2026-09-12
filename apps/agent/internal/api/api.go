@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/config"
@@ -27,10 +28,14 @@ import (
 )
 
 // Server 持有工作区与账目等运行时依赖。
+// 工作区可在运行时切换（见 docs/agent-architecture/19-界面设计.md 阶段 2），
+// 因此 Layout/Cfg/Ledger 都在锁内读写。
 type Server struct {
+	mu     sync.RWMutex
 	Cfg    *config.Config
 	Layout *workspace.Layout
 	Ledger *ledger.Ledger
+	Reg    *workspace.Registry
 	Addr   string
 }
 
@@ -42,11 +47,64 @@ func New(cfg *config.Config, layout *workspace.Layout, led *ledger.Ledger, addr 
 	return &Server{Cfg: cfg, Layout: layout, Ledger: led, Addr: addr}
 }
 
+// WithRegistry 挂上工作区注册表（可为 nil，则不支持切换）。
+// 同时把启动时的工作区登记进去，否则初次打开时列表里看不到自己。
+func (s *Server) WithRegistry(reg *workspace.Registry) *Server {
+	s.mu.Lock()
+	s.Reg = reg
+	layout := s.Layout
+	s.mu.Unlock()
+	if reg != nil && layout != nil {
+		tables, _ := layout.DataFiles()
+		_, _ = reg.Touch(layout.Root, len(tables))
+	}
+	return s
+}
+
+// cur 取当前工作区相关引用（读锁）。
+func (s *Server) cur() (*config.Config, *workspace.Layout, *ledger.Ledger, *workspace.Registry) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.Cfg, s.Layout, s.Ledger, s.Reg
+}
+
+// SwitchWorkspace 切换当前工作区：建目录结构、开新账目、登记。
+// 供 handleWorkspaceOpen / handleWorkspaceCreate 调用。
+func (s *Server) SwitchWorkspace(dir string) error {
+	layout, err := workspace.LayoutOf(dir)
+	if err != nil {
+		return err
+	}
+	led, err := ledger.Open(layout.Ledger)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.Layout = layout
+	s.Ledger = led
+	s.Cfg.Workspace = layout.Root
+	reg := s.Reg
+	s.mu.Unlock()
+
+	if reg != nil {
+		tables, _ := layout.DataFiles()
+		if _, err := reg.Touch(layout.Root, len(tables)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Handler 返回注册好路由的 http.Handler（便于测试直接打）。
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/workspace", s.handleWorkspace)
 	mux.HandleFunc("/api/v1/workspace/files", s.handleWorkspaceFiles)
+	mux.HandleFunc("/api/v1/workspace/open", s.handleWorkspaceOpen)
+	mux.HandleFunc("/api/v1/workspace/create", s.handleWorkspaceCreate)
+	mux.HandleFunc("/api/v1/workspace/forget", s.handleWorkspaceForget)
+	mux.HandleFunc("/api/v1/workspaces", s.handleWorkspaces)
+	mux.HandleFunc("/api/v1/settings", s.handleSettings)
 	mux.HandleFunc("/api/v1/graph", s.handleGraph)
 	mux.HandleFunc("/api/v1/scan", s.handleScan)
 	mux.HandleFunc("/api/v1/scan/run", s.handleScanRun)
@@ -59,7 +117,8 @@ func (s *Server) Handler() http.Handler {
 
 // ListenAndServe 启动服务（阻塞）。
 func (s *Server) ListenAndServe() error {
-	log.Printf("Gridwright API 监听 %s（工作区=%s）", s.Addr, s.Layout.Root)
+	_, layout, _, _ := s.cur()
+	log.Printf("Gridwright API 监听 %s（工作区=%s）", s.Addr, layout.Root)
 	srv := &http.Server{
 		Addr:              s.Addr,
 		Handler:           s.Handler(),
@@ -114,19 +173,20 @@ func (s *Server) handleWorkspace(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusMethodNotAllowed, "只支持 GET")
 		return
 	}
-	tables, err := s.Layout.DataFiles()
+	cfg, layout, led, _ := s.cur()
+	tables, err := layout.DataFiles()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	inbox, _ := s.Layout.InboxFiles()
+	inbox, _ := layout.InboxFiles()
 	writeJSON(w, http.StatusOK, workspaceInfo{
-		Root:       s.Layout.Root,
+		Root:       layout.Root,
 		Tables:     len(tables),
 		InboxCount: len(inbox),
-		LedgerPath: s.Ledger.Path(),
-		BrainReady: s.Cfg.BrainReady(),
-		Offline:    !s.Cfg.BrainReady(),
+		LedgerPath: led.Path(),
+		BrainReady: cfg.BrainReady(),
+		Offline:    !cfg.BrainReady(),
 	})
 }
 
@@ -141,13 +201,13 @@ func (s *Server) handleWorkspaceFiles(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusMethodNotAllowed, "只支持 GET")
 		return
 	}
-	tables, _ := s.Layout.DataFiles()
-	inbox, _ := s.Layout.InboxFiles()
+	_, layout, _, _ := s.cur()
+	tables, _ := layout.DataFiles()
+	inbox, _ := layout.InboxFiles()
 	writeJSON(w, http.StatusOK, map[string]any{
-		"tables":      describeFiles(tables),
-		"inbox":       describeFiles(inbox),
-		"inboxDone":   describeFiles(mustList(s.Layout.Done)),
-		"placeholder": false,
+		"tables":    describeFiles(tables),
+		"inbox":     describeFiles(inbox),
+		"inboxDone": describeFiles(mustList(layout.Done)),
 	})
 }
 
@@ -233,14 +293,15 @@ func (s *Server) handleGraph(w http.ResponseWriter, r *http.Request) {
 
 // scanGraph 扫工作区里全部 xlsx。
 func (s *Server) scanGraph() (*graph.Graph, error) {
-	tables, err := s.Layout.DataFiles()
+	_, layout, _, _ := s.cur()
+	tables, err := layout.DataFiles()
 	if err != nil {
 		return nil, err
 	}
 	if len(tables) == 0 {
-		return nil, fmt.Errorf("工作区没有 .xlsx 表（%s）", s.Layout.Root)
+		return nil, fmt.Errorf("工作区没有 .xlsx 表（%s）", layout.Root)
 	}
-	return graph.ScanWorkspace(s.Layout.Root, tables, graph.Options{})
+	return graph.ScanWorkspace(layout.Root, tables, graph.Options{})
 }
 
 // parseNode 解析 "文件!工作表" 或裸 "工作表"。
@@ -291,15 +352,16 @@ func (s *Server) handleScanRun(w http.ResponseWriter, r *http.Request) {
 
 // runScan 对工作区**所有**表做只读体检，合并成一份报告（报告按文件分组）。
 func (s *Server) runScan() (*scan.Report, error) {
-	tables, err := s.Layout.DataFiles()
+	_, layout, _, _ := s.cur()
+	tables, err := layout.DataFiles()
 	if err != nil {
 		return nil, err
 	}
 	if len(tables) == 0 {
-		return nil, fmt.Errorf("工作区没有 .xlsx 表（%s）", s.Layout.Root)
+		return nil, fmt.Errorf("工作区没有 .xlsx 表（%s）", layout.Root)
 	}
 	start := time.Now()
-	merged := &scan.Report{File: s.Layout.Root}
+	merged := &scan.Report{File: layout.Root}
 	for _, t := range tables {
 		rep, err := scan.Run(t, scan.Options{})
 		if err != nil {
@@ -330,7 +392,8 @@ func (s *Server) handleLedger(w http.ResponseWriter, r *http.Request) {
 			limit = n
 		}
 	}
-	entries, err := s.Ledger.Entries(limit)
+	_, _, led, _ := s.cur()
+	entries, err := led.Entries(limit)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -344,17 +407,19 @@ func (s *Server) handleLedger(w http.ResponseWriter, r *http.Request) {
 // ---------- 健康 ----------
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "workspace": s.Layout.Root})
+	_, layout, _, _ := s.cur()
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "workspace": layout.Root})
 }
 
 // pickTable 选取一张表：给了文件名就用它（校验存在），否则用工作区第一张。
 func (s *Server) pickTable(name string) (string, error) {
-	tables, err := s.Layout.DataFiles()
+	_, layout, _, _ := s.cur()
+	tables, err := layout.DataFiles()
 	if err != nil {
 		return "", err
 	}
 	if len(tables) == 0 {
-		return "", fmt.Errorf("工作区没有 .xlsx 表（%s）", s.Layout.Root)
+		return "", fmt.Errorf("工作区没有 .xlsx 表（%s）", layout.Root)
 	}
 	if name == "" {
 		return tables[0], nil
