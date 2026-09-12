@@ -30,9 +30,9 @@ type Fact struct {
 	Key        map[string]string `json:"key"`   // 业务键（如 铺位: B31）
 	Value      string            `json:"value"` // 精确值（字符串，避免浮点误差）
 	Unit       string            `json:"unit,omitempty"`
-	Source     string            `json:"source"`    // 出处（如 商铺台账（详）!B45）
+	Source     string            `json:"source"`             // 出处（如 商铺台账（详）!B45）
 	Observed   string            `json:"observed,omitempty"` // 观察依据（如 "连续6个月一致"）
-	Confidence string            `json:"confidence"` // high | medium
+	Confidence string            `json:"confidence"`         // high | medium
 	Updated    string            `json:"updated"`
 }
 
@@ -53,10 +53,23 @@ type Stale struct {
 	Found string `json:"found"`
 }
 
+// Relation 是"语义类别 → 涉及哪些表"的关系记忆（见 docs/agent-architecture/23-影响面推断.md）。
+//   - source=observed        ：系统从结构/使用推断
+//   - source=user-correction ：**人纠正的**（权重更高，永不自动删）
+type Relation struct {
+	Kind     string   `json:"kind"`     // 语义类别：收租 / 卖房 / 保证金 / 退款 ...
+	Tables   []string `json:"tables"`   // 该类改动涉及的表（节点ID 或 sheet 名）
+	Source   string   `json:"source"`   // observed | user-correction
+	Approved string   `json:"approved"` // 记录时间
+	Note     string   `json:"note,omitempty"`
+	Hits     int      `json:"hits,omitempty"` // 被用中过几次（用于排序）
+}
+
 // File 是 memory.json 的形状。
 type File struct {
 	Facts     []Fact     `json:"facts"`
 	Decisions []Decision `json:"decisions"`
+	Relations []Relation `json:"relations"`
 	Stale     []Stale    `json:"stale"`
 }
 
@@ -82,11 +95,24 @@ func Open(workspaceRoot string) (*Store, error) {
 // Path 返回记忆文件路径。
 func (s *Store) Path() string { return s.path }
 
-// All 返回全部记忆（只读快照）。
+// All 返回全部记忆（只读快照）。切片保证非 nil，前端不必特判。
 func (s *Store) All() File {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.f
+	f := s.f
+	if f.Facts == nil {
+		f.Facts = []Fact{}
+	}
+	if f.Decisions == nil {
+		f.Decisions = []Decision{}
+	}
+	if f.Relations == nil {
+		f.Relations = []Relation{}
+	}
+	if f.Stale == nil {
+		f.Stale = []Stale{}
+	}
+	return f
 }
 
 // Counts 汇总各类条数。
@@ -94,6 +120,85 @@ func (s *Store) Counts() (facts, decisions, stale int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return len(s.f.Facts), len(s.f.Decisions), len(s.f.Stale)
+}
+
+// RelationCount 关系记忆条数。
+func (s *Store) RelationCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.f.Relations)
+}
+
+// RelationsOf 取某个语义类别的关系记忆（合并同类的多条目）。
+func (s *Store) RelationsOf(kind string) Relation {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := Relation{Kind: kind}
+	seen := map[string]bool{}
+	for _, r := range s.f.Relations {
+		if !strings.EqualFold(r.Kind, kind) {
+			continue
+		}
+		for _, t := range r.Tables {
+			if !seen[t] {
+				seen[t] = true
+				out.Tables = append(out.Tables, t)
+			}
+		}
+		// 有人纠正过的，整条标记为 user-correction（优先级更高）
+		if r.Source == "user-correction" {
+			out.Source = "user-correction"
+		}
+	}
+	if out.Tables == nil {
+		out.Tables = []string{}
+	}
+	return out
+}
+
+// AddRelation 追加/合并一条关系记忆（用户纠正时 source 传 user-correction）。
+func (s *Store) AddRelation(r Relation) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if r.Source == "" {
+		r.Source = "observed"
+	}
+	if r.Approved == "" {
+		r.Approved = time.Now().Format("2006-01-02")
+	}
+	// 与同类已有条目合并（避免同类堆一堆）
+	for i := range s.f.Relations {
+		if strings.EqualFold(s.f.Relations[i].Kind, r.Kind) && s.f.Relations[i].Source == r.Source {
+			have := map[string]bool{}
+			for _, t := range s.f.Relations[i].Tables {
+				have[t] = true
+			}
+			for _, t := range r.Tables {
+				if !have[t] {
+					s.f.Relations[i].Tables = append(s.f.Relations[i].Tables, t)
+				}
+			}
+			if r.Note != "" {
+				s.f.Relations[i].Note = r.Note
+			}
+			s.f.Relations[i].Approved = r.Approved
+			return s.saveLocked()
+		}
+	}
+	s.f.Relations = append(s.f.Relations, r)
+	return s.saveLocked()
+}
+
+// BumpRelation 记一次"这条关系被用中"（用于排序：常用的更靠前）。
+func (s *Store) BumpRelation(kind string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.f.Relations {
+		if strings.EqualFold(s.f.Relations[i].Kind, kind) {
+			s.f.Relations[i].Hits++
+		}
+	}
+	_ = s.saveLocked()
 }
 
 // PutFact 写入/更新一条事实（同 ID 覆盖）。
@@ -276,6 +381,7 @@ func unit(u string) string {
 	}
 	return " " + u
 }
+
 // RetrieveByText 按一段自由文本（如用户的指令/新数据）检索相关记忆：
 // 只要某条记忆的键值或内容里出现了文本中提到的词，就算相关。
 //
