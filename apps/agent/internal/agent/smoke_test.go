@@ -112,7 +112,7 @@ func TestM1Loop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = led.Append(time.Now(), "销售", "C2", "set", "320", "455", "报价#14", "quote.csv", "报价同步", "deepseek-chat", "ok")
+	_ = led.Append(time.Now(), "销售", "销售", "C2", "set", "320", "455", "报价#14", "quote.csv", "报价同步", "deepseek-chat", "ok")
 	recent, err := led.Recent(20)
 	if err != nil {
 		t.Fatal(err)

@@ -170,11 +170,11 @@ func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
 			detail = append(detail, fmt.Sprintf("%s %s: %s", e.Op, e.Cell, note))
 		}
 		_ = new
-		a.Ledger.Append(now, table, e.Cell, e.Op, old, cellNew(e), e.Reason, source, ruleName(rules, e.Reason), a.Brain.Model(), st)
+		a.Ledger.Append(now, table, e.Sheet, e.Cell, e.Op, old, cellNew(e), e.Reason, source, ruleName(rules, e.Reason), a.Brain.Model(), st)
 	}
 	// 护栏挡下的单独补记账（它们不在 p.Edits 里）
 	for _, b := range blocked {
-		a.Ledger.Append(now, table, b.Cell, b.Op, "", "", b.Reason, source, "forbid护栏", a.Brain.Model(), "rejected")
+		a.Ledger.Append(now, table, b.Sheet, b.Cell, b.Op, "", "", b.Reason, source, "forbid护栏", a.Brain.Model(), "rejected")
 		detail = append(detail, fmt.Sprintf("%s %s: forbid 护栏", b.Op, b.Cell))
 	}
 

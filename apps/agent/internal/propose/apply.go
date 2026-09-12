@@ -106,7 +106,7 @@ func recordAll(led *ledger.Ledger, p *Proposal, results []ApplyResult, model str
 		if status == "" {
 			status = "rejected"
 		}
-		_ = led.Append(now, table, r.Ref, "set",
+		_ = led.Append(now, table, r.Sheet, r.Ref, "set",
 			fmt.Sprint(r.Old), fmt.Sprint(r.New),
 			r.Note, "confirmed-plan", "", model, status)
 	}
