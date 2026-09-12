@@ -18,10 +18,10 @@ import (
 
 // Entry 是一个登记过的工作区。
 type Entry struct {
-	Path    string `json:"path"`    // 文件夹绝对路径
-	Name    string `json:"name"`    // 显示名（默认取目录名）
-	Tables  int    `json:"tables"`  // 上次已知的表数量（供列表展示）
-	Opened  string `json:"opened"`  // 上次打开时间
+	Path   string `json:"path"`   // 文件夹绝对路径
+	Name   string `json:"name"`   // 显示名（默认取目录名）
+	Tables int    `json:"tables"` // 上次已知的表数量（供列表展示）
+	Opened string `json:"opened"` // 上次打开时间
 }
 
 // Registry 是工作区注册表（线程安全，落盘为 JSON）。

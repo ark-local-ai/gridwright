@@ -150,7 +150,7 @@ func ScanWorkspace(root string, files []string, opt Options) (*Graph, error) {
 		edgeCount[key]["n"]++
 		edgeMeta[key] = Edge{
 			From: from, To: to, Kind: kind, Confidence: ConfHigh,
-			CrossFile: from.File != "" && to.File != "" && from.File != to.File,
+			CrossFile:   from.File != "" && to.File != "" && from.File != to.File,
 			ExternalIdx: idx,
 		}
 	}

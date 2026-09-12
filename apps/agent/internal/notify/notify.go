@@ -11,10 +11,10 @@ import (
 
 // Message 是一条通知。
 type Message struct {
-	Table     string
-	Summary   string
-	Applied   int
-	Rejected  int
+	Table          string
+	Summary        string
+	Applied        int
+	Rejected       int
 	RejectedDetail []string
 }
 

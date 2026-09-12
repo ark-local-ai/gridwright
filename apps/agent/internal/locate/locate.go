@@ -181,9 +181,9 @@ func fromExcelSerial(serial int) time.Time {
 // Cell 是定位结果。
 type Cell struct {
 	Sheet string `json:"sheet"`
-	Ref   string `json:"ref"`   // A1 形式
-	Row   int    `json:"row"`   // 1 基
-	Col   int    `json:"col"`   // 1 基
+	Ref   string `json:"ref"` // A1 形式
+	Row   int    `json:"row"` // 1 基
+	Col   int    `json:"col"` // 1 基
 	Note  string `json:"note,omitempty"`
 }
 

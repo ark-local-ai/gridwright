@@ -35,9 +35,9 @@ func TestMacroBlocked(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "m.xlsm")
 	writeZip(t, p, map[string]string{
-		"[Content_Types].xml":    `<?xml version="1.0"?><Types/>`,
-		"xl/vbaProject.bin":      "fake-macro-bytes",
-		"xl/workbook.xml":        `<workbook/>`,
+		"[Content_Types].xml": `<?xml version="1.0"?><Types/>`,
+		"xl/vbaProject.bin":   "fake-macro-bytes",
+		"xl/workbook.xml":     `<workbook/>`,
 	})
 	rep, err := Check(p)
 	if err != nil {

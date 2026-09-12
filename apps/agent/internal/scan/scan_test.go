@@ -8,10 +8,10 @@ import (
 
 func TestParseAmount(t *testing.T) {
 	cases := map[string]float64{
-		"19,354.02": 19354.02,
+		"19,354.02":    19354.02,
 		"1,761,143.10": 1761143.10,
 		" 803,333.40 ": 803333.40,
-		"0.00": 0,
+		"0.00":         0,
 	}
 	for in, want := range cases {
 		got, ok := parseAmount(in)

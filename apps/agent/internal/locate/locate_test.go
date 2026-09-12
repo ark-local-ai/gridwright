@@ -9,9 +9,9 @@ import (
 
 func TestParseHeaderMonth(t *testing.T) {
 	cases := []struct {
-		in    string
-		y, m  int
-		ok    bool
+		in   string
+		y, m int
+		ok   bool
 	}{
 		{"2026年9月", 2026, 9, true},
 		{"2026年09月", 2026, 9, true},

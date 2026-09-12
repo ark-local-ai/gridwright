@@ -6,9 +6,9 @@ package plan
 type Edit struct {
 	Op     string         `json:"op"` // set | append
 	Sheet  string         `json:"sheet"`
-	Cell   string         `json:"cell,omitempty"` // set 用：A1 形式坐标
+	Cell   string         `json:"cell,omitempty"`  // set 用：A1 形式坐标
 	Value  any            `json:"value,omitempty"` // set 用：新值
-	Row    map[string]any `json:"row,omitempty"`  // append 用：表头列名 → 值
+	Row    map[string]any `json:"row,omitempty"`   // append 用：表头列名 → 值
 	Reason string         `json:"reason,omitempty"`
 }
 

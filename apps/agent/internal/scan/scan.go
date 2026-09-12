@@ -23,9 +23,9 @@ import (
 
 // Severity 是问题严重度。
 const (
-	SevError   = "error"   // 明确的错误（坏公式、坏引用）
-	SevWarn    = "warn"    // 可疑（数值对不上）
-	SevInfo    = "info"    // 提示
+	SevError = "error" // 明确的错误（坏公式、坏引用）
+	SevWarn  = "warn"  // 可疑（数值对不上）
+	SevInfo  = "info"  // 提示
 )
 
 // Issue 是一条体检发现。带精确坐标，界面可点击跳转。
@@ -34,8 +34,8 @@ type Issue struct {
 	Severity string `json:"severity"` // error | warn | info
 	File     string `json:"file"`     // 文件名（跨文件体检时定位用）
 	Sheet    string `json:"sheet"`
-	Ref      string `json:"ref"`   // A1 形式（可空）
-	Row      int    `json:"row"`   // 1 基，0=不适用
+	Ref      string `json:"ref"` // A1 形式（可空）
+	Row      int    `json:"row"` // 1 基，0=不适用
 	Col      int    `json:"col"`
 	Message  string `json:"message"`
 	Detail   string `json:"detail,omitempty"`

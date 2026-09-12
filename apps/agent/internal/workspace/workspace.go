@@ -11,12 +11,12 @@ import (
 
 // Layout 是工作区的目录结构。
 type Layout struct {
-	Root   string // 工作区根目录
-	Inbox  string // 新数据入口
-	Done   string // 处理完的文件归档
-	Rules  string // rules.yaml
-	State  string // state.yaml
-	Ledger string // ledger.csv
+	Root    string // 工作区根目录
+	Inbox   string // 新数据入口
+	Done    string // 处理完的文件归档
+	Rules   string // rules.yaml
+	State   string // state.yaml
+	Ledger  string // ledger.csv
 	Archive string
 }
 

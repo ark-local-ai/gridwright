@@ -26,18 +26,18 @@ const (
 
 // Message 是一条消息。
 type Message struct {
-	Role    string `json:"role"`
-	Text    string `json:"text"`
+	Role string `json:"role"`
+	Text string `json:"text"`
 	// 结构化产物：这条回复把用户的话变成了什么（任务/规则/工具申请/澄清问题）
 	Proposal *Proposal `json:"proposal,omitempty"`
-	Time    string `json:"time"`
+	Time     string    `json:"time"`
 }
 
 // Proposal 是结构化建议（机器可执行的那部分）。
 type Proposal struct {
-	Kind     string   `json:"kind"`     // task | rule | tool_request | clarify | plan
-	Title    string   `json:"title"`    // 一句话给人看
-	Detail   string   `json:"detail"`   // 展开说明
+	Kind     string   `json:"kind"`               // task | rule | tool_request | clarify | plan
+	Title    string   `json:"title"`              // 一句话给人看
+	Detail   string   `json:"detail"`             // 展开说明
 	Schedule string   `json:"schedule,omitempty"` // 任务：cron
 	Action   string   `json:"action,omitempty"`
 	Tools    []string `json:"tools,omitempty"`
