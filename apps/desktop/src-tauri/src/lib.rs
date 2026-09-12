@@ -1,19 +1,16 @@
 // =====================================================================
-// Ark · 方舟 桌面壳（Tauri 2）
+// gridwright 桌面壳（Tauri 2）
 //
-// 职责：把「空 Tauri 壳」变成「自包含、双击即用」的桌面应用——
-//   1. 启动时探测本地后端，未运行则拉起随包分发的后端可执行文件（sidecar，
-//      由 apps/backend/scripts/build-sea.mjs 产出的单文件 exe）；
-//   2. 把后端数据目录（SQLite / 工作空间 / 技能）重定向到 per-user 应用数据目录，
-//      避免写进安装目录；
-//   3. 后端就绪 UI 由前端 BackendGate（src/main.tsx）负责（「后端未运行」面板 + 自动进入）；
-//   4. 退出时清理后端子进程；
-//   5. 单实例：再次打开聚焦既有窗口。
+// 职责：把「空 Tauri 壳」变成「双击即用、离线可用」的桌面应用：
+//   1. 启动时探测本地引擎（Go，127.0.0.1:7700），未运行则拉起随包 sidecar；
+//   2. 把工作区目录放到 per-user 应用数据目录（不写安装目录/程序目录）；
+//   3. 退出时清理引擎子进程；单实例防止重复开。
 //
-// ⚠️ 本机已装 Rust/MSVC，可 `cargo tauri build` 直接编译；首次构建前需：
-//    a) 构建后端 exe：node apps/backend/scripts/build-sea.mjs
-//    b) 复制为 sidecar：apps/desktop/src-tauri/binaries/ark-backend-x86_64-pc-windows-msvc.exe
-//   （tauri.conf.json 的 externalBin: ["binaries/ark-backend"] 会按平台后缀寻找）。
+// 界面由 Tauri 自带协议加载打包好的前端资源（../dist）——**不指向任何 http 地址、
+// 不依赖 dev server、不依赖网络**（见 docs/agent-architecture/20-离线可用与桌面交付.md）。
+//
+// 离线可用：引擎在没有 LLM api_key / 没有网络时也能启动，看表、体检、联动图、
+// 账目照常工作；只有需要"判断"的改动类动作才要求配好脑。
 // =====================================================================
 
 use std::io::{Read, Write};
@@ -26,16 +23,19 @@ use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_single_instance::init as single_instance;
 
-// tauri-plugin-shell 的 Command::spawn() 返回 (事件接收器, 子进程句柄) 元组；
-// 事件接收器驱动 shell 事件（回调日志/stdin），子进程句柄用于退出清理。
+/// 引擎监听的端口（与 internal/api 默认一致）
+const ENGINE_PORT: u16 = 7700;
+
+// tauri-plugin-shell 的 Command::spawn() 返回 (事件接收器, 子进程句柄)。
 type Spawned = (tauri::async_runtime::Receiver<CommandEvent>, CommandChild);
 
-struct BackendProcess(Mutex<Option<Spawned>>);
+struct EngineProcess(Mutex<Option<Spawned>>);
 
-/// 探测本地后端是否已就绪（TCP 到 127.0.0.1:4000 发 /health 请求，看是否 200）
-fn backend_up() -> bool {
-    if let Ok(mut s) = TcpStream::connect("127.0.0.1:4000") {
-        let _ = s.write_all(b"GET /health HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n");
+/// 探测本地引擎是否就绪（TCP 到 127.0.0.1:7700 发 /api/v1/health，看是否 200）。
+fn engine_up() -> bool {
+    let addr = format!("127.0.0.1:{ENGINE_PORT}");
+    if let Ok(mut s) = TcpStream::connect(&addr) {
+        let _ = s.write_all(b"GET /api/v1/health HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n");
         let mut buf = [0u8; 64];
         if let Ok(n) = s.read(&mut buf) {
             let head = String::from_utf8_lossy(&buf[..n]).to_ascii_lowercase();
@@ -45,27 +45,24 @@ fn backend_up() -> bool {
     false
 }
 
-/// 拉起随包分发、单文件打包的后端可执行文件（sidecar `ark-backend`），
-/// 并把数据目录重定向到 per-user 应用数据目录。
-fn spawn_backend(app: &tauri::App) -> Option<Spawned> {
+/// 拉起随包的 Go 引擎（sidecar `gridwright`），工作区落在 per-user 应用数据目录。
+fn spawn_engine(app: &tauri::App) -> Option<Spawned> {
     let data_dir = app.path().app_data_dir().ok()?;
     let ws_dir = data_dir.join("workspace");
-    let skill_dir = data_dir.join("skills");
     let _ = std::fs::create_dir_all(&ws_dir);
-    let _ = std::fs::create_dir_all(&skill_dir);
 
     let cmd = app
         .shell()
-        .sidecar("ark-backend")
+        .sidecar("gridwright")
         .ok()?
-        .env("ARK_DATA_DIR", data_dir.to_string_lossy().to_string())
-        .env("ARK_WORKSPACE_DIR", ws_dir.to_string_lossy().to_string())
-        .env("ARK_SKILLS_DIR", skill_dir.to_string_lossy().to_string())
-        .env("PORT", "4000");
+        // 把本壳的 PID 传给引擎：壳退出（含被强杀）时引擎监视到父进程消失会自行退出，
+        // 不会留下占着 7700 端口的孤儿进程。
+        .args(["-api", &format!("127.0.0.1:{ENGINE_PORT}"), "-parent-pid", &std::process::id().to_string()])
+        .env("WORKSPACE", ws_dir.to_string_lossy().to_string());
     match cmd.spawn() {
         Ok(child) => Some(child),
         Err(e) => {
-            eprintln!("[ark] 后端启动失败: {e}");
+            eprintln!("[gridwright] 引擎启动失败: {e}");
             None
         }
     }
@@ -76,20 +73,19 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(single_instance(|app, _args, _cwd| {
-            // 已有实例在跑：把主窗口调到前台
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.show();
                 let _ = w.set_focus();
             }
         }))
-        .manage(BackendProcess(Mutex::new(None)))
+        .manage(EngineProcess(Mutex::new(None)))
         .setup(|app| {
-            // 若后端没起，拉起并短等就绪（前端 BackendGate 会接管后续 UI/轮询）
-            if !backend_up() {
-                let child = spawn_backend(app);
-                *app.state::<BackendProcess>().0.lock().unwrap() = child;
-                for _ in 0..12 {
-                    if backend_up() {
+            if !engine_up() {
+                let child = spawn_engine(app);
+                *app.state::<EngineProcess>().0.lock().unwrap() = child;
+                // 短等就绪；前端会自己轮询并显示「正在启动」状态
+                for _ in 0..16 {
+                    if engine_up() {
                         break;
                     }
                     std::thread::sleep(Duration::from_millis(500));
@@ -98,13 +94,13 @@ pub fn run() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while building Ark · 方舟 desktop");
+        .expect("error while building gridwright desktop");
 
     app.run(|app_handle, event| {
-        // 退出时清理后端子进程，避免残留 4000 端口占用
+        // 退出时清理引擎子进程，避免残留端口占用
         if let tauri::RunEvent::Exit = event {
             if let Some(child) = app_handle
-                .state::<BackendProcess>()
+                .state::<EngineProcess>()
                 .0
                 .lock()
                 .unwrap()
