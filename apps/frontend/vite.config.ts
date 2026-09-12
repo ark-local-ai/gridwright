@@ -4,6 +4,10 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    // 避免打进两份 React（与 desktop 同理：跨包 import 共用组件时会出现）。
+    dedupe: ['react', 'react-dom', 'react-router-dom'],
+  },
   server: {
     // 开发时把 /api 代理到本地后端（仅本机，数据不出本机）
     proxy: {
