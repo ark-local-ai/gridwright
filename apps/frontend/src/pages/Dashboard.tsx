@@ -248,7 +248,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
 
           <div className="dash-tabs">
             <button className={tab === "confirm" ? "on" : ""} onClick={() => setTab("confirm")}>
-              待确认{proposal && proposal.items.length > 0 && <em>{proposal.items.length}</em>}
+              待确认{proposal && (proposal.items?.length ?? 0) > 0 && <em>{proposal.items.length}</em>}
             </button>
             <button className={tab === "scan" ? "on" : ""} onClick={() => setTab("scan")}>
               体检发现{(counts.error + counts.warn) > 0 && <em>{counts.error + counts.warn}</em>}

@@ -85,7 +85,7 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
       </div>
 
       <ul className="pend-items">
-        {proposal.items.map((it, i) => (
+        {(proposal.items ?? []).map((it, i) => (
           <li key={i} className="pend-item">
             <div className="pi-main">
               <span className="pi-where">{describeWhere(it)}</span>

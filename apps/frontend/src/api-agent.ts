@@ -198,6 +198,12 @@ export interface Proposal {
   blocked?: ProposalBlocked[];
 }
 
+/** 把引擎回传的清单收敛成界面可直接用的形状：null → []，并给每条补上 affects。 */
+export function normalizeProposal(p: Proposal): Proposal {
+  const items = (p.items ?? []).map((it) => ({ ...it, affects: it.affects ?? [] }));
+  return { ...p, items, blocked: p.blocked ?? [] };
+}
+
 export interface ApplyResult {
   ref: string;
   sheet: string;
@@ -313,8 +319,13 @@ export const agentApi = {
     put<{ ok: boolean; brainReady: boolean; saved: boolean; configPath?: string; warning?: string }>(
       "/api/v1/settings", p),
   // 待确认闭环：计划 → 确认 → 执行
-  plan: (instruction: string, file?: string) =>
-    post<{ id: string; proposal: Proposal }>("/api/v1/plan", { instruction, file }),
+  // 归一化：Go 的空切片会 marshal 成 null，界面若直接 .length/.map 会整页崩，
+  // 所以在 API 边界把 items/blocked/affects 一律收敛成数组。
+  plan: async (instruction: string, file?: string) => {
+    const r = await post<{ id: string; proposal: Proposal }>("/api/v1/plan", { instruction, file });
+    if (r?.proposal) r.proposal = normalizeProposal(r.proposal);
+    return r;
+  },
   apply: (id: string) =>
     post<{
       ok: boolean; applied: number; rejected: number;
