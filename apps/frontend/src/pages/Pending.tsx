@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import "./confirm.css";
 import { agentApi } from "../api-agent";
-import type { Proposal, ApplyResult, ImpactResult, SafetyReport } from "../api-agent";
-import { IconCheck, IconSpark, IconSend, IconNote, IconLink, IconShield } from "../components/icons";
+import type { Proposal, ApplyResult, ImpactResult, SafetyReport, SelfCheckReport } from "../api-agent";
+import { IconCheck, IconSpark, IconSend, IconNote, IconLink, IconShield, IconRefresh } from "../components/icons";
 
 /* 待确认（A）+ 会话（B）（见 docs/agent-architecture/19-界面设计.md 阶段 3-4）
    用户的规则：看清单 → 你确认 → 才改。会话是配置入口，产出结构化建议。 */
@@ -11,7 +11,7 @@ import { IconCheck, IconSpark, IconSend, IconNote, IconLink, IconShield } from "
 
 export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safety }: {
   proposal: Proposal | null;
-  onApplied: (r: { applied: number; rejected: number; results: ApplyResult[] }) => void;
+  onApplied: (r: { applied: number; rejected: number; results: ApplyResult[]; selfCheck?: SelfCheckReport | null }) => void;
   onDiscarded: () => void;
   /** 改动点（用于推断"这笔还牵连谁"） */
   impactNode?: string;
@@ -25,6 +25,7 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
   const [correcting, setCorrecting] = useState(false);
   const [extra, setExtra] = useState("");
   const [learned, setLearned] = useState("");
+  const [selfCheck, setSelfCheck] = useState<SelfCheckReport | null>(null);
 
   // 推断"这一笔还牵连谁"（见 23-影响面推断）
   useEffect(() => {
@@ -66,7 +67,9 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
     setBusy(true);
     setErr("");
     try {
-      onApplied(await agentApi.apply(proposal.id));
+      const r = await agentApi.apply(proposal.id);
+      setSelfCheck(r.selfCheck ?? null);
+      onApplied(r);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -158,6 +161,33 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
             <button className="pi-fix" onClick={() => setCorrecting(true)}>
               {learned || "漏了？告诉我还要看哪些表（会记住）"}
             </button>
+          )}
+        </div>
+      )}
+
+      {/* 自检结果（见 docs/agent-architecture/26-自检流程.md） */}
+      {selfCheck && (
+        <div className={`pend-self ${selfCheck.level}`}>
+          <div className="ps-h">
+            <IconRefresh size={13} />
+            <b>改完自检</b>
+            <span className="ps-sum">{selfCheck.summary}</span>
+            <span className="ps-time">{selfCheck.elapsed}</span>
+          </div>
+          {selfCheck.findings.length > 0 && (
+            <ul className="ps-list">
+              {selfCheck.findings.map((f, i) => (
+                <li key={i} className={f.level}>
+                  <span className="ps-sheet">{f.node.sheet}</span>
+                  <span className="ps-msg">{f.message}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {selfCheck.findings.some((f) => f.needClarify) && (
+            <p className="ps-clarify">
+              以上需要你确认；漏了哪些表就说一声，我会记住。
+            </p>
           )}
         </div>
       )}

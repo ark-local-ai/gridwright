@@ -1,8 +1,8 @@
 import { useEffect, useCallback, useState } from "react";
 import "./dashboard.css";
 import { agentApi, nodeId } from "../api-agent";
-import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, WorkspaceListItem, Proposal, WeightScore, ScanIssue, SafetyReport } from "../api-agent";
-import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder } from "../components/icons";
+import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, WorkspaceListItem, Proposal, WeightScore, ScanIssue, SafetyReport, SelfCheckReport } from "../api-agent";
+import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink } from "../components/icons";
 import SheetView from "./SheetView";
 import Settings from "./Settings2";
 import { PendingList, ChatPane } from "./Pending";
@@ -37,6 +37,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [safetyRep, setSafetyRep] = useState<SafetyReport | null>(null);
   const [appliedNote, setAppliedNote] = useState("");
+  const [lastSelfCheck, setLastSelfCheck] = useState<SelfCheckReport | null>(null);
 
   const refresh = useCallback(async () => {
     setLoad("loading");
@@ -135,6 +136,12 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
           </button>
           {!brainReady && <span className="dash-offline" title="未配置模型：看表/体检可用，改表需联网配置">离线</span>}
           {appliedNote && <span className="dash-applied"><IconCheck size={12} />{appliedNote}</span>}
+          {lastSelfCheck && (
+            <span className={`dash-self ${lastSelfCheck.level}`} title={lastSelfCheck.summary}>
+              {lastSelfCheck.level === "ok" ? <IconCheck size={12} /> : "!"}
+              {lastSelfCheck.level === "ok" ? "改动已同步" : `自检 ${lastSelfCheck.findings.length} 项待看`}
+            </span>
+          )}
           {switcherOpen && (
             <WorkspaceSwitcher
               onPick={() => { setSwitcherOpen(false); void refresh(); }}
@@ -258,6 +265,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
                 onApplied={(r) => {
                   setProposal(null);
                   setAppliedNote(`${r.applied} 处已应用${r.rejected ? `，${r.rejected} 处被拒` : ""}`);
+                  setLastSelfCheck(r.selfCheck ?? null);
                   void refresh();
                 }}
                 onDiscarded={() => setProposal(null)}
@@ -435,6 +443,31 @@ function GraphOverlay({ graph, active, hot, onPick, onClose }: {
   graph: GraphData; active: GraphNode | null; hot: Set<string>;
   onPick: (n: GraphNode) => void; onClose: () => void;
 }) {
+  // 连线模式（见 docs/agent-architecture/24 第五节）：
+  // 用户在图上来回拨动 → 产生一条关系 → 存进关系记忆 → 权重随之修正。
+  // **这比打字纠正更直觉**：所见即所得。
+  const [linking, setLinking] = useState(false);
+  const [linkKind, setLinkKind] = useState("");
+  const [linkFrom, setLinkFrom] = useState<string>("");
+  const [linkMsg, setLinkMsg] = useState("");
+
+  const handleNodeClick = async (n: GraphNode) => {
+    if (!linking) { onPick(n); return; }
+    if (!linkFrom) { setLinkFrom(nodeId(n)); setLinkMsg("再点一张表，表示它们有关联"); return; }
+    const target = nodeId(n);
+    if (target === linkFrom) { setLinkMsg("不能连自己"); return; }
+    if (!linkKind.trim()) { setLinkMsg("先填类别（如 收租）——它决定下次什么时候用上"); return; }
+    try {
+      // 存成"这类改动还涉及该表"的关系（源表视为该类改动的入口）
+      const fromSheet = linkFrom.indexOf("!") >= 0 ? linkFrom.slice(linkFrom.indexOf("!") + 1) : linkFrom;
+      const toSheet = n.sheet;
+      await agentApi.learnRelation(linkKind.trim(), [fromSheet, toSheet], "用户在图上手动画的关联");
+      setLinkMsg(`已记住：「${linkKind.trim()}」涉及 ${fromSheet}、${toSheet}`);
+      setLinkFrom("");
+    } catch (e) {
+      setLinkMsg(e instanceof Error ? e.message : String(e));
+    }
+  };
   // "相关就连，不相关留白"：只把有边的节点画进图里，孤立的单独留白区。
   // 留白本身是信息（这些表目前互不相关），也是将来权重计算的观察起点。
   const related = new Set<string>();
@@ -463,7 +496,8 @@ function GraphOverlay({ graph, active, hot, onPick, onClose }: {
         <div className="gv-body">
           <div className="gv-section-h">有关联</div>
           {linkedGroups.map((grp) => (
-            <FileGroup key={grp.file} grp={grp} active={active} hot={hot} onPick={onPick} />
+            <FileGroup key={grp.file} grp={grp} active={active} hot={hot} onPick={onPick}
+              linkFrom={linkFrom} onNodeClick={(n) => void handleNodeClick(n)} />
           ))}
           {linked.length === 0 && <p className="dash-muted">未发现表间关联</p>}
 
@@ -485,13 +519,31 @@ function GraphOverlay({ graph, active, hot, onPick, onClose }: {
             </div>
           )}
 
+          {/* 手动画关联（把用户的判断直接变成记忆） */}
+          <div className="gv-link">
+            <button className={`btn ${linking ? "primary" : "ghost"} sm`}
+              onClick={() => { setLinking((v) => !v); setLinkFrom(""); setLinkMsg(""); }}>
+              <IconLink size={13} />{linking ? "退出连线" : "手动连关联"}
+            </button>
+            {linking && (
+              <>
+                <input className="gv-link-kind" value={linkKind} placeholder="类别（收租/售房…）"
+                  onChange={(e) => setLinkKind(e.target.value)} />
+                <span className="gv-link-msg">
+                  {linkMsg || (linkFrom ? "再点一张表" : "点第一张表开始")}
+                </span>
+              </>
+            )}
+          </div>
+
           {isolated.length > 0 && (
             <div className="gv-isolated">
               <div className="gv-edges-h">
                 暂无关联 <span className="dash-muted">（先留白 · 等权重出来再看是否连上）</span>
               </div>
               {isolatedGroups.map((grp) => (
-                <FileGroup key={grp.file} grp={grp} active={active} hot={hot} onPick={onPick} muted />
+                <FileGroup key={grp.file} grp={grp} active={active} hot={hot} onPick={onPick} muted
+                  linkFrom={linkFrom} onNodeClick={(n) => void handleNodeClick(n)} />
               ))}
             </div>
           )}
@@ -501,9 +553,13 @@ function GraphOverlay({ graph, active, hot, onPick, onClose }: {
   );
 }
 
-function FileGroup({ grp, active, hot, onPick, muted }: {
+function FileGroup({ grp, active, hot, onPick, muted, linkFrom, onNodeClick }: {
   grp: Group; active: GraphNode | null; hot: Set<string>;
   onPick: (n: GraphNode) => void; muted?: boolean;
+  /** 连线模式下：已选中的起点（高亮用） */
+  linkFrom?: string;
+  /** 连线模式下的点击处理（非连线模式由调用方传 onPick） */
+  onNodeClick?: (n: GraphNode) => void;
 }) {
   return (
     <div className={`gv-file${muted ? " muted" : ""}`}>
@@ -515,8 +571,9 @@ function FileGroup({ grp, active, hot, onPick, muted }: {
           const isHot = hot.has(id);
           return (
             <button key={id}
-              className={`gv-node${isHot ? " hot" : ""}${isActive ? " on" : ""}`}
-              onClick={() => onPick(n)} title={`${n.file}!${n.sheet}`}>
+              className={`gv-node${isHot ? " hot" : ""}${isActive ? " on" : ""}${linkFrom === id ? " linking" : ""}`}
+              onClick={() => { if (onNodeClick) onNodeClick(n); else onPick(n); }}
+              title={`${n.file}!${n.sheet}`}>
               {n.sheet}
               {grp.refs[id] > 0 && <span className="gv-count">{grp.refs[id]}</span>}
             </button>

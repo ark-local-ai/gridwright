@@ -208,6 +208,24 @@ export interface ApplyResult {
   note?: string;
 }
 
+export interface SelfCheckFinding {
+  node: GraphNode;
+  level: "ok" | "notice" | "issue";
+  kind: string;
+  where?: string;
+  message: string;
+  needClarify: boolean;
+  score: number;
+  reasons: string[];
+}
+export interface SelfCheckReport {
+  level: "ok" | "notice" | "issue";
+  checked: number;
+  findings: SelfCheckFinding[];
+  summary: string;
+  elapsed: string;
+  correctable: boolean;
+}
 export interface ImpactCandidate {
   node: GraphNode;
   score: number;
@@ -298,7 +316,12 @@ export const agentApi = {
   plan: (instruction: string, file?: string) =>
     post<{ id: string; proposal: Proposal }>("/api/v1/plan", { instruction, file }),
   apply: (id: string) =>
-    post<{ ok: boolean; applied: number; rejected: number; results: ApplyResult[] }>("/api/v1/apply", { id }),
+    post<{
+      ok: boolean; applied: number; rejected: number;
+      results: ApplyResult[]; selfCheck?: SelfCheckReport | null;
+    }>("/api/v1/apply", { id }),
+  selfCheck: (node: string, kind?: string, files?: string[]) =>
+    post<SelfCheckReport>("/api/v1/selfcheck", { node, kind, files }),
   // 会话
   chat: (message: string, conversationId?: string) =>
     post<{ conversationId: string; conversation: ConvoDto }>("/api/v1/chat", { message, conversationId }),

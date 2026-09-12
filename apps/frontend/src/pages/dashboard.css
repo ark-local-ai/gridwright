@@ -303,3 +303,26 @@
 }
 /* 权重来源说明（如"还没积累使用数据，只按结构排序"） */
 .dash-weight-note { font-size: 11px; color: var(--text-3); margin: 10px 0 0; line-height: 1.5; }
+
+/* 顶栏自检徽标：改完常驻，直到下次改动 */
+.dash-self {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11.5px; padding: 1px 8px; border-radius: 999px;
+}
+.dash-self.ok { color: var(--ok); background: var(--ok-bg); }
+.dash-self.notice { color: var(--warn); background: var(--warn-bg); }
+.dash-self.issue { color: var(--danger); background: var(--danger-bg); }
+
+/* 手动画关联控制条 */
+.gv-link {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  border-top: 1px solid var(--line); padding-top: 14px;
+}
+.gv-link-kind {
+  width: 150px; padding: 5px 9px; font-size: 12px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text-1); font-family: var(--font);
+}
+.gv-link-kind:focus { outline: none; border-color: var(--brand); }
+.gv-link-msg { font-size: 11.5px; color: var(--text-3); }
+.gv-node.linking { box-shadow: 0 0 0 3px var(--ok-bg); border-color: var(--ok); color: var(--ok); }
