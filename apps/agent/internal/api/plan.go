@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"path/filepath"
+	"strings"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/agent"
 	"github.com/ark-local-ai/ark/apps/agent/internal/propose"
@@ -81,15 +83,31 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 	}
 	store.Drop(req.ID) // 已应用，防重复
 	applied, rejected := 0, 0
+	touched := []string{}
 	for _, x := range results {
 		if x.Status == "ok" {
 			applied++
+			// 记下"已同步"的节点，供自检判断哪些表动过
+			if x.Sheet != "" {
+				touched = append(touched, propNodeBase(prop)+"!"+x.Sheet)
+			}
 		} else {
 			rejected++
 		}
 	}
+
+	// **改动后自动自检**：确认"该同步的表动了吗"（见 26-自检流程）
+	// 自检失败不影响改动本身（改动已落盘），只是少一份报告
+	var sc any
+	if node := firstItemNode(prop); node != "" {
+		if rep, err := s.runSelfCheck(node, "", touched); err == nil {
+			sc = rep
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok": true, "applied": applied, "rejected": rejected, "results": results,
+		"ok": true, "applied": applied, "rejected": rejected,
+		"results": results, "selfCheck": sc,
 	})
 }
 
@@ -115,4 +133,22 @@ func (s *Server) handlePlanOrGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.handlePlan(w, r)
+}
+
+// propNodeBase 取清单目标表的文件名（不带扩展名）。
+func propNodeBase(p *propose.Proposal) string {
+	b := filepath.Base(p.Target)
+	return strings.TrimSuffix(b, ".xlsx")
+}
+
+// firstItemNode 取清单第一条改动所在的节点，作为自检的"改动点"。
+func firstItemNode(p *propose.Proposal) string {
+	if len(p.Items) == 0 {
+		return ""
+	}
+	it := p.Items[0]
+	if it.File == "" || it.Sheet == "" {
+		return ""
+	}
+	return it.File + "!" + it.Sheet
 }
