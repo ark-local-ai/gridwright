@@ -184,42 +184,63 @@ func (s *Server) handleGraph(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusMethodNotAllowed, "只支持 GET")
 		return
 	}
-	name := r.URL.Query().Get("table")
-	target, err := s.pickTable(name)
+	// 扫整个工作区（所有 xlsx），产出跨文件联动图
+	g, err := s.scanGraph()
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	g, err := graph.Scan(target)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	// 若带 ?sheet=xxx，附上该表被牵动的闭包
-	sheets := g.Sheets
+	sheets := g.Nodes
 	if sheets == nil {
-		sheets = []string{}
+		sheets = []graph.Node{}
 	}
 	edges := g.Edges
 	if edges == nil {
 		edges = []graph.Edge{}
 	}
+	files := g.Files
+	if files == nil {
+		files = []string{}
+	}
 	resp := map[string]any{
-		"file":   filepath.Base(target),
-		"sheets": sheets,
+		"root":   g.Root,
+		"files":  files,
+		"nodes":  sheets,
 		"edges":  edges,
 	}
-	if sh := r.URL.Query().Get("sheet"); sh != "" {
-		to := g.Propagate(sh)
+	// ?node=文件!工作表（或裸 sheet 名，若唯一）→ 附上被牵动的闭包
+	if q := r.URL.Query().Get("node"); q != "" {
+		target := parseNode(q)
+		to := g.Propagate(g.ResolveNode(target))
 		if to == nil {
 			to = []string{} // 保证是数组而非 null，前端不用特判
 		}
 		resp["propagate"] = map[string]any{
-			"from": sh,
+			"from": target.ID(),
 			"to":   to,
 		}
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// scanGraph 扫工作区里全部 xlsx。
+func (s *Server) scanGraph() (*graph.Graph, error) {
+	tables, err := s.Layout.DataFiles()
+	if err != nil {
+		return nil, err
+	}
+	if len(tables) == 0 {
+		return nil, fmt.Errorf("工作区没有 .xlsx 表（%s）", s.Layout.Root)
+	}
+	return graph.ScanWorkspace(s.Layout.Root, tables, graph.Options{})
+}
+
+// parseNode 解析 "文件!工作表" 或裸 "工作表"。
+func parseNode(s string) graph.Node {
+	if i := strings.LastIndex(s, "!"); i >= 0 {
+		return graph.Node{File: s[:i], Sheet: s[i+1:]}
+	}
+	return graph.Node{Sheet: s}
 }
 
 // ---------- 体检 ----------
@@ -260,19 +281,32 @@ func (s *Server) handleScanRun(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// runScan 对工作区第一张表做只读体检（多表时后续可扩展为逐个）。
+// runScan 对工作区**所有**表做只读体检，合并成一份报告（报告按文件分组）。
 func (s *Server) runScan() (*scan.Report, error) {
-	target, err := s.pickTable("")
+	tables, err := s.Layout.DataFiles()
 	if err != nil {
 		return nil, err
+	}
+	if len(tables) == 0 {
+		return nil, fmt.Errorf("工作区没有 .xlsx 表（%s）", s.Layout.Root)
 	}
 	start := time.Now()
-	rep, err := scan.Run(target, scan.Options{})
-	if err != nil {
-		return nil, err
+	merged := &scan.Report{File: s.Layout.Root}
+	for _, t := range tables {
+		rep, err := scan.Run(t, scan.Options{})
+		if err != nil {
+			merged.Issues = append(merged.Issues, scan.Issue{
+				Kind: "scan_error", Severity: scan.SevWarn,
+				Sheet: filepath.Base(t), Message: "扫描失败：" + err.Error(),
+			})
+			continue
+		}
+		merged.Sheets += rep.Sheets
+		merged.Cells += rep.Cells
+		merged.Issues = append(merged.Issues, rep.Issues...)
 	}
-	rep.Elapsed = time.Since(start).String()
-	return rep, nil
+	merged.Elapsed = time.Since(start).String()
+	return merged, nil
 }
 
 // ---------- 账目 ----------

@@ -63,23 +63,41 @@ func TestGraphAndLedgerEndpoints(t *testing.T) {
 	s := newTestServer(t)
 	h := s.Handler()
 
-	// graph
+	// graph：节点现在是 {file, sheet}，且扫整个工作区
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/graph?sheet=Sheet1", nil))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/graph", nil))
 	if rec.Code != 200 {
 		t.Fatalf("graph 状态 %d：%s", rec.Code, rec.Body.String())
 	}
 	var g struct {
-		Sheets    []string `json:"sheets"`
-		Propagate struct {
-			To []string `json:"to"`
-		} `json:"propagate"`
+		Files  []string `json:"files"`
+		Nodes  []struct {
+			File  string `json:"file"`
+			Sheet string `json:"sheet"`
+		} `json:"nodes"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &g); err != nil {
 		t.Fatal(err)
 	}
-	if len(g.Sheets) == 0 {
-		t.Error("graph 应返回至少一张 sheet")
+	if len(g.Nodes) == 0 {
+		t.Error("graph 应返回至少一个 sheet 节点")
+	}
+	if len(g.Files) == 0 {
+		t.Error("graph 应返回文件清单")
+	}
+	// 节点应带文件前缀（跨文件不撞车的前提）
+	if g.Nodes[0].File == "" {
+		t.Error("节点应带文件名")
+	}
+
+	// 带 ?node= 时附传播闭包，且是数组不是 null
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/graph?node=nonexistent!sheet", nil))
+	if rec.Code != 200 {
+		t.Fatalf("graph?node= 状态 %d", rec.Code)
+	}
+	if !contains(string(rec.Body.Bytes()), `"to":[]`) {
+		t.Errorf("propagate.to 应为空数组而非 null：%s", rec.Body.String())
 	}
 
 	// ledger（空账目也应是 200 + 空数组）
@@ -143,4 +161,15 @@ func hashFile(t *testing.T, path string) string {
 		sum = sum*31 + int64(x)
 	}
 	return string(rune(sum))
+}
+
+func contains(haystack, needle string) bool {
+	return len(haystack) >= len(needle) && (func() bool {
+		for i := 0; i+len(needle) <= len(haystack); i++ {
+			if haystack[i:i+len(needle)] == needle {
+				return true
+			}
+		}
+		return false
+	})()
 }
