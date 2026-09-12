@@ -20,6 +20,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/agent"
+	"github.com/ark-local-ai/ark/apps/agent/internal/api"
 	"github.com/ark-local-ai/ark/apps/agent/internal/config"
 	"github.com/ark-local-ai/ark/apps/agent/internal/ledger"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
@@ -28,6 +29,7 @@ import (
 
 func main() {
 	cfgPath := flag.String("config", "config.yaml", "config.yaml 路径")
+	apiAddr := flag.String("api", "127.0.0.1:7700", "本地 API 监听地址（空字符串=不启动）")
 	flag.Parse()
 
 	cfg, err := config.Load(*cfgPath)
@@ -45,6 +47,16 @@ func main() {
 	}
 	brain := llm.New(cfg.LLM)
 	ag := agent.New(cfg, layout, led, brain)
+
+	// 本地 API（界面用的通用契约，见 docs/agent-architecture/13-接口契约.md）
+	if *apiAddr != "" {
+		srv := api.New(cfg, layout, led, *apiAddr)
+		go func() {
+			if err := srv.ListenAndServe(); err != nil {
+				log.Printf("API 服务退出: %v", err)
+			}
+		}()
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

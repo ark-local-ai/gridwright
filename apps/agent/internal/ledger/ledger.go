@@ -88,5 +88,59 @@ func (l *Ledger) Recent(n int) ([]string, error) {
 	return out, nil
 }
 
+// Entry 是一条账目的结构化形式（供界面 / API 展示，见 docs/agent-architecture/13-接口契约.md）。
+type Entry struct {
+	Ts     string `json:"ts"`
+	Table  string `json:"table"`
+	Cell   string `json:"cell"`
+	Op     string `json:"op"`
+	Old    string `json:"old"`
+	New    string `json:"new"`
+	Reason string `json:"reason"`
+	Source string `json:"source"`
+	Rule   string `json:"rule"`
+	Model  string `json:"model"`
+	Status string `json:"status"`
+}
+
+// Entries 读取账目并结构化返回，最近 n 条（n<=0 表示全部）。
+func (l *Ledger) Entries(n int) ([]Entry, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	f, err := os.Open(l.path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer f.Close()
+	records, err := csv.NewReader(f).ReadAll()
+	if err != nil {
+		return nil, err
+	}
+	if len(records) > 0 && len(records[0]) > 0 && records[0][0] == "ts" {
+		records = records[1:]
+	}
+	if n > 0 && len(records) > n {
+		records = records[len(records)-n:]
+	}
+	out := make([]Entry, 0, len(records))
+	for _, rec := range records {
+		e := Entry{}
+		get := func(i int) string {
+			if i < len(rec) {
+				return rec[i]
+			}
+			return ""
+		}
+		e.Ts, e.Table, e.Cell, e.Op = get(0), get(1), get(2), get(3)
+		e.Old, e.New, e.Reason, e.Source = get(4), get(5), get(6), get(7)
+		e.Rule, e.Model, e.Status = get(8), get(9), get(10)
+		out = append(out, e)
+	}
+	return out, nil
+}
+
 // Path 返回账目文件路径。
 func (l *Ledger) Path() string { return l.path }
