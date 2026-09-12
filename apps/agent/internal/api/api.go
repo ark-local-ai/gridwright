@@ -26,6 +26,7 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
 	"github.com/ark-local-ai/ark/apps/agent/internal/propose"
 	"github.com/ark-local-ai/ark/apps/agent/internal/scan"
+	"github.com/ark-local-ai/ark/apps/agent/internal/webui"
 	"github.com/ark-local-ai/ark/apps/agent/internal/workspace"
 )
 
@@ -148,6 +149,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/sheets", s.handleListSheets)
 	mux.HandleFunc("/api/v1/sheets/preview", s.handleSheetPreview)
 	mux.HandleFunc("/api/v1/health", s.handleHealth)
+
+	// 界面：把前端产物嵌进二进制（Win7/8 单文件版靠它自带界面，无需 WebView2）。
+	// 未嵌入时返回 nil → 只提供 API，不影响运行。
+	if ui := webui.Handler(); ui != nil {
+		mux.Handle("/", ui)
+	}
 	return withCommon(mux)
 }
 
