@@ -13,6 +13,7 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/locate"
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory2"
 	"github.com/ark-local-ai/ark/apps/agent/internal/propose"
+	"github.com/ark-local-ai/ark/apps/agent/internal/terms"
 )
 
 // 这是"待改清单"的产出（见 docs/agent-architecture/5-编辑语义.md、19-界面设计.md 阶段 4）。
@@ -83,6 +84,13 @@ func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) 
 	memText := ""
 	if mem, merr := memory2.Open(a.Layout.Root); merr == nil {
 		memText = mem.RetrieveByText(instruction).Describe()
+	}
+	// 语义映射（见 24/25）：用户嘴里的模糊词先翻译成明确的表/字段/类别。
+	// "那笔钱""老李那家"这类说法，第一次问清、以后复用。
+	if tm, terr := terms.Open(a.Layout.Root); terr == nil {
+		if hits := tm.Resolve(instruction); len(hits) > 0 {
+			memText = terms.Describe(hits) + memText
+		}
 	}
 
 	prompt := assemblePlanPrompt(instruction, structs, g, memText)
