@@ -1,0 +1,136 @@
+/* =====================================================================
+   数据管家 · 主看板（见 docs/agent-architecture/14-第一屏设计.md）
+   原则：一屏答一个问题；只有一个视觉重心；颜色只三条
+   （钢蓝=要你动，绿=完成，黄=警告，其余全灰）。全程不滚动主区。
+   复用 index.css 的设计令牌，不新增颜色。
+   ===================================================================== */
+
+.dash {
+  display: flex; flex-direction: column;
+  height: 100%; min-height: 0;
+  background: var(--bg);
+}
+
+/* ---------- 顶栏 ---------- */
+.dash-top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 24px; border-bottom: 1px solid var(--line); flex: none;
+}
+.dash-title { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: var(--fw-h); color: var(--text-1); }
+.dash-actions { display: flex; gap: 8px; }
+
+/* ---------- 主体：左理解 / 右行动 ---------- */
+.dash-body {
+  flex: 1; min-height: 0; display: grid; grid-template-columns: 300px 1fr; gap: 0;
+}
+.dash-left {
+  border-right: 1px solid var(--line); padding: 22px 24px;
+  display: flex; flex-direction: column; min-height: 0; overflow: auto;
+}
+.dash-h { font-size: 13px; font-weight: var(--fw-h); color: var(--text-1); margin: 0 0 4px; }
+.dash-sub { font-size: 11.5px; color: var(--text-3); margin: 0 0 20px; line-height: 1.5; }
+.dash-muted { font-size: 11.5px; color: var(--text-3); }
+.dash-foot { margin-top: auto; padding-top: 16px; }
+
+/* 垂直链（不用力导向蛛网——那最丑也最难懂） */
+.chain { display: flex; flex-direction: column; align-items: flex-start; }
+.chain-row { display: flex; flex-direction: column; align-items: flex-start; }
+.chain-node {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-md);
+  background: var(--surface); color: var(--text-2); cursor: pointer;
+  font-size: 12.5px; font-weight: var(--fw-med); font-family: var(--font);
+  max-width: 240px; text-align: left;
+  transition: border-color .15s var(--ease-out), color .15s var(--ease-out), background .15s var(--ease-out);
+}
+.chain-node:hover { border-color: var(--line-strong); color: var(--text-1); }
+.chain-node.on { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+.chain-node.hot { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+.chain-node .cn-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chain-node .cn-count {
+  flex: none; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  background: var(--brand); color: #fff; font-size: 10.5px; font-weight: var(--fw-h);
+  display: grid; place-items: center; font-variant-numeric: tabular-nums;
+}
+.chain-link {
+  width: 2px; height: 18px; margin-left: 18px;
+  background: var(--line); transition: background .15s var(--ease-out);
+}
+.chain-link.hot { background: var(--brand); }
+
+/* ---------- 右：待确认 / 体检 ---------- */
+.dash-right { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.dash-tabs { display: flex; gap: 4px; padding: 14px 24px 0; flex: none; }
+.dash-tabs button {
+  border: 1px solid transparent; background: transparent; color: var(--text-2);
+  font-size: 12.5px; font-weight: var(--fw-med); font-family: var(--font);
+  padding: 6px 12px; border-radius: var(--radius-sm); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.dash-tabs button:hover { color: var(--text-1); }
+.dash-tabs button.on { background: var(--brand); color: #fff; font-weight: var(--fw-h); }
+.dash-tabs em {
+  font-style: normal; background: rgba(255,255,255,.24); border-radius: 999px;
+  padding: 0 6px; font-size: 10.5px; font-variant-numeric: tabular-nums;
+}
+.dash-pane { flex: 1; min-height: 0; overflow: auto; padding: 16px 24px 24px; }
+
+/* 无待确认 */
+.dash-none {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; height: 100%; min-height: 200px; color: var(--text-3); text-align: center;
+}
+.dash-none svg { color: var(--ok); }
+.dash-none p { font-size: 13.5px; color: var(--text-2); margin: 4px 0 0; font-weight: var(--fw-med); }
+.dash-none span { font-size: 11.5px; }
+
+/* 体检汇总 + 列表 */
+.scan-sum {
+  display: flex; align-items: baseline; gap: 14px; margin-bottom: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.scan-err { color: var(--danger); font-size: 13.5px; font-weight: var(--fw-h); }
+.scan-warn { color: var(--warn); font-size: 13.5px; font-weight: var(--fw-h); }
+.scan-cells { margin-left: auto; font-size: 11px; color: var(--text-3); }
+.scan-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.scan-item {
+  display: flex; align-items: baseline; gap: 10px; padding: 7px 10px;
+  border-radius: var(--radius-sm); font-size: 12px;
+}
+.scan-item:hover { background: var(--surface-2); }
+.scan-item .si-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; margin-top: 5px; }
+.scan-item.error .si-dot { background: var(--danger); }
+.scan-item.warn .si-dot { background: var(--warn); }
+.scan-item .si-main { display: flex; gap: 10px; min-width: 0; flex-wrap: wrap; }
+.scan-item .si-ref { font-family: var(--mono); color: var(--brand); font-size: 11.5px; flex: none; }
+.scan-item .si-msg { color: var(--text-2); }
+
+/* ---------- 底：账目 ---------- */
+.dash-ledger {
+  flex: none; border-top: 1px solid var(--line); background: var(--surface);
+  padding: 10px 24px; display: flex; align-items: center; gap: 18px;
+  font-size: 11.5px; overflow-x: auto; white-space: nowrap;
+}
+.dash-ledger .dl-h { display: inline-flex; align-items: center; gap: 6px; color: var(--text-3); font-weight: var(--fw-h); flex: none; }
+.dash-ledger .dl-row { color: var(--text-2); font-variant-numeric: tabular-nums; }
+.dash-ledger .dl-row em { font-style: normal; color: var(--text-3); font-family: var(--mono); }
+.dash-ledger .ok { color: var(--ok); margin-left: 6px; }
+.dash-ledger .rj { color: var(--warn); margin-left: 6px; }
+
+/* ---------- 空 / 错状态 ---------- */
+.dash-empty {
+  height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; text-align: center; padding: 40px;
+}
+.dash-empty h2 { font-size: 17px; font-weight: var(--fw-title); color: var(--text-1); margin: 0; }
+.dash-empty p { font-size: 13px; color: var(--text-2); margin: 0; max-width: 460px; }
+.dash-hint { font-size: 12px; color: var(--text-3); }
+.dash-hint code {
+  font-family: var(--mono); background: var(--surface-2); padding: 2px 6px;
+  border-radius: var(--radius-xs); border: 1px solid var(--line);
+}
+
+@media (max-width: 900px) {
+  .dash-body { grid-template-columns: 1fr; }
+  .dash-left { border-right: none; border-bottom: 1px solid var(--line); }
+}

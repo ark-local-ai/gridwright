@@ -10,22 +10,30 @@ import '../../frontend/src/pages/site.css'
 import './desktop.css'
 import App from './App.tsx'
 
-// 桌面版直接打本地后端 127.0.0.1:4000（构建时由 vite define 注入 VITE_API_BASE）。
+// 桌面版直接打本地服务：
+//  - 数据管家 Go 引擎 127.0.0.1:7700（VITE_AGENT_API_BASE，见 api-agent.ts）
+//  - 旧 TS 后端 127.0.0.1:4000（VITE_API_BASE，过渡期保留）
 const BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:4000'
+const AGENT_BASE = import.meta.env.VITE_AGENT_API_BASE ?? 'http://127.0.0.1:7700'
 
+// 任一后端就绪即可进入工作台：优先数据管家（新），旧后端作为过渡期兜底。
 function BackendGate() {
   const [ready, setReady] = useState(false)
 
   const probe = useCallback(async () => {
-    try {
-      const ctrl = new AbortController()
-      const timer = setTimeout(() => ctrl.abort(), 1500)
-      const res = await fetch(`${BASE}/health`, { signal: ctrl.signal })
-      clearTimeout(timer)
-      if (res.ok) setReady(true)
-    } catch {
-      /* 后端未就绪，保持未 ready */
+    const ping = async (url: string) => {
+      try {
+        const ctrl = new AbortController()
+        const timer = setTimeout(() => ctrl.abort(), 1500)
+        const res = await fetch(url, { signal: ctrl.signal })
+        clearTimeout(timer)
+        return res.ok
+      } catch {
+        return false
+      }
     }
+    if (await ping(`${AGENT_BASE}/api/v1/health`)) { setReady(true); return }
+    if (await ping(`${BASE}/health`)) setReady(true)
   }, [])
 
   useEffect(() => {
@@ -40,11 +48,11 @@ function BackendGate() {
     <div className="desktop-root">
       <div className="be-rec-panel">
         <div className="be-rec-logo">gridwright</div>
-        <h1>本地后端未运行</h1>
-        <p>桌面版需要一个本地后端服务（127.0.0.1:4000）来读写你的数据。</p>
-        <p className="be-rec-cmd">请先启动后端：<code>node apps/backend/dist/server.js</code></p>
-        <p className="be-rec-meta">或在项目根目录运行一键启动器 <code>npm start</code>（会同时拉起后端 + 网页预览）。</p>
-        <p className="be-rec-wait">正在检测后端…后端一就绪会自动进入工作台</p>
+        <h1>数据管家未运行</h1>
+        <p>桌面版需要一个本地服务（默认 127.0.0.1:7700）来读写你的表。</p>
+        <p className="be-rec-cmd">请先启动引擎：<code>gridwright -config config.yaml</code></p>
+        <p className="be-rec-meta">或在项目根目录运行一键启动器 <code>npm start</code>。</p>
+        <p className="be-rec-wait">正在检测…服务一就绪会自动进入工作台</p>
       </div>
     </div>
   )

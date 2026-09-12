@@ -2,6 +2,7 @@ import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'r
 import { useEffect } from 'react'
 import Layout from '../../frontend/src/layout/Layout'
 import Site from '../../frontend/src/pages/Site'
+import Dashboard from '../../frontend/src/pages/Dashboard'
 import Home from '../../frontend/src/pages/Home'
 import Chat from '../../frontend/src/pages/Chat'
 import Experts from '../../frontend/src/pages/Experts'
@@ -37,8 +38,11 @@ function Shell() {
       <TitleBar />
       <div className="desktop-body">
         <Routes>
-          <Route path="/app" element={<Layout />}>
-            <Route index element={<Home />} />
+          {/* 数据管家主看板：自带极简外壳，不套旧侧栏（旧业务导航已无意义）。 */}
+          <Route path="/app" element={<Dashboard />} />
+          {/* 旧「交付工作台」页面整体移到 /legacy，代码保留、默认不可见，便于日后取用或删除。 */}
+          <Route path="/legacy" element={<Layout />}>
+            <Route path="home" element={<Home />} />
             <Route path="chat" element={<Chat />} />
             <Route path="experts" element={<Experts />} />
             <Route path="skills" element={<Skills />} />

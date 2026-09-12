@@ -11,6 +11,12 @@ export default defineConfig({
         target: 'http://127.0.0.1:4000',
         changeOrigin: true,
       },
+      // 数据管家 Go 引擎（手脑分离）：/agent-api/* → 127.0.0.1:7700/api/v1/*
+      '/agent-api': {
+        target: 'http://127.0.0.1:7700',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/agent-api/, ''),
+      },
     },
   },
 })

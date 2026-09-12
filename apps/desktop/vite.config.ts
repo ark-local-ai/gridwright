@@ -10,8 +10,11 @@ export default defineConfig({
   clearScreen: false,
   base: './',
   // Desktop 通过 Tauri 自定义协议加载（非 HTTP 服务），没有 Vite 代理可用，
-  // 必须把后端地址在构建时钉死，否则 API 会打到相对 /api 打不到 127.0.0.1:4000。
+  // 必须把后端地址在构建时钉死，否则 API 会打到相对路径打不到本机服务。
   define: {
+    // 数据管家 Go 引擎（主）
+    'import.meta.env.VITE_AGENT_API_BASE': JSON.stringify('http://127.0.0.1:7700'),
+    // 旧 TS 后端（过渡期保留）
     'import.meta.env.VITE_API_BASE': JSON.stringify('http://127.0.0.1:4000'),
   },
   server: {
