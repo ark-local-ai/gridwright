@@ -49,12 +49,18 @@ func Load(path string) (*Config, error) {
 	c.LLM.TimeoutSeconds = 60
 	c.Notify.Channel = "console"
 
+	// 配置文件是**可选**的：桌面版随包运行、没有 config.yaml，全靠环境变量。
+	// 只有"显式指定了配置路径却读不到"才算错误。
 	b, err := os.ReadFile(path)
-	if err != nil {
+	switch {
+	case err == nil:
+		if err := yaml.Unmarshal(b, c); err != nil {
+			return nil, fmt.Errorf("解析配置: %w", err)
+		}
+	case os.IsNotExist(err) && path == "config.yaml":
+		// 默认路径不存在：正常（桌面版），继续用默认值 + 环境变量
+	default:
 		return nil, fmt.Errorf("读取配置 %s: %w", path, err)
-	}
-	if err := yaml.Unmarshal(b, c); err != nil {
-		return nil, fmt.Errorf("解析配置: %w", err)
 	}
 
 	// 环境变量优先（密钥不落 config.yaml）
@@ -74,11 +80,14 @@ func Load(path string) (*Config, error) {
 	if c.Workspace == "" {
 		return nil, fmt.Errorf("未配置工作区（config.yaml 的 workspace 或 env WORKSPACE）")
 	}
-	if c.LLM.APIKey == "" {
-		return nil, fmt.Errorf("未配置 LLM API key（config.yaml llm.api_key 或 env LLM_API_KEY）")
-	}
-	if c.LLM.BaseURL == "" {
-		return nil, fmt.Errorf("未配置 LLM base_url")
-	}
+	// 脑（LLM）不是启动前提：没有 key/网络时，只读能力（看表、体检、联动图、
+	// 账目、预览）必须照常可用。只有"需要判断"的动作才要求配好脑。
+	// 见 docs/agent-architecture/20-离线可用与桌面交付.md
 	return c, nil
+}
+
+// BrainReady 表示"脑"是否配好（有 base_url + api_key）。
+// 未就绪时，agent 只能做确定性、只读的工作，改动类动作应明确报错而不是静默失败。
+func (c *Config) BrainReady() bool {
+	return c.LLM.BaseURL != "" && c.LLM.APIKey != ""
 }

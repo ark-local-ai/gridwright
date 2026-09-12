@@ -43,8 +43,15 @@ func New(c config.LLM) *Client {
 // Model 返回当前模型名（记账用）。
 func (c *Client) Model() string { return c.model }
 
+// Ready 表示"脑"是否配好（有 baseURL + apiKey）。未配好时只读能力照常，
+// 但需要判断的动作应明确报错，而不是发出一个必然 401 的请求。
+func (c *Client) Ready() bool { return c.baseURL != "" && c.apiKey != "" }
+
 // Plan 把 prompt 发给脑，解析结构化输出。
 func (c *Client) Plan(ctx context.Context, prompt string) (*plan.Plan, error) {
+	if !c.Ready() {
+		return nil, fmt.Errorf("还没配置模型（脑）：请在设置里填 base_url 与 api_key，之后才能让它判断/改表；只读的看表与体检不受影响")
+	}
 	body := map[string]any{
 		"model":           c.model,
 		"temperature":     0,

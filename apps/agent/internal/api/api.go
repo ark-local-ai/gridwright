@@ -103,6 +103,10 @@ type workspaceInfo struct {
 	Tables     int    `json:"tables"`
 	InboxCount int    `json:"inboxCount"`
 	LedgerPath string `json:"ledgerPath"`
+	// 脑是否配好（没配也能看表/体检，只是不能让它判断改表）
+	BrainReady bool `json:"brainReady"`
+	// 环境是否"离线可用"的说明位（前端据此弱化联网功能）
+	Offline bool `json:"offline"`
 }
 
 func (s *Server) handleWorkspace(w http.ResponseWriter, r *http.Request) {
@@ -121,6 +125,8 @@ func (s *Server) handleWorkspace(w http.ResponseWriter, r *http.Request) {
 		Tables:     len(tables),
 		InboxCount: len(inbox),
 		LedgerPath: s.Ledger.Path(),
+		BrainReady: s.Cfg.BrainReady(),
+		Offline:    !s.Cfg.BrainReady(),
 	})
 }
 

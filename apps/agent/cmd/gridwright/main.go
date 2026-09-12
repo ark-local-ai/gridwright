@@ -24,12 +24,14 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/config"
 	"github.com/ark-local-ai/ark/apps/agent/internal/ledger"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
+	"github.com/ark-local-ai/ark/apps/agent/internal/proc"
 	"github.com/ark-local-ai/ark/apps/agent/internal/workspace"
 )
 
 func main() {
 	cfgPath := flag.String("config", "config.yaml", "config.yaml 路径")
 	apiAddr := flag.String("api", "127.0.0.1:7700", "本地 API 监听地址（空字符串=不启动）")
+	parentPID := flag.Int("parent-pid", 0, "父进程 PID（桌面壳传入；父进程退出时本进程随之退出）")
 	flag.Parse()
 
 	cfg, err := config.Load(*cfgPath)
@@ -60,6 +62,9 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// 若由桌面壳拉起，监视父进程：壳没了就退出，避免留下占着端口的孤儿进程
+	proc.WatchParent(*parentPID, stop)
 
 	// fsnotify 盯 inbox + 工作区根（新表/新数据进来都触发）
 	watcher, err := fsnotify.NewWatcher()
