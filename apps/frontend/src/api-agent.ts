@@ -208,6 +208,19 @@ export interface ApplyResult {
   note?: string;
 }
 
+export interface WeightScore {
+  node: GraphNode;
+  structural: number;
+  activity: number;
+  risk: number;
+  attention: number;
+  inDegree: number;
+  formulas: number;
+  master: boolean;
+  reasons: string[];
+  hasUsage: boolean;
+}
+
 export const agentApi = {
   health: () => get<{ ok: boolean; workspace: string }>("/api/v1/health"),
   workspace: () => get<WorkspaceInfo>("/api/v1/workspace"),
@@ -247,6 +260,8 @@ export const agentApi = {
     post<{ conversationId: string; conversation: ConvoDto }>("/api/v1/chat", { message, conversationId }),
   conversations: () => get<{ items: ConvoSummary[] }>("/api/v1/conversations"),
   conversation: (id: string) => get<ConvoDto>(`/api/v1/conversation?id=${encodeURIComponent(id)}`),
+  // 权重（结构重要性 + 活跃度 + 风险 → 注意力）
+  weights: () => get<{ scores: WeightScore[]; hasUsage: boolean; note: string }>("/api/v1/weights"),
 };
 
 export interface ConvoSummary {

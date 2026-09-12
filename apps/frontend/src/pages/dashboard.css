@@ -295,3 +295,11 @@
   .dash-body { grid-template-columns: 1fr; }
   .dash-left { border-right: none; border-bottom: 1px solid var(--line); }
 }
+/* 权重徽标：注意力分（0-100）。只在高分节点上显示，避免满屏数字。 */
+.cn-weight {
+  flex: none; font-size: 10px; font-variant-numeric: tabular-nums;
+  color: var(--brand); background: var(--brand-soft);
+  padding: 0 5px; border-radius: 999px; line-height: 16px;
+}
+/* 权重来源说明（如"还没积累使用数据，只按结构排序"） */
+.dash-weight-note { font-size: 11px; color: var(--text-3); margin: 10px 0 0; line-height: 1.5; }

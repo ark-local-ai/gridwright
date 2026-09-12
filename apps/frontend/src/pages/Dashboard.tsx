@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useState } from "react";
 import "./dashboard.css";
 import { agentApi, nodeId } from "../api-agent";
-import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, WorkspaceListItem, Proposal } from "../api-agent";
+import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, WorkspaceListItem, Proposal, WeightScore, ScanIssue } from "../api-agent";
 import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder } from "../components/icons";
 import SheetView from "./SheetView";
 import Settings from "./Settings2";
@@ -20,6 +20,8 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   const [wsPath, setWsPath] = useState("");
   const [files, setFiles] = useState<WorkspaceFiles | null>(null);
   const [graph, setGraph] = useState<GraphData | null>(null);
+  const [weights, setWeights] = useState<Record<string, WeightScore>>({});
+  const [weightsNote, setWeightsNote] = useState("");
   const [scan, setScan] = useState<ScanReport | null>(null);
   const [counts, setCounts] = useState({ error: 0, warn: 0 });
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
@@ -46,17 +48,24 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
         setWsPath(ws.root);
         setBrainReady(ws.brainReady);
       });
-      const [f, g, s, l] = await Promise.all([
+      const [f, g, s, l, w] = await Promise.all([
         agentApi.files().catch(() => null),
         agentApi.graph().catch(() => null),
         agentApi.scanRun().catch(() => null),
         agentApi.ledger(5).catch(() => ({ entries: [], limit: 5 })),
+        agentApi.weights().catch(() => null),
       ]);
       setFiles(f);
       setGraph(g);
       setScan(s?.report ?? null);
       setCounts({ error: s?.errors ?? 0, warn: s?.warns ?? 0 });
       setLedger(l.entries ?? []);
+      if (w) {
+        const m: Record<string, WeightScore> = {};
+        for (const sc of w.scores) m[nodeId(sc.node)] = sc;
+        setWeights(m);
+        setWeightsNote(w.note);
+      }
       // 默认选中"被引用最多"的那个节点（最能说明这张表的影响力）
       setActive(g?.nodes?.length ? pickHub(g) : null);
       setLoad("ready");
@@ -158,7 +167,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
 
           {graph ? (
             <div className="chain-groups">
-              {groupByFile(graph, 8).map((grp) => (
+              {groupByFile(graph, 8, weights).map((grp) => (
                 <div key={grp.file} className="chain-group">
                   <div className="cg-file">
                     <IconXls size={12} />
@@ -177,6 +186,11 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
                       >
                         <span className="cn-name">{shortName(n.sheet)}</span>
                         {grp.refs[id] > 0 && <span className="cn-count">{grp.refs[id]}</span>}
+                        {weights[id] && weights[id].attention >= 0.15 && (
+                          <span className="cn-weight" title={weights[id].reasons.join(" · ")}>
+                            {(weights[id].attention * 100).toFixed(0)}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -185,6 +199,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
             </div>
           ) : <p className="dash-muted">未发现表间依赖</p>}
 
+          {weightsNote && <p className="dash-weight-note">{weightsNote}</p>}
           <p className="dash-muted dash-foot">
             共 {graph?.nodes.length ?? 0} 张表 · {graph?.edges.length ?? 0} 条关联
             {(graph?.edges.filter((e) => e.crossFile).length ?? 0) > 0 &&
@@ -256,7 +271,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
                 <span className="scan-cells">{scan?.cells.toLocaleString() ?? 0} 格 · {scan?.sheets ?? 0} 表 · {scan?.elapsed ?? "—"}</span>
               </div>
               <ul className="scan-list">
-                {issues.slice(0, 80).map((it, i) => (
+                {sortedIssues(issues, weights).slice(0, 80).map((it, i) => (
                   <li key={i} className={`scan-item ${it.severity}`}>
                     <span className="si-dot" />
                     <div className="si-main">
@@ -536,12 +551,13 @@ function incoming(g: GraphData, n: GraphNode): string[] {
 type Group = { file: string; items: GraphNode[]; refs: Record<string, number> };
 
 /** 按文件分组节点，并统计每个节点被引用次数（用于徽标）。limit=0 表示不截断。 */
-function groupByFile(g: GraphData, limit = 0): Group[] {
-  return groupNodes(g, g.nodes, limit);
+function groupByFile(g: GraphData, limit = 0, weights?: Record<string, WeightScore>): Group[] {
+  return groupNodes(g, g.nodes, limit, weights);
 }
 
-/** 把给定节点按文件分组（用于"有关联 / 留白"分区渲染）。 */
-function groupNodes(g: GraphData, nodes: GraphNode[], limit = 0): Group[] {
+/** 把给定节点按文件分组（用于"有关联 / 留白"分区渲染）。
+    传了 weights 时，**组内按注意力权重降序**——重要的表排前面，否则权重看不见。 */
+function groupNodes(g: GraphData, nodes: GraphNode[], limit = 0, weights?: Record<string, WeightScore>): Group[] {
   const refs: Record<string, number> = {};
   for (const e of g.edges) refs[nodeId(e.to)] = (refs[nodeId(e.to)] ?? 0) + e.count;
   const byFile = new Map<string, GraphNode[]>();
@@ -550,9 +566,13 @@ function groupNodes(g: GraphData, nodes: GraphNode[], limit = 0): Group[] {
     if (!byFile.has(key)) byFile.set(key, []);
     byFile.get(key)!.push(n);
   }
+  const attn = (n: GraphNode) => (weights ? (weights[nodeId(n)]?.attention ?? 0) : 0);
   return [...byFile.entries()]
     .sort((a, b) => b[1].length - a[1].length)
-    .map(([file, items]) => ({ file, items: limit > 0 ? items.slice(0, limit) : items, refs }));
+    .map(([file, items]) => {
+      const sorted = weights ? [...items].sort((x, y) => attn(y) - attn(x)) : items;
+      return { file, items: limit > 0 ? sorted.slice(0, limit) : sorted, refs };
+    });
 }
 
 function shortName(name: string): string {
@@ -562,4 +582,24 @@ function shortName(name: string): string {
 function shortId(id: string): string {
   const i = id.indexOf("!");
   return i >= 0 ? shortName(id.slice(i + 1)) : shortName(id);
+}
+/** 体检条目按"所在表的注意力权重"排序：**高权重区的问题先看**（见 22-权重设计.md）。
+    这实现用户要的"跑定时的时候根据权重着重校验"——界面层先做，定时层后续接同一套排序。 */
+function sortedIssues(issues: ScanIssue[], weights: Record<string, WeightScore>): ScanIssue[] {
+  const wOf = (sheet: string): number => {
+    // 体检条目只带 sheet 名（不含文件），按 sheet 匹配即可
+    for (const [id, w] of Object.entries(weights)) {
+      const i = id.indexOf("!");
+      const s = i >= 0 ? id.slice(i + 1) : id;
+      if (s === sheet) return w.attention;
+    }
+    return 0;
+  };
+  return [...issues].sort((a, b) => {
+    const d = wOf(b.sheet) - wOf(a.sheet);
+    if (d !== 0) return d;
+    // 同权重时：错误优先于警告
+    if (a.severity !== b.severity) return a.severity === "error" ? -1 : 1;
+    return 0;
+  });
 }
