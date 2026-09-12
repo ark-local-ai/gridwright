@@ -84,3 +84,55 @@
   display: flex; align-items: center; gap: 5px; margin: 7px 0 0;
   font-size: 11px; color: var(--text-3); flex: none;
 }
+
+/* ---------- 同步检查（这笔还牵连谁） ---------- */
+.pend-impact {
+  border: 1px solid var(--line); border-radius: var(--radius-md);
+  padding: 11px 13px; background: var(--surface-2);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.pi-h { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.pi-h b { font-weight: var(--fw-h); color: var(--text-1); }
+.pi-h svg { color: var(--brand); }
+.pi-kind {
+  margin-left: auto; width: 130px; padding: 4px 8px; font-size: 12px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text-1); font-family: var(--font);
+}
+.pi-kind:focus { outline: none; border-color: var(--brand); }
+
+.pi-cands { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.pi-cands li {
+  display: flex; align-items: baseline; gap: 9px; font-size: 12px;
+  padding: 4px 7px; border-radius: var(--radius-xs);
+}
+.pi-cands li.mem { background: var(--brand-soft); }
+.pic-name { color: var(--text-1); min-width: 120px; }
+.pic-score {
+  font-family: var(--mono); font-size: 11px; color: var(--brand);
+  font-variant-numeric: tabular-nums; min-width: 24px;
+}
+.pic-why { color: var(--text-3); font-size: 11px; }
+
+.pi-correct { display: flex; gap: 8px; }
+.pi-correct input {
+  flex: 1; min-width: 0; padding: 5px 9px; font-size: 12px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text-1); font-family: var(--font);
+}
+.pi-correct input:focus { outline: none; border-color: var(--brand); }
+.pi-fix {
+  border: 1px dashed var(--line-strong); background: none; cursor: pointer;
+  padding: 6px 10px; border-radius: var(--radius-sm); text-align: left;
+  font-size: 11.5px; color: var(--text-3); font-family: var(--font);
+}
+.pi-fix:hover { color: var(--brand); border-color: var(--brand); }
+
+/* ---------- 写入安全提示 ---------- */
+.pend-safe {
+  display: flex; align-items: flex-start; gap: 8px; font-size: 12px;
+  padding: 9px 12px; border-radius: var(--radius-md); line-height: 1.6;
+}
+.pend-safe.warn { background: var(--warn-bg); color: var(--warn); }
+.pend-safe.block { background: var(--danger-bg); color: var(--danger); }
+.pend-safe svg { flex: none; margin-top: 2px; }

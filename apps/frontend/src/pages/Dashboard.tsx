@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useState } from "react";
 import "./dashboard.css";
 import { agentApi, nodeId } from "../api-agent";
-import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, WorkspaceListItem, Proposal, WeightScore, ScanIssue } from "../api-agent";
+import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, WorkspaceListItem, Proposal, WeightScore, ScanIssue, SafetyReport } from "../api-agent";
 import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder } from "../components/icons";
 import SheetView from "./SheetView";
 import Settings from "./Settings2";
@@ -35,6 +35,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   const [brainReady, setBrainReady] = useState(true);
   // 待确认清单（A）与应用结果提示
   const [proposal, setProposal] = useState<Proposal | null>(null);
+  const [safetyRep, setSafetyRep] = useState<SafetyReport | null>(null);
   const [appliedNote, setAppliedNote] = useState("");
 
   const refresh = useCallback(async () => {
@@ -60,6 +61,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
       setScan(s?.report ?? null);
       setCounts({ error: s?.errors ?? 0, warn: s?.warns ?? 0 });
       setLedger(l.entries ?? []);
+      agentApi.safety().then((r) => setSafetyRep(r.report)).catch(() => setSafetyRep(null));
       if (w) {
         const m: Record<string, WeightScore> = {};
         for (const sc of w.scores) m[nodeId(sc.node)] = sc;
@@ -251,6 +253,8 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
             <div className="dash-pane">
               <PendingList
                 proposal={proposal}
+                safety={safetyRep}
+                impactNode={proposal?.items?.[0] ? `${proposal.items[0].file}!${proposal.items[0].sheet}` : undefined}
                 onApplied={(r) => {
                   setProposal(null);
                   setAppliedNote(`${r.applied} 处已应用${r.rejected ? `，${r.rejected} 处被拒` : ""}`);

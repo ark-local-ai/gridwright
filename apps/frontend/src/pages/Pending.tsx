@@ -1,21 +1,56 @@
 import { useEffect, useRef, useState } from "react";
 import "./confirm.css";
 import { agentApi } from "../api-agent";
-import type { Proposal, ApplyResult } from "../api-agent";
-import { IconCheck, IconSpark, IconSend, IconNote } from "../components/icons";
+import type { Proposal, ApplyResult, ImpactResult, SafetyReport } from "../api-agent";
+import { IconCheck, IconSpark, IconSend, IconNote, IconLink, IconShield } from "../components/icons";
 
 /* 待确认（A）+ 会话（B）（见 docs/agent-architecture/19-界面设计.md 阶段 3-4）
    用户的规则：看清单 → 你确认 → 才改。会话是配置入口，产出结构化建议。 */
 
 /* ---------- 待确认卡片 ---------- */
 
-export function PendingList({ proposal, onApplied, onDiscarded }: {
+export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safety }: {
   proposal: Proposal | null;
   onApplied: (r: { applied: number; rejected: number; results: ApplyResult[] }) => void;
   onDiscarded: () => void;
+  /** 改动点（用于推断"这笔还牵连谁"） */
+  impactNode?: string;
+  /** 写入安全评估 */
+  safety?: SafetyReport | null;
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [impact, setImpact] = useState<ImpactResult | null>(null);
+  const [kind, setKind] = useState("");
+  const [correcting, setCorrecting] = useState(false);
+  const [extra, setExtra] = useState("");
+  const [learned, setLearned] = useState("");
+
+  // 推断"这一笔还牵连谁"（见 23-影响面推断）
+  useEffect(() => {
+    if (!impactNode) { setImpact(null); return; }
+    let alive = true;
+    agentApi.impact(impactNode, kind || undefined)
+      .then((r) => { if (alive) setImpact(r); })
+      .catch(() => { if (alive) setImpact(null); });
+    return () => { alive = false; };
+  }, [impactNode, kind]);
+
+  // 用户纠正："还要看 X 表" → 存成关系记忆，下次自动带上
+  const learn = async () => {
+    const tables = extra.replace(/[，、]/g, ",").split(",").map((x) => x.trim()).filter(Boolean);
+    if (!tables.length || !kind.trim()) return;
+    try {
+      await agentApi.learnRelation(kind.trim(), tables, "用户指出漏了");
+      setLearned("已记住：" + kind.trim() + " 类改动还要看 " + tables.join("、"));
+      setExtra("");
+      setCorrecting(false);
+      // 立刻重算，让用户看到变化
+      if (impactNode) setImpact(await agentApi.impact(impactNode, kind.trim()));
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  };
 
   if (!proposal) {
     return (
@@ -84,6 +119,56 @@ export function PendingList({ proposal, onApplied, onDiscarded }: {
       )}
 
       {err && <p className="pend-err">{err}</p>}
+
+      {/* 同步检查：这笔改动还牵连谁（见 docs/agent-architecture/23-影响面推断.md） */}
+      {impactNode && (
+        <div className="pend-impact">
+          <div className="pi-h">
+            <IconLink size={13} />
+            <b>这笔还牵连谁</b>
+            <input className="pi-kind" value={kind} placeholder="类别（收租/售房…）"
+              onChange={(e) => setKind(e.target.value)} />
+          </div>
+          {impact && impact.candidates.length > 0 ? (
+            <ul className="pi-cands">
+              {impact.candidates.slice(0, 8).map((c, i) => (
+                <li key={i} className={c.byMemory ? "mem" : ""}>
+                  <span className="pic-name">{c.node.sheet}</span>
+                  <span className="pic-score">{(c.score * 100).toFixed(0)}</span>
+                  <span className="pic-why">{c.reasons.join(" · ")}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="dash-muted">
+              {impact?.note || "没找到相关表——可以自己补上，我会记住"}
+            </p>
+          )}
+
+          {correcting ? (
+            <div className="pi-correct">
+              <input value={extra} placeholder="还要看哪些表？（逗号分隔）"
+                onChange={(e) => setExtra(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") void learn(); }} />
+              <button className="btn primary sm" onClick={() => void learn()}
+                disabled={!extra.trim() || !kind.trim()}>记住</button>
+              <button className="btn ghost sm" onClick={() => setCorrecting(false)}>取消</button>
+            </div>
+          ) : (
+            <button className="pi-fix" onClick={() => setCorrecting(true)}>
+              {learned || "漏了？告诉我还要看哪些表（会记住）"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* 写入安全（见 24-语义映射与安全边界） */}
+      {safety && safety.level !== "ok" && (
+        <div className={`pend-safe ${safety.level}`}>
+          <IconShield size={13} />
+          <span>{safety.advice}</span>
+        </div>
+      )}
 
       <div className="pend-actions">
         <button className="btn primary" onClick={() => void apply()} disabled={busy || proposal.items.length === 0}>

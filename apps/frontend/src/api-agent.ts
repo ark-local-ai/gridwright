@@ -208,6 +208,50 @@ export interface ApplyResult {
   note?: string;
 }
 
+export interface ImpactCandidate {
+  node: GraphNode;
+  score: number;
+  reasons: string[];
+  byStructure: boolean;
+  byMemory: boolean;
+  touched: boolean;
+}
+export interface ImpactResult {
+  kind: string;
+  source: string;
+  candidates: ImpactCandidate[];
+  note?: string;
+}
+export interface RelationDto {
+  kind: string;
+  tables: string[];
+  source: string;
+  approved: string;
+  note?: string;
+  hits?: number;
+}
+export interface SafetyRisk {
+  level: string;
+  kind: string;
+  where?: string;
+  detail: string;
+}
+export interface SafetyReport {
+  file: string;
+  level: string;
+  risks: SafetyRisk[];
+  advice: string;
+  canWrite: boolean;
+}
+export interface TermDto {
+  word: string;
+  resolves_to: { sheet?: string; field?: string; kind?: string; key?: Record<string, string> };
+  note?: string;
+  source: string;
+  approved?: string;
+  hits?: number;
+}
+
 export interface WeightScore {
   node: GraphNode;
   structural: number;
@@ -260,6 +304,18 @@ export const agentApi = {
     post<{ conversationId: string; conversation: ConvoDto }>("/api/v1/chat", { message, conversationId }),
   conversations: () => get<{ items: ConvoSummary[] }>("/api/v1/conversations"),
   conversation: (id: string) => get<ConvoDto>(`/api/v1/conversation?id=${encodeURIComponent(id)}`),
+  // 影响面 / 语义映射 / 安全
+  impact: (node: string, kind?: string) =>
+    post<ImpactResult>("/api/v1/impact", { node, kind }),
+  learnRelation: (kind: string, tables: string[], note?: string) =>
+    post<{ ok: boolean }>("/api/v1/impact/learn", { kind, tables, note }),
+  relations: () => get<{ relations: RelationDto[] }>("/api/v1/relations"),
+  safety: (file?: string) =>
+    get<{ report: SafetyReport; advice: string; canWrite: boolean }>(
+      `/api/v1/safety${file ? `?file=${encodeURIComponent(file)}` : ""}`),
+  terms: () => get<{ terms: TermDto[]; prompts: Record<string, string>; path: string }>("/api/v1/terms"),
+  saveTerm: (p: { word: string; sheet?: string; field?: string; kind?: string; key?: Record<string,string>; note?: string; manual?: boolean }) =>
+    post<{ ok: boolean }>("/api/v1/terms", p),
   // 权重（结构重要性 + 活跃度 + 风险 → 注意力）
   weights: () => get<{ scores: WeightScore[]; hasUsage: boolean; note: string }>("/api/v1/weights"),
 };
