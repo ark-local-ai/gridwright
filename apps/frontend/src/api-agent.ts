@@ -163,6 +163,7 @@ export interface SettingsDto {
   brainReady: boolean;
   workspace: string;
   pollSeconds: number;
+  configPath: string;
 }
 
 export interface ProposalItem {
@@ -234,7 +235,8 @@ export const agentApi = {
   // 设置（脑）
   settings: () => get<SettingsDto>("/api/v1/settings"),
   saveSettings: (p: { baseUrl?: string; apiKey?: string; model?: string }) =>
-    put<{ ok: boolean; brainReady: boolean }>("/api/v1/settings", p),
+    put<{ ok: boolean; brainReady: boolean; saved: boolean; configPath?: string; warning?: string }>(
+      "/api/v1/settings", p),
   // 待确认闭环：计划 → 确认 → 执行
   plan: (instruction: string, file?: string) =>
     post<{ id: string; proposal: Proposal }>("/api/v1/plan", { instruction, file }),

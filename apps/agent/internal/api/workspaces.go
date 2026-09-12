@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/ark-local-ai/ark/apps/agent/internal/config"
 	"github.com/ark-local-ai/ark/apps/agent/internal/workspace"
 )
 
@@ -156,6 +157,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			"brainReady":  cfg.BrainReady(),
 			"workspace":   cfg.Workspace,
 			"pollSeconds": cfg.PollSeconds,
+			"configPath":  config.UserConfigPath(),
 		})
 	case http.MethodPut:
 		var req struct {
@@ -177,9 +179,23 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		if req.Model != "" {
 			s.Cfg.LLM.Model = req.Model
 		}
-		ready := s.Cfg.BrainReady()
+		cfg := s.Cfg
+		ready := cfg.BrainReady()
 		s.mu.Unlock()
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "brainReady": ready})
+
+		// 持久化：配一次就留下，更新/重装后可复用（用户要求）
+		path := config.UserConfigPath()
+		if err := cfg.Save(path); err != nil {
+			// 保存失败要让用户知道，否则会"以为存住了"
+			writeJSON(w, http.StatusOK, map[string]any{
+				"ok": true, "brainReady": ready, "saved": false,
+				"warning": "配置已生效，但写入本地配置文件失败：" + err.Error(),
+			})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok": true, "brainReady": ready, "saved": true, "configPath": path,
+		})
 	default:
 		writeErr(w, http.StatusMethodNotAllowed, "只支持 GET/PUT")
 	}

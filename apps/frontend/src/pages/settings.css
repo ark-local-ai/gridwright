@@ -26,6 +26,11 @@
 .set-hint { font-size: 12px; color: var(--text-2); margin: 0; line-height: 1.6; }
 .set-hint b { color: var(--text-1); font-weight: var(--fw-med); }
 .set-hint-sm { font-size: 11.5px; color: var(--text-3); }
+.set-path {
+  font-family: var(--mono); font-size: 11px; color: var(--text-2);
+  background: var(--surface-2); padding: 1px 5px; border-radius: var(--radius-xs);
+  border: 1px solid var(--line); word-break: break-all;
+}
 
 .set-field { display: flex; align-items: center; gap: 12px; }
 .set-field > span { flex: none; width: 68px; font-size: 12px; color: var(--text-2); }

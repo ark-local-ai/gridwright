@@ -42,9 +42,9 @@ export default function Settings({ onClose, onWorkspaceChanged, pickFolder }: {
     setSaving(true);
     setMsg("");
     try {
-      await agentApi.saveSettings({ baseUrl, model, apiKey: apiKey || undefined });
+      const r = await agentApi.saveSettings({ baseUrl, model, apiKey: apiKey || undefined });
       setApiKey("");
-      setMsg("已保存");
+      setMsg(r.saved ? "已保存到本机，更新后依然有效" : (r.warning ?? "已生效，但本地写入失败"));
       await load();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e));
@@ -140,6 +140,11 @@ export default function Settings({ onClose, onWorkspaceChanged, pickFolder }: {
               </span>
               {msg && <span className="set-msg">{msg}</span>}
             </div>
+            {s?.configPath && (
+              <p className="set-hint set-hint-sm">
+                配置保存在本机：<code className="set-path">{s.configPath}</code>（更新或重装后仍会复用）
+              </p>
+            )}
           </section>
 
           {/* 工作区 */}

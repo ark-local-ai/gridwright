@@ -48,6 +48,16 @@ func main() {
 		log.Fatalf("账目错误: %v", err)
 	}
 	brain := llm.New(cfg.LLM)
+
+	// 首次运行落一次配置，让用户能看到/编辑这个本地配置文件
+	// （配一次就留下，更新/重装后可复用；见 internal/config/persist.go）
+	if cfgPath2 := config.UserConfigPath(); !fileExists(cfgPath2) {
+		if err := cfg.Save(cfgPath2); err != nil {
+			log.Printf("写入本地配置失败（不影响运行）：%v", err)
+		} else {
+			log.Printf("已生成本地配置：%s", cfgPath2)
+		}
+	}
 	ag := agent.New(cfg, layout, led, brain)
 
 	// 本地 API（界面用的通用契约，见 docs/agent-architecture/13-接口契约.md）
@@ -151,4 +161,10 @@ func isDataFile(name string) bool {
 	}
 	ext := filepath.Ext(name)
 	return ext == ".csv" || ext == ".xlsx" || ext == ".CSV" || ext == ".XLSX"
+}
+
+// fileExists 判断文件是否存在。
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
 }

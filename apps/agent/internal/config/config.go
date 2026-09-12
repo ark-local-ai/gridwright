@@ -4,6 +4,8 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -11,7 +13,7 @@ import (
 
 // Config 是 agent 的运行配置。
 type Config struct {
-	Workspace   string `yaml:"workspace"`   // 工作区 = 一个文件夹（spec §3）
+	Workspace   string `yaml:"workspace"`    // 工作区 = 一个文件夹（spec §3）
 	PollSeconds int    `yaml:"poll_seconds"` // fsnotify 之外的兜底轮询间隔
 	SampleRows  int    `yaml:"sample_rows"`  // 发给脑的每表样例行数
 
@@ -21,9 +23,9 @@ type Config struct {
 
 // LLM 是"脑"的连接配置（OpenAI 兼容 API）。
 type LLM struct {
-	BaseURL        string `yaml:"base_url"`        // 例如 https://api.deepseek.com/v1（以 /v1 结尾）
-	APIKey         string `yaml:"api_key"`         // 也可用 env LLM_API_KEY
-	Model          string `yaml:"model"`           // 例如 deepseek-chat
+	BaseURL        string `yaml:"base_url"` // 例如 https://api.deepseek.com/v1（以 /v1 结尾）
+	APIKey         string `yaml:"api_key"`  // 也可用 env LLM_API_KEY
+	Model          string `yaml:"model"`    // 例如 deepseek-chat
 	TimeoutSeconds int    `yaml:"timeout_seconds"`
 }
 
@@ -37,33 +39,50 @@ func (l *LLM) Timeout() time.Duration {
 
 // Notify 是通知出口配置（M1 仅 console；M3 接 serverchan/pushplus/webhook）。
 type Notify struct {
-	Channel        string `yaml:"channel"`         // console | serverchan | pushplus | webhook
+	Channel        string `yaml:"channel"` // console | serverchan | pushplus | webhook
 	ServerChanSKey string `yaml:"serverchan_skey"`
 	PushPlusToken  string `yaml:"pushplus_token"`
 	WebhookURL     string `yaml:"webhook_url"`
 }
 
-// Load 读取 path 处的 config.yaml 并应用环境变量覆盖。
+// Load 读取配置并应用环境变量覆盖。
+//
+// 查找顺序（后者覆盖前者）：
+//  1. 默认值
+//  2. 用户级配置文件（UserConfigPath()，配一次就留在这里，更新/重装可复用）
+//  3. path 指定的文件（若存在；通常由 -config 显式给出）
+//  4. 环境变量
+//
+// 若 path 与用户配置路径相同则只读一次，不重复。
 func Load(path string) (*Config, error) {
 	c := &Config{PollSeconds: 5, SampleRows: 10}
 	c.LLM.TimeoutSeconds = 60
 	c.Notify.Channel = "console"
 
-	// 配置文件是**可选**的：桌面版随包运行、没有 config.yaml，全靠环境变量。
-	// 只有"显式指定了配置路径却读不到"才算错误。
-	b, err := os.ReadFile(path)
-	switch {
-	case err == nil:
+	// ① 用户级配置（不存在不算错——首次运行必然没有）
+	userPath := UserConfigPath()
+	if b, err := os.ReadFile(userPath); err == nil {
 		if err := yaml.Unmarshal(b, c); err != nil {
-			return nil, fmt.Errorf("解析配置: %w", err)
+			return nil, fmt.Errorf("解析用户配置 %s: %w", userPath, err)
 		}
-	case os.IsNotExist(err) && path == "config.yaml":
-		// 默认路径不存在：正常（桌面版），继续用默认值 + 环境变量
-	default:
-		return nil, fmt.Errorf("读取配置 %s: %w", path, err)
 	}
 
-	// 环境变量优先（密钥不落 config.yaml）
+	// ② 显式指定/默认的配置文件
+	if !sameFile(path, userPath) {
+		b, err := os.ReadFile(path)
+		switch {
+		case err == nil:
+			if err := yaml.Unmarshal(b, c); err != nil {
+				return nil, fmt.Errorf("解析配置: %w", err)
+			}
+		case os.IsNotExist(err) && path == "config.yaml":
+			// 默认路径不存在：正常（桌面版随包运行），继续
+		default:
+			return nil, fmt.Errorf("读取配置 %s: %w", path, err)
+		}
+	}
+
+	// ③ 环境变量优先（密钥不落 config.yaml）
 	if v := os.Getenv("LLM_API_KEY"); v != "" {
 		c.LLM.APIKey = v
 	}
@@ -84,6 +103,19 @@ func Load(path string) (*Config, error) {
 	// 账目、预览）必须照常可用。只有"需要判断"的动作才要求配好脑。
 	// 见 docs/agent-architecture/20-离线可用与桌面交付.md
 	return c, nil
+}
+
+// sameFile 比较两个路径是否指向同一文件（大小写不敏感，Windows 友好）。
+func sameFile(a, b string) bool {
+	if a == "" || b == "" {
+		return false
+	}
+	ca, err1 := filepath.Abs(a)
+	cb, err2 := filepath.Abs(b)
+	if err1 != nil || err2 != nil {
+		return a == b
+	}
+	return strings.EqualFold(filepath.Clean(ca), filepath.Clean(cb))
 }
 
 // BrainReady 表示"脑"是否配好（有 base_url + api_key）。

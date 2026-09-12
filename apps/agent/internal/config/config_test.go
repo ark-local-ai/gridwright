@@ -85,3 +85,66 @@ func TestMissingWorkspaceIsError(t *testing.T) {
 		t.Fatal("没有工作区应报错")
 	}
 }
+
+// TestSaveAndReload 配一次 → 落盘 → 重启后能读回（"更新可复用"的核心保证）。
+func TestSaveAndReload(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("GRIDWRIGHT_CONFIG_DIR", dir)
+	t.Setenv("WORKSPACE", filepath.Join(dir, "ws"))
+	t.Setenv("LLM_API_KEY", "")
+	t.Setenv("LLM_BASE_URL", "")
+
+	// 首次启动：没有配置文件也能起
+	c, err := Load("config.yaml")
+	if err != nil {
+		t.Fatalf("首次启动不应报错: %v", err)
+	}
+	// 配模型并保存
+	c.LLM.BaseURL = "https://api.example.com/v1"
+	c.LLM.APIKey = "sk-abc"
+	c.LLM.Model = "m1"
+	if err := c.Save(UserConfigPath()); err != nil {
+		t.Fatal(err)
+	}
+
+	// 模拟"重启应用"：重新 Load（不给任何 LLM env）
+	c2, err := Load("config.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c2.BrainReady() {
+		t.Error("重启后应读回模型配置")
+	}
+	if c2.LLM.Model != "m1" || c2.LLM.BaseURL != "https://api.example.com/v1" {
+		t.Errorf("配置未复用：%+v", c2.LLM)
+	}
+}
+
+// TestSavePreservesWorkspace 保存设置不应把工作区弄丢（合并而非覆盖）。
+func TestSavePreservesOtherFields(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("GRIDWRIGHT_CONFIG_DIR", dir)
+	path := UserConfigPath()
+
+	c := &Config{Workspace: filepath.Join(dir, "ws"), PollSeconds: 9, SampleRows: 7}
+	c.LLM.Model = "first"
+	if err := c.Save(path); err != nil {
+		t.Fatal(err)
+	}
+	// 只改模型再存（模拟只动设置页的一项）
+	c2 := &Config{Workspace: filepath.Join(dir, "ws"), PollSeconds: 9, SampleRows: 7}
+	c2.LLM.Model = "second"
+	if err := c2.Save(path); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load("config.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.LLM.Model != "second" {
+		t.Errorf("模型应更新为 second，得到 %q", got.LLM.Model)
+	}
+	if got.PollSeconds != 9 || got.SampleRows != 7 {
+		t.Errorf("其他字段应保留：poll=%d sample=%d", got.PollSeconds, got.SampleRows)
+	}
+}
