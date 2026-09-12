@@ -23,6 +23,8 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/config"
 	"github.com/ark-local-ai/ark/apps/agent/internal/graph"
 	"github.com/ark-local-ai/ark/apps/agent/internal/ledger"
+	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
+	"github.com/ark-local-ai/ark/apps/agent/internal/propose"
 	"github.com/ark-local-ai/ark/apps/agent/internal/scan"
 	"github.com/ark-local-ai/ark/apps/agent/internal/workspace"
 )
@@ -37,6 +39,8 @@ type Server struct {
 	Ledger *ledger.Ledger
 	Reg    *workspace.Registry
 	Addr   string
+	props  *propose.Store
+	brain  *llm.Client
 }
 
 // New 构造 server。Addr 形如 "127.0.0.1:7700"。
@@ -44,7 +48,22 @@ func New(cfg *config.Config, layout *workspace.Layout, led *ledger.Ledger, addr 
 	if addr == "" {
 		addr = "127.0.0.1:7700"
 	}
-	return &Server{Cfg: cfg, Layout: layout, Ledger: led, Addr: addr}
+	return &Server{
+		Cfg: cfg, Layout: layout, Ledger: led, Addr: addr,
+		props: propose.NewStore(30 * time.Minute),
+		brain: llm.New(cfg.LLM),
+	}
+}
+
+// proposals 返回待确认清单暂存区。
+func (s *Server) proposals() *propose.Store { return s.props }
+
+// brainClient 返回当前"脑"客户端（设置改动后需重建）。
+func (s *Server) brainClient() *llm.Client {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.brain = llm.New(s.Cfg.LLM)
+	return s.brain
 }
 
 // WithRegistry 挂上工作区注册表（可为 nil，则不支持切换）。
@@ -105,6 +124,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/workspace/forget", s.handleWorkspaceForget)
 	mux.HandleFunc("/api/v1/workspaces", s.handleWorkspaces)
 	mux.HandleFunc("/api/v1/settings", s.handleSettings)
+	mux.HandleFunc("/api/v1/plan", s.handlePlanOrGet)
+	mux.HandleFunc("/api/v1/apply", s.handleApply)
 	mux.HandleFunc("/api/v1/graph", s.handleGraph)
 	mux.HandleFunc("/api/v1/scan", s.handleScan)
 	mux.HandleFunc("/api/v1/scan/run", s.handleScanRun)
@@ -271,10 +292,10 @@ func (s *Server) handleGraph(w http.ResponseWriter, r *http.Request) {
 		files = []string{}
 	}
 	resp := map[string]any{
-		"root":   g.Root,
-		"files":  files,
-		"nodes":  sheets,
-		"edges":  edges,
+		"root":  g.Root,
+		"files": files,
+		"nodes": sheets,
+		"edges": edges,
 	}
 	// ?node=文件!工作表（或裸 sheet 名，若唯一）→ 附上被牵动的闭包
 	if q := r.URL.Query().Get("node"); q != "" {

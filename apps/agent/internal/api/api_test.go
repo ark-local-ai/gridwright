@@ -70,8 +70,8 @@ func TestGraphAndLedgerEndpoints(t *testing.T) {
 		t.Fatalf("graph 状态 %d：%s", rec.Code, rec.Body.String())
 	}
 	var g struct {
-		Files  []string `json:"files"`
-		Nodes  []struct {
+		Files []string `json:"files"`
+		Nodes []struct {
 			File  string `json:"file"`
 			Sheet string `json:"sheet"`
 		} `json:"nodes"`

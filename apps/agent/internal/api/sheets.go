@@ -18,9 +18,9 @@ import (
 type sheetPreview struct {
 	File      string     `json:"file"`
 	Sheet     string     `json:"sheet"`
-	Rows      int        `json:"rows"`     // 总行数（含表头）
-	Cols      int        `json:"cols"`     // 总列数
-	Formulas  int        `json:"formulas"` // 公式格数
+	Rows      int        `json:"rows"`      // 总行数（含表头）
+	Cols      int        `json:"cols"`      // 总列数
+	Formulas  int        `json:"formulas"`  // 公式格数
 	HeaderRow int        `json:"headerRow"` // 表头在第几行（1 基）
 	Header    []string   `json:"header"`
 	Sample    [][]string `json:"sample"`    // 前 N 行数据

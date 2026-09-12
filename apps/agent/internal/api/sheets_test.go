@@ -18,12 +18,12 @@ func TestSheetPreviewEndpoint(t *testing.T) {
 		t.Fatalf("preview 状态 %d：%s", rec.Code, rec.Body.String())
 	}
 	var pv struct {
-		Sheet     string   `json:"sheet"`
-		Rows      int      `json:"rows"`
-		Cols      int      `json:"cols"`
-		Formulas  int      `json:"formulas"`
-		HeaderRow int      `json:"headerRow"`
-		Header    []string `json:"header"`
+		Sheet     string     `json:"sheet"`
+		Rows      int        `json:"rows"`
+		Cols      int        `json:"cols"`
+		Formulas  int        `json:"formulas"`
+		HeaderRow int        `json:"headerRow"`
+		Header    []string   `json:"header"`
 		Sample    [][]string `json:"sample"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &pv); err != nil {

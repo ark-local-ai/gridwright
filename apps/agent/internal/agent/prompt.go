@@ -9,6 +9,7 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/config"
+	"github.com/ark-local-ai/ark/apps/agent/internal/graph"
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory"
 	"github.com/ark-local-ai/ark/apps/agent/internal/plan"
 	"github.com/ark-local-ai/ark/apps/agent/internal/xl"
@@ -77,9 +78,48 @@ func readXLSXText(path string) (string, error) {
 }
 
 // assemblePrompt 组装发给脑的 prompt（spec §4 ①~⑤），发送量 O(1) 恒定。
+// assemblePlanPrompt 组装"待改清单"用的 prompt（见 docs/agent-architecture/5-编辑语义.md）。
+//
+// 与旧的 assemblePrompt 关键区别：**要求模型输出业务语义坐标，不要输出单元格坐标**。
+// 因为真实台账里（合并单元格、汇总表列是日期序列号）坐标极易错行错列，坐标由代码算。
+func assemblePlanPrompt(instruction string, structures []*xl.Structure, g *graph.Graph) string {
+	var b strings.Builder
+	b.WriteString("# 任务\n")
+	b.WriteString(strings.TrimSpace(instruction))
+	b.WriteString("\n\n# 工作区表结构（表头 + 样例行）\n")
+	for _, s := range structures {
+		b.WriteString(s.Describe(5))
+		b.WriteString("\n")
+	}
+	if g != nil {
+		b.WriteString("# 表间依赖（改动会沿这些关系牵动其他表）\n")
+		for _, e := range g.Edges {
+			if e.Confidence != graph.ConfHigh {
+				continue
+			}
+			fmt.Fprintf(&b, "  「%s」→「%s」(%s ×%d)\n", e.To.ID(), e.From.ID(), e.Kind, e.Count)
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString(`# 输出要求
+只输出一个 JSON 对象，不要解释、不要 markdown。结构：
+{"edits":[{"sheet":"工作表名","key":{"物业位置":"B31"},"month":"2026-08","field":"本月实收","op":"add","value":23540,"reason":"8月租金"}],
+ "summary":"一句话总结","skip_reasons":["被跳过及原因"],"questions":["你不确定而需要问人的问题"]}
+规则：
+- **绝对不要给单元格坐标**。用 key（业务键列，如 物业位置/铺位号）、field（字段列名）、
+  可选的 month（年月，格式 2026-08）来描述位置；坐标由程序计算。
+- op=add 表示在该格原值上累加（收款类通常用 add）；op=set 表示覆盖。
+- 若一行备注说了要拆到多个月（如"收到7月租金19256元，8月租金4284元"），
+  **拆成多条 edits**，金额之和必须等于原额，且逐条给出 month。
+- 不确定、信息不足、或疑似要动不允许改的列时，放进 questions 或 skip_reasons，
+  **不要猜**。宁可问，也不要在财务表上猜错。`)
+	return b.String()
+}
+
+// assemblePrompt 组装发给脑的 prompt（spec §4 ①~⑤），发送量 O(1) 恒定。
+// 这是"inbox 自动处理"那条老路径用的（输出坐标为 edit 契约）；见 planner.go 的语义版。
 func assemblePrompt(cfg *config.Config, structures []*xl.Structure, source, data string,
 	recentLedger []string, rules memory.RulesFile, state memory.State) string {
-
 	var b strings.Builder
 	fmt.Fprintf(&b, "# 新数据（来自 %s）\n%s\n\n", source, data)
 

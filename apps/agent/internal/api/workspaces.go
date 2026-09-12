@@ -149,12 +149,12 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		cfg, _, _, _ := s.cur()
 		writeJSON(w, http.StatusOK, map[string]any{
-			"baseUrl":    cfg.LLM.BaseURL,
-			"model":      cfg.LLM.Model,
+			"baseUrl": cfg.LLM.BaseURL,
+			"model":   cfg.LLM.Model,
 			// 密钥不回传明文，只回"是否已配"
-			"hasApiKey":  cfg.LLM.APIKey != "",
-			"brainReady": cfg.BrainReady(),
-			"workspace":  cfg.Workspace,
+			"hasApiKey":   cfg.LLM.APIKey != "",
+			"brainReady":  cfg.BrainReady(),
+			"workspace":   cfg.Workspace,
 			"pollSeconds": cfg.PollSeconds,
 		})
 	case http.MethodPut:
