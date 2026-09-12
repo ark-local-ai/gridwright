@@ -149,7 +149,7 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
               <div className="brandrow">
                 <GridwrightLogo h={19} />
               </div>
-              <span className="brand-ver">交付工作台 · v0.1.0</span>
+              <span className="brand-ver">数据管家 · v0.1.0</span>
             </div>
             <button
               className="sb-collapse"

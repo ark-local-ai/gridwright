@@ -86,7 +86,7 @@ export default function TitleBar() {
               <GridwrightLogo h={28} thin />
               <span>v0.1.0</span>
             </div>
-            <p>本地运行的 AI 交付工作台 —— 把一句话需求，做成能直接打开、可编辑的交付物，数据不出本机。</p>
+            <p>跑在办公机上的数据管家 —— 新数据一进 inbox，按你定的规矩自动改表，每一格改动都留账目、能回滚、改完就通知你。</p>
             <p className="tb-about-meta">gridwright 承载你的工作与数据，安全独立、自主可控、成果归你。</p>
             <button className="btn ghost sm" onClick={() => setAboutOpen(false)}>关闭</button>
           </div>
