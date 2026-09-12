@@ -58,6 +58,87 @@
 }
 .chain-link.hot { background: var(--brand); }
 
+/* 按文件分组的联动摘要 */
+.chain-groups { display: flex; flex-direction: column; gap: 14px; }
+.chain-group { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.cg-file {
+  display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-3);
+  margin-bottom: 2px; max-width: 240px;
+}
+.cg-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chain-group .chain-node { margin-left: 2px; }
+
+/* ---------- 节点详情 ---------- */
+.node-detail {
+  flex: none; padding: 14px 24px; border-bottom: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.nd-h { display: flex; align-items: baseline; gap: 10px; }
+.nd-h b { font-size: 13.5px; font-weight: var(--fw-h); color: var(--text-1); }
+.nd-h span { font-size: 11px; color: var(--text-3); }
+.nd-links { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.nd-lab { font-size: 11px; color: var(--text-3); min-width: 48px; }
+.nd-chip {
+  font-size: 11.5px; padding: 2px 8px; border-radius: var(--radius-xs);
+  background: var(--brand-soft); color: var(--brand); border: 1px solid var(--brand-line);
+}
+.nd-chip.dep { background: var(--surface-2); color: var(--text-2); border-color: var(--line); }
+.dash-count {
+  font-style: normal; font-size: 11px; color: var(--text-3); font-weight: var(--fw-med);
+  margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: var(--surface-2);
+}
+
+/* ---------- 联动大图 ---------- */
+.gv-overlay {
+  position: fixed; inset: 0; z-index: 100; background: rgba(20, 24, 30, 0.45);
+  display: grid; place-items: center; padding: 32px;
+}
+.gv-panel {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md); width: min(1080px, 100%); max-height: 88vh;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.gv-head {
+  display: flex; align-items: center; gap: 14px; padding: 14px 20px;
+  border-bottom: 1px solid var(--line); flex: none;
+}
+.gv-head b { font-size: 14px; font-weight: var(--fw-h); }
+.gv-head button { margin-left: auto; }
+.gv-body { overflow: auto; padding: 20px; display: flex; flex-direction: column; gap: 18px; }
+
+.gv-file { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 12px 14px; background: var(--surface-2); }
+.gv-file-head {
+  display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: var(--fw-h);
+  color: var(--text-2); margin-bottom: 10px;
+}
+.gv-nodes { display: flex; flex-wrap: wrap; gap: 8px; }
+.gv-node {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface);
+  color: var(--text-2); font-size: 12px; font-family: var(--font); cursor: pointer;
+  max-width: 260px; transition: border-color .15s var(--ease-out), color .15s var(--ease-out);
+}
+.gv-node:hover { border-color: var(--line-strong); color: var(--text-1); }
+.gv-node.on { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+.gv-node.hot { box-shadow: 0 0 0 3px var(--brand-soft); border-color: var(--brand); }
+.gv-node .gv-count {
+  min-width: 17px; height: 17px; padding: 0 5px; border-radius: 999px;
+  background: var(--brand); color: #fff; font-size: 10px; font-weight: var(--fw-h);
+  display: grid; place-items: center; font-variant-numeric: tabular-nums;
+}
+
+.gv-edges { border-top: 1px solid var(--line); padding-top: 14px; }
+.gv-edges-h { font-size: 12px; font-weight: var(--fw-h); color: var(--text-1); margin-bottom: 8px; }
+.gv-edge {
+  display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: var(--radius-xs);
+  font-size: 12px; font-variant-numeric: tabular-nums;
+}
+.gv-edge:hover { background: var(--surface-2); }
+.gv-edge .gv-from, .gv-edge .gv-to { color: var(--text-2); }
+.gv-edge.cross .gv-from, .gv-edge.cross .gv-to { color: var(--brand); font-weight: var(--fw-med); }
+.gv-edge .gv-arrow { color: var(--brand); }
+.gv-edge .gv-kind { margin-left: auto; font-size: 11px; color: var(--text-3); }
+
 /* ---------- 右：待确认 / 体检 ---------- */
 .dash-right { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .dash-tabs { display: flex; gap: 4px; padding: 14px 24px 0; flex: none; }

@@ -47,19 +47,32 @@ export interface WorkspaceFiles {
   inboxDone: FileItem[];
 }
 
+export interface GraphNode {
+  file: string; // 文件名（空=未知外部文件）
+  sheet: string;
+}
+
 export interface GraphEdge {
-  from: string;
-  to: string;
+  from: GraphNode;
+  to: GraphNode;
   kind: "formula" | "semantic" | "declared";
   count: number;
   confidence: "high" | "medium";
+  crossFile?: boolean;
+  externalIdx?: number; // >0 表示来自 [n] 外部工作簿引用
 }
 
 export interface GraphData {
-  file: string;
-  sheets: string[];
+  root: string;
+  files: string[];
+  nodes: GraphNode[];
   edges: GraphEdge[];
   propagate?: { from: string; to: string[] };
+}
+
+/** 节点稳定 ID（与 Go 侧 Node.ID() 一致）。 */
+export function nodeId(n: GraphNode): string {
+  return n.file ? `${n.file}!${n.sheet}` : n.sheet;
 }
 
 export interface ScanIssue {
@@ -104,8 +117,8 @@ export const agentApi = {
   health: () => get<{ ok: boolean; workspace: string }>("/api/v1/health"),
   workspace: () => get<WorkspaceInfo>("/api/v1/workspace"),
   files: () => get<WorkspaceFiles>("/api/v1/workspace/files"),
-  graph: (sheet?: string) =>
-    get<GraphData>(`/api/v1/graph${sheet ? `?sheet=${encodeURIComponent(sheet)}` : ""}`),
+  graph: (node?: string) =>
+    get<GraphData>(`/api/v1/graph${node ? `?node=${encodeURIComponent(node)}` : ""}`),
   scan: () => get<ScanResult>("/api/v1/scan"),
   scanRun: () => post<{ ok: boolean; errors: number; warns: number; report: ScanReport }>("/api/v1/scan/run"),
   ledger: (limit = 50) => get<{ entries: LedgerEntry[]; limit: number }>(`/api/v1/ledger?limit=${limit}`),
