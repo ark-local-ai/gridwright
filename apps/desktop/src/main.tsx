@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { useState, useEffect, useCallback } from 'react'
+import { Component, useState, useEffect, useCallback } from 'react'
+import type { ReactNode, ErrorInfo } from 'react'
 // Reuse the web UI styling wholesale (tokens + shell + pages).
 import '../../frontend/src/index.css'
 import '../../frontend/src/layout/shell.css'
@@ -58,8 +59,36 @@ function BackendGate() {
   )
 }
 
+// 渲染出错兜底：宁可显示错误，也不要白屏（白屏无法排查，也让人以为程序死了）
+class ErrorBoundary extends Component<{ children: ReactNode }, { err: Error | null; stack: string }> {
+  state = { err: null as Error | null, stack: '' }
+  static getDerivedStateFromError(err: Error) { return { err, stack: '' } }
+  componentDidCatch(err: Error, info: ErrorInfo) {
+    console.error('界面渲染出错:', err, info.componentStack)
+    this.setState({ stack: info.componentStack || '' })
+  }
+  render() {
+    if (!this.state.err) return this.props.children
+    return (
+      <div className="desktop-root">
+        <div className="be-rec-panel">
+          <div className="be-rec-logo">gridwright</div>
+          <h1>界面出错了</h1>
+          <p className="be-rec-cmd">{String(this.state.err.message || this.state.err)}</p>
+          <pre style={{ fontSize: 11, textAlign: 'left', maxHeight: 200, overflow: 'auto', color: '#565e6b', whiteSpace: 'pre-wrap' }}>
+            {this.state.stack.split('\n').slice(0, 8).join('\n')}
+          </pre>
+          <button className="btn primary" onClick={() => this.setState({ err: null, stack: '' })}>重试</button>
+        </div>
+      </div>
+    )
+  }
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BackendGate />
+    <ErrorBoundary>
+      <BackendGate />
+    </ErrorBoundary>
   </StrictMode>,
 )

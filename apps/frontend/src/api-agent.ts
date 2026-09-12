@@ -78,6 +78,7 @@ export function nodeId(n: GraphNode): string {
 export interface ScanIssue {
   kind: string;
   severity: "error" | "warn" | "info";
+  file: string;
   sheet: string;
   ref: string;
   row: number;
@@ -113,6 +114,25 @@ export interface LedgerEntry {
   status: string;
 }
 
+export interface SheetSummary {
+  label: string;
+  values: string[];
+  ref?: string;
+}
+
+export interface SheetPreview {
+  file: string;
+  sheet: string;
+  rows: number;
+  cols: number;
+  formulas: number;
+  headerRow: number;
+  header: string[];
+  sample: string[][];
+  summaries: SheetSummary[];
+  note?: string;
+}
+
 export const agentApi = {
   health: () => get<{ ok: boolean; workspace: string }>("/api/v1/health"),
   workspace: () => get<WorkspaceInfo>("/api/v1/workspace"),
@@ -122,4 +142,11 @@ export const agentApi = {
   scan: () => get<ScanResult>("/api/v1/scan"),
   scanRun: () => post<{ ok: boolean; errors: number; warns: number; report: ScanReport }>("/api/v1/scan/run"),
   ledger: (limit = 50) => get<{ entries: LedgerEntry[]; limit: number }>(`/api/v1/ledger?limit=${limit}`),
+  sheets: (file?: string) =>
+    get<{ file: string; sheets: string[] }>(`/api/v1/sheets${file ? `?file=${encodeURIComponent(file)}` : ""}`),
+  preview: (sheet: string, file?: string, rows = 50) => {
+    const q = new URLSearchParams({ sheet, rows: String(rows) });
+    if (file) q.set("file", file);
+    return get<SheetPreview>(`/api/v1/sheets/preview?${q.toString()}`);
+  },
 };

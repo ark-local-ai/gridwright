@@ -1,8 +1,9 @@
 import { useEffect, useCallback, useState } from "react";
 import "./dashboard.css";
 import { agentApi, nodeId } from "../api-agent";
-import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles } from "../api-agent";
+import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview } from "../api-agent";
 import { IconRefresh, IconCheck, IconXls, IconNote } from "../components/icons";
+import SheetView from "./SheetView";
 
 /* 数据管家 · 主看板（见 docs/agent-architecture/14-第一屏设计.md、17-工作区与跨文件联动.md）
    一屏答一个问题：「我的表，有没有事？它要动什么？」
@@ -22,6 +23,8 @@ export default function Dashboard() {
   const [active, setActive] = useState<GraphNode | null>(null);
   const [tab, setTab] = useState<"confirm" | "scan">("confirm");
   const [zoomed, setZoomed] = useState(false);
+  // 打开表格：{sheet, file, highlight} —— 表预览整屏覆盖（表数据要看全）
+  const [opened, setOpened] = useState<{ sheet: string; file?: string; ref?: string } | null>(null);
 
   const refresh = useCallback(async () => {
     setLoad("loading");
@@ -74,6 +77,18 @@ export default function Dashboard() {
           <button className="btn primary" onClick={() => void refresh()}><IconRefresh size={14} />重试</button>
         </div>
       </div>
+    );
+  }
+
+  // 表预览整屏覆盖：表数据要看全，右栏太窄
+  if (opened) {
+    return (
+      <SheetView
+        sheet={opened.sheet}
+        file={opened.file}
+        highlight={opened.ref ? { ref: opened.ref } : null}
+        onBack={() => setOpened(null)}
+      />
     );
   }
 
@@ -154,7 +169,14 @@ export default function Dashboard() {
               <div className="nd-h">
                 <b>{active.sheet}</b>
                 <span>{active.file || "外部文件"}</span>
+                <button
+                  className="btn primary sm nd-open"
+                  onClick={() => setOpened({ sheet: active.sheet, file: active.file })}
+                >
+                  打开表格
+                </button>
               </div>
+              <NodeStats node={active} />
               <div className="nd-links">
                 <span className="nd-lab">牵动它</span>
                 {hot.size === 0
@@ -197,7 +219,13 @@ export default function Dashboard() {
                   <li key={i} className={`scan-item ${it.severity}`}>
                     <span className="si-dot" />
                     <div className="si-main">
-                      <span className="si-ref">{shortName(it.sheet)}!{it.ref}</span>
+                      <button
+                        className="si-ref si-ref-btn"
+                        onClick={() => setOpened({ sheet: it.sheet, file: it.file, ref: it.ref })}
+                        title="打开表格并定位到该格"
+                      >
+                        {shortName(it.sheet)}!{it.ref}
+                      </button>
                       <span className="si-msg">{it.message}</span>
                     </div>
                   </li>
@@ -226,6 +254,49 @@ export default function Dashboard() {
       {zoomed && graph && (
         <GraphOverlay graph={graph} active={active} hot={hot} onPick={(n) => void pickNode(n)} onClose={() => setZoomed(false)} />
       )}
+    </div>
+  );
+}
+
+/* ---------- 节点汇总（用户要的"点模块展示大概汇总数据"） ---------- */
+
+function NodeStats({ node }: { node: GraphNode }) {
+  const [pv, setPv] = useState<SheetPreview | null>(null);
+  useEffect(() => {
+    let alive = true;
+    agentApi.preview(node.sheet, node.file, 1)
+      .then((d) => { if (alive) setPv(d); })
+      .catch(() => { if (alive) setPv(null); });
+    return () => { alive = false; };
+  }, [node.sheet, node.file]);
+
+  if (!pv) return <div className="nd-stats muted">汇总读取中…</div>;
+
+  // 空表（无数据行）时 summaries/sample/header 可能是 null，必须兜底
+  const sums = pv.summaries ?? [];
+  const header = pv.header ?? [];
+  const overview = sums.find((s) => s.label && s.values.length > 2) ?? sums[0];
+  return (
+    <div className="nd-stats">
+      <div className="nd-stat-row">
+        <span className="ns-k">规模</span>
+        <span className="ns-v">{pv.rows} 行 · {pv.cols} 列 · {pv.formulas} 公式</span>
+      </div>
+      <div className="nd-stat-row">
+        <span className="ns-k">列</span>
+        <span className="ns-v ns-cols">{header.filter(Boolean).slice(0, 6).join(" / ")}{header.length > 6 ? " …" : ""}</span>
+      </div>
+      {overview && (overview.values ?? []).length > 0 && (
+        <div className="nd-stat-row">
+          <span className="ns-k">概览</span>
+          <span className="ns-v ns-sum">
+            {(overview.values ?? []).filter((v) => v !== overview.label).slice(0, 8).map((v, i) => (
+              <span key={i} className="ns-chip">{v}</span>
+            ))}
+          </span>
+        </div>
+      )}
+      {pv.note && <div className="nd-note">{pv.note}</div>}
     </div>
   );
 }
