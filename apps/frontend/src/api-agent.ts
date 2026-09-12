@@ -28,11 +28,26 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function put<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({}));
+    throw new Error((b as { error?: string }).error ?? `${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 export interface WorkspaceInfo {
   root: string;
   tables: number;
   inboxCount: number;
   ledgerPath: string;
+  brainReady: boolean;
+  offline: boolean;
 }
 
 export interface FileItem {
@@ -133,6 +148,23 @@ export interface SheetPreview {
   note?: string;
 }
 
+export interface WorkspaceListItem {
+  path: string;
+  name: string;
+  tables: number;
+  opened: string;
+  current: boolean;
+}
+
+export interface SettingsDto {
+  baseUrl: string;
+  model: string;
+  hasApiKey: boolean;
+  brainReady: boolean;
+  workspace: string;
+  pollSeconds: number;
+}
+
 export const agentApi = {
   health: () => get<{ ok: boolean; workspace: string }>("/api/v1/health"),
   workspace: () => get<WorkspaceInfo>("/api/v1/workspace"),
@@ -149,4 +181,16 @@ export const agentApi = {
     if (file) q.set("file", file);
     return get<SheetPreview>(`/api/v1/sheets/preview?${q.toString()}`);
   },
+  // 工作区
+  workspaces: () => get<{ current: string; items: WorkspaceListItem[] }>("/api/v1/workspaces"),
+  openWorkspace: (dir: string) =>
+    post<{ ok: boolean; root: string }>("/api/v1/workspace/open", { dir }),
+  createWorkspace: (name: string, base?: string) =>
+    post<{ ok: boolean; root: string }>("/api/v1/workspace/create", { name, base }),
+  forgetWorkspace: (dir: string) =>
+    post<{ ok: boolean }>("/api/v1/workspace/forget", { dir }),
+  // 设置（脑）
+  settings: () => get<SettingsDto>("/api/v1/settings"),
+  saveSettings: (p: { baseUrl?: string; apiKey?: string; model?: string }) =>
+    put<{ ok: boolean; brainReady: boolean }>("/api/v1/settings", p),
 };

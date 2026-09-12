@@ -1,9 +1,10 @@
 import { useEffect, useCallback, useState } from "react";
 import "./dashboard.css";
 import { agentApi, nodeId } from "../api-agent";
-import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview } from "../api-agent";
-import { IconRefresh, IconCheck, IconXls, IconNote } from "../components/icons";
+import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, WorkspaceListItem } from "../api-agent";
+import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder } from "../components/icons";
 import SheetView from "./SheetView";
+import Settings from "./Settings2";
 
 /* 数据管家 · 主看板（见 docs/agent-architecture/14-第一屏设计.md、17-工作区与跨文件联动.md）
    一屏答一个问题：「我的表，有没有事？它要动什么？」
@@ -15,6 +16,7 @@ export default function Dashboard() {
   const [load, setLoad] = useState<Load>("loading");
   const [err, setErr] = useState("");
   const [wsName, setWsName] = useState("");
+  const [wsPath, setWsPath] = useState("");
   const [files, setFiles] = useState<WorkspaceFiles | null>(null);
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [scan, setScan] = useState<ScanReport | null>(null);
@@ -25,6 +27,9 @@ export default function Dashboard() {
   const [zoomed, setZoomed] = useState(false);
   // 打开表格：{sheet, file, highlight} —— 表预览整屏覆盖（表数据要看全）
   const [opened, setOpened] = useState<{ sheet: string; file?: string; ref?: string } | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [brainReady, setBrainReady] = useState(true);
 
   const refresh = useCallback(async () => {
     setLoad("loading");
@@ -34,6 +39,8 @@ export default function Dashboard() {
         // 工作区名取目录名（工作区是容器，可以含多个表）
         const seg = ws.root.replace(/\\/g, "/").split("/").filter(Boolean);
         setWsName(seg[seg.length - 1] ?? "工作区");
+        setWsPath(ws.root);
+        setBrainReady(ws.brainReady);
       });
       const [f, g, s, l] = await Promise.all([
         agentApi.files().catch(() => null),
@@ -92,15 +99,10 @@ export default function Dashboard() {
     );
   }
 
-  // 空地盘：工作区里还没有表
+  // 空地盘：工作区里还没有表。**仍要保留顶栏**——否则用户没法切换工作区/进设置，
+  // 新建用户会卡在空白页没有出路。
   const tableCount = files?.tables?.length ?? 0;
-  if (load === "ready" && tableCount === 0) {
-    return (
-      <div className="dash">
-        <EmptyWorkspace root={graph?.root ?? ""} onRefresh={() => void refresh()} />
-      </div>
-    );
-  }
+  const isEmpty = load === "ready" && tableCount === 0;
 
   const propagate = graph?.propagate?.to ?? [];
   const hot = new Set(propagate);
@@ -110,15 +112,38 @@ export default function Dashboard() {
     <div className="dash">
       <header className="dash-top">
         <div className="dash-title">
-          <IconXls size={17} />
-          <span>{wsName || "工作区"}</span>
-          <em className="dash-count">{tableCount} 个表</em>
+          <button className="ws-switch" onClick={() => setSwitcherOpen((v) => !v)} title="切换工作区">
+            <IconXls size={16} />
+            <span>{wsName || "工作区"}</span>
+            <em className="dash-count">{isEmpty ? "空" : `${tableCount} 个表`}</em>
+            <IconChevD size={13} />
+          </button>
+          {!brainReady && <span className="dash-offline" title="未配置模型：看表/体检可用，改表需联网配置">离线</span>}
+          {switcherOpen && (
+            <WorkspaceSwitcher
+              onPick={() => { setSwitcherOpen(false); void refresh(); }}
+              onOpenSettings={() => { setSwitcherOpen(false); setSettingsOpen(true); }}
+            />
+          )}
         </div>
         <div className="dash-actions">
-          <button className="btn ghost sm" onClick={() => setZoomed(true)}>展开联动图</button>
-          <button className="btn ghost sm" onClick={() => void refresh()}><IconRefresh size={13} />体检</button>
+          {!isEmpty && <button className="btn ghost sm" onClick={() => setZoomed(true)}>展开联动图</button>}
+          {!isEmpty && <button className="btn ghost sm" onClick={() => void refresh()}><IconRefresh size={13} />体检</button>}
+          <button className="btn ghost sm" onClick={() => setSettingsOpen(true)}><IconGear size={13} />设置</button>
         </div>
       </header>
+
+      {settingsOpen && (
+        <Settings onClose={() => setSettingsOpen(false)} onWorkspaceChanged={() => void refresh()} />
+      )}
+
+      {/* 空地盘：只有这一块，但顶栏在，能换工作区 */}
+      {isEmpty ? (
+        <div className="dash-body dash-body-empty">
+          <EmptyWorkspace root={wsPath} onRefresh={() => void refresh()} onNew={() => setSettingsOpen(true)} />
+        </div>
+      ) : (
+        <>
 
       <div className="dash-body">
         {/* 左：联动摘要（按文件分组） */}
@@ -250,6 +275,8 @@ export default function Dashboard() {
           ))
         )}
       </footer>
+        </>
+      )}
 
       {zoomed && graph && (
         <GraphOverlay graph={graph} active={active} hot={hot} onPick={(n) => void pickNode(n)} onClose={() => setZoomed(false)} />
@@ -301,16 +328,68 @@ function NodeStats({ node }: { node: GraphNode }) {
   );
 }
 
+/* ---------- 工作区切换器 ---------- */
+
+function WorkspaceSwitcher({ onPick, onOpenSettings }: { onPick: () => void; onOpenSettings: () => void }) {
+  const [items, setItems] = useState<WorkspaceListItem[]>([]);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    agentApi.workspaces()
+      .then((r) => setItems(r.items))
+      .catch(() => setItems([]));
+  }, []);
+
+  const pick = async (dir: string) => {
+    setBusy(true);
+    try { await agentApi.openWorkspace(dir); onPick(); } finally { setBusy(false); }
+  };
+
+  return (
+    <>
+      <div className="ws-backdrop" onClick={onOpenSettings} />
+      <div className="ws-menu" onClick={(e) => e.stopPropagation()}>
+        {items.length === 0 && <div className="ws-empty">还没有其他工作区</div>}
+        {items.map((w) => (
+          <button key={w.path} className={`ws-item${w.current ? " on" : ""}`}
+            disabled={busy || w.current} onClick={() => void pick(w.path)}>
+            <IconFolder size={13} />
+            <span className="ws-n">{w.name}</span>
+            <span className="ws-m">{w.tables} 表</span>
+            {w.current && <IconCheck size={13} />}
+          </button>
+        ))}
+        <button className="ws-item ws-manage" onClick={onOpenSettings}>
+          <IconGear size={13} />管理工作区…
+        </button>
+      </div>
+    </>
+  );
+}
+
 /* ---------- 空地盘 ---------- */
 
-function EmptyWorkspace({ root, onRefresh }: { root: string; onRefresh: () => void }) {
+function EmptyWorkspace({ root, onRefresh, onNew }: {
+  root: string; onRefresh: () => void; onNew: () => void;
+}) {
   return (
     <div className="dash-empty">
-      <h2>还没有工作区内容</h2>
-      <p>工作区是一块地盘，可以放多个表。把 xlsx 拖进这个文件夹，或选一个已有文件夹当工作区。</p>
+      <h2>这个工作区还是空的</h2>
+      <p>工作区就是一个文件夹，表放在里面。两种做法：</p>
+      <div className="empty-ways">
+        <div className="empty-way">
+          <b>放表格进来</b>
+          <span>把 xlsx 拖进下面这个文件夹，然后点「重新读取」。</span>
+        </div>
+        <div className="empty-way">
+          <b>换个工作区</b>
+          <span>左上角点工作区名可切换；「设置」里能新建或打开别的文件夹。</span>
+        </div>
+      </div>
       <p className="dash-hint">当前目录：<code>{root || "（未设置）"}</code></p>
-      <p className="dash-hint">放入文件后点这里重新读取。inbox 里的新数据会自动被处理。</p>
-      <button className="btn primary" onClick={onRefresh}><IconRefresh size={14} />重新读取</button>
+      <div className="empty-actions">
+        <button className="btn primary" onClick={onRefresh}><IconRefresh size={14} />重新读取</button>
+        <button className="btn ghost" onClick={onNew}><IconGear size={14} />打开设置</button>
+      </div>
     </div>
   );
 }
