@@ -41,3 +41,8 @@ ark-app/
 docs/
 apps/data/
 gui-test-screenshots/
+
+# 运行时状态（每台机器不同，不该进仓库）
+gridwright-workspaces.json
+# 本地测试工作区（含用户真表副本与运行状态）
+testXls/
