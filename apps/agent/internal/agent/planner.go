@@ -11,6 +11,7 @@ import (
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/graph"
 	"github.com/ark-local-ai/ark/apps/agent/internal/locate"
+	"github.com/ark-local-ai/ark/apps/agent/internal/memory2"
 	"github.com/ark-local-ai/ark/apps/agent/internal/propose"
 )
 
@@ -77,7 +78,14 @@ func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) 
 	}
 	g, _ := graph.ScanWorkspace(a.Layout.Root, files, graph.Options{})
 
-	prompt := assemblePlanPrompt(instruction, structs, g)
+	// 相关记忆（见 docs/agent-architecture/21-记忆设计.md）：**只取与本次指令相关的**，
+	// 不把全部记忆塞进 prompt——上下文里没有噪音，模型更容易判对。
+	memText := ""
+	if mem, merr := memory2.Open(a.Layout.Root); merr == nil {
+		memText = mem.RetrieveByText(instruction).Describe()
+	}
+
+	prompt := assemblePlanPrompt(instruction, structs, g, memText)
 	resp, err := a.Brain.PlanSemantic(ctx, prompt)
 	if err != nil {
 		return nil, err

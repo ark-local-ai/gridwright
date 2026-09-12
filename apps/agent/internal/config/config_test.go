@@ -9,6 +9,7 @@ import (
 // TestOfflineNoConfigFile 桌面版没有 config.yaml：只要能拿到工作区就应可启动。
 // 这是"没网络也能用 xls"的前提——引擎不能因为没有配置文件/没有 key 就拒绝启动。
 func TestNoConfigFileUsesEnv(t *testing.T) {
+	isolateConfig(t)
 	t.Setenv("WORKSPACE", filepath.Join(t.TempDir(), "ws"))
 	t.Setenv("LLM_API_KEY", "")
 	t.Setenv("LLM_BASE_URL", "")
@@ -32,6 +33,7 @@ func TestNoConfigFileUsesEnv(t *testing.T) {
 
 // TestExplicitMissingConfigIsError 显式指定了配置文件却读不到 → 应报错（不静默）。
 func TestExplicitMissingConfigIsError(t *testing.T) {
+	isolateConfig(t)
 	t.Setenv("WORKSPACE", t.TempDir())
 	if _, err := Load("does-not-exist.yaml"); err == nil {
 		t.Fatal("显式指定的配置不存在时应报错")
@@ -40,6 +42,7 @@ func TestExplicitMissingConfigIsError(t *testing.T) {
 
 // TestConfigFileRead 正常读配置文件 + env 覆盖。
 func TestConfigFileRead(t *testing.T) {
+	isolateConfig(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
 	body := `
@@ -80,6 +83,7 @@ llm:
 
 // TestMissingWorkspaceIsError 工作区是硬要求（没有它无从下手）。
 func TestMissingWorkspaceIsError(t *testing.T) {
+	isolateConfig(t)
 	t.Setenv("WORKSPACE", "")
 	if _, err := Load("config.yaml"); err == nil {
 		t.Fatal("没有工作区应报错")
@@ -147,4 +151,11 @@ func TestSavePreservesOtherFields(t *testing.T) {
 	if got.PollSeconds != 9 || got.SampleRows != 7 {
 		t.Errorf("其他字段应保留：poll=%d sample=%d", got.PollSeconds, got.SampleRows)
 	}
+}
+
+// isolateConfig 把用户配置目录指到临时目录，避免测试读到开发机上真实的
+// %APPDATA%\gridwright\config.yaml（否则测试结果依赖本机状态）。
+func isolateConfig(t *testing.T) {
+	t.Helper()
+	t.Setenv("GRIDWRIGHT_CONFIG_DIR", t.TempDir())
 }

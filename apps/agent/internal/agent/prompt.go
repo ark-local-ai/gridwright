@@ -82,7 +82,7 @@ func readXLSXText(path string) (string, error) {
 //
 // 与旧的 assemblePrompt 关键区别：**要求模型输出业务语义坐标，不要输出单元格坐标**。
 // 因为真实台账里（合并单元格、汇总表列是日期序列号）坐标极易错行错列，坐标由代码算。
-func assemblePlanPrompt(instruction string, structures []*xl.Structure, g *graph.Graph) string {
+func assemblePlanPrompt(instruction string, structures []*xl.Structure, g *graph.Graph, memoryText string) string {
 	var b strings.Builder
 	b.WriteString("# 任务\n")
 	b.WriteString(strings.TrimSpace(instruction))
@@ -99,6 +99,10 @@ func assemblePlanPrompt(instruction string, structures []*xl.Structure, g *graph
 			}
 			fmt.Fprintf(&b, "  「%s」→「%s」(%s ×%d)\n", e.To.ID(), e.From.ID(), e.Kind, e.Count)
 		}
+		b.WriteString("\n")
+	}
+	if strings.TrimSpace(memoryText) != "" {
+		b.WriteString(memoryText)
 		b.WriteString("\n")
 	}
 	b.WriteString(`# 输出要求

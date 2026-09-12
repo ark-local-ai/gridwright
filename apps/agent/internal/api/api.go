@@ -129,6 +129,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/chat", s.handleChat)
 	mux.HandleFunc("/api/v1/conversations", s.handleConversations)
 	mux.HandleFunc("/api/v1/conversation", s.handleConversation)
+	mux.HandleFunc("/api/v1/memory", s.handleMemoryOrPut)
+	mux.HandleFunc("/api/v1/memory/stale", s.handleMemoryStale)
 	mux.HandleFunc("/api/v1/graph", s.handleGraph)
 	mux.HandleFunc("/api/v1/scan", s.handleScan)
 	mux.HandleFunc("/api/v1/scan/run", s.handleScanRun)
