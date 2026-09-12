@@ -1,0 +1,86 @@
+/* 待确认 + 会话（见 docs/agent-architecture/19-界面设计.md 阶段 3-4） */
+
+/* ---------- 待确认清单 ---------- */
+.pend { display: flex; flex-direction: column; gap: 14px; }
+.pend-head { display: flex; align-items: baseline; gap: 10px; }
+.pend-head b { font-size: 14px; font-weight: var(--fw-h); color: var(--text-1); }
+.pend-target { font-size: 11.5px; color: var(--text-3); }
+
+.pend-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.pend-item {
+  border: 1px solid var(--line); border-left: 3px solid var(--brand);
+  border-radius: var(--radius-md); padding: 11px 13px; background: var(--surface);
+  display: flex; flex-direction: column; gap: 7px;
+}
+.pi-main { display: flex; align-items: baseline; gap: 10px; }
+.pi-where { font-size: 13px; font-weight: var(--fw-med); color: var(--text-1); }
+.pi-field { font-size: 11.5px; color: var(--text-3); padding: 1px 7px; border-radius: 999px; background: var(--surface-2); }
+
+/* 墨迹式：旧值 → 新值（这一屏唯一"改变正在发生"的地方） */
+.pi-change { display: flex; align-items: baseline; gap: 9px; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.pi-old { color: var(--text-3); text-decoration: line-through; font-size: 12.5px; }
+.pi-arrow { color: var(--brand); }
+.pi-new { color: var(--text-1); font-weight: var(--fw-h); font-size: 14px; }
+.pi-op { font-size: 10.5px; color: var(--brand); background: var(--brand-soft); padding: 1px 6px; border-radius: 999px; font-family: var(--font); }
+
+.pi-meta { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; font-size: 11.5px; }
+.pi-ref { font-family: var(--mono); color: var(--brand); }
+.pi-reason { color: var(--text-2); }
+.pi-affects { color: var(--warn); }
+
+.pend-blocked { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 10px 13px; background: var(--surface-2); }
+.pb-h { font-size: 11.5px; font-weight: var(--fw-h); color: var(--warn); margin-bottom: 6px; }
+.pend-blocked ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.pend-blocked li { font-size: 12px; color: var(--text-2); }
+.pend-blocked em { font-style: normal; font-family: var(--mono); color: var(--text-3); margin-right: 6px; }
+
+.pend-err { font-size: 12px; color: var(--danger); margin: 0; }
+.pend-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pend-hint { font-size: 11.5px; color: var(--text-3); }
+
+/* ---------- 会话 ---------- */
+.chat { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.chat-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding-bottom: 8px; }
+
+.chat-hello {
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  padding: 28px 12px; color: var(--text-3); text-align: center;
+}
+.chat-hello svg { color: var(--brand); }
+.chat-hello p { font-size: 13.5px; color: var(--text-2); margin: 2px 0 6px; font-weight: var(--fw-med); }
+.chat-ex { font-size: 12px; color: var(--text-3); }
+
+.msg { max-width: 92%; }
+.msg.user { align-self: flex-end; }
+.msg-text {
+  font-size: 13px; line-height: 1.6; padding: 8px 12px; border-radius: var(--radius-md);
+  background: var(--surface-2); color: var(--text-1); white-space: pre-wrap;
+}
+.msg.user .msg-text { background: var(--brand); color: #fff; }
+.msg.system .msg-text { background: var(--warn-bg); color: var(--warn); font-size: 12px; }
+.msg-text.typing { color: var(--text-3); }
+
+/* 结构化建议卡 */
+.msg-prop {
+  margin-top: 7px; border: 1px solid var(--brand-line); border-radius: var(--radius-md);
+  background: var(--brand-soft); padding: 10px 12px;
+}
+.mp-kind { font-size: 10.5px; color: var(--brand); font-weight: var(--fw-h); margin-bottom: 3px; }
+.mp-title { font-size: 13px; font-weight: var(--fw-h); color: var(--text-1); }
+.mp-detail { font-size: 12px; color: var(--text-2); margin-top: 3px; line-height: 1.6; }
+.mp-meta { font-size: 11.5px; color: var(--text-3); margin-top: 5px; font-family: var(--mono); }
+.mp-opts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+
+.chat-err { font-size: 12px; color: var(--danger); }
+
+.chat-input { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); flex: none; }
+.chat-input input {
+  flex: 1; min-width: 0; padding: 8px 11px; font-size: 13px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text-1); font-family: var(--font);
+}
+.chat-input input:focus { outline: none; border-color: var(--brand); }
+.chat-foot {
+  display: flex; align-items: center; gap: 5px; margin: 7px 0 0;
+  font-size: 11px; color: var(--text-3); flex: none;
+}

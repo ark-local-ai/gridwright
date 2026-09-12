@@ -43,6 +43,7 @@
           "args": true
         }
       ]
-    }
+    },
+    "dialog:allow-open"
   ]
 }

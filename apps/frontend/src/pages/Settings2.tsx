@@ -7,9 +7,11 @@ import { IconCheck, IconFolder, IconGear, IconX } from "../components/icons";
 /* 设置（见 docs/agent-architecture/19-界面设计.md、20-离线可用与桌面交付.md）
    两件事：配"脑"（模型） + 管工作区。离线时明确告诉用户哪些能用、哪些要联网。 */
 
-export default function Settings({ onClose, onWorkspaceChanged }: {
+export default function Settings({ onClose, onWorkspaceChanged, pickFolder }: {
   onClose: () => void;
   onWorkspaceChanged?: () => void;
+  /** 选文件夹（桌面端注入原生选择框；网页端不传则退化为主输路径） */
+  pickFolder?: () => Promise<string | null>;
 }) {
   const [s, setS] = useState<SettingsDto | null>(null);
   const [spaces, setSpaces] = useState<WorkspaceListItem[]>([]);
@@ -19,6 +21,7 @@ export default function Settings({ onClose, onWorkspaceChanged }: {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [newName, setNewName] = useState("");
+  const [manualPath, setManualPath] = useState("");
   const [busySpace, setBusySpace] = useState(false);
 
   const load = async () => {
@@ -76,6 +79,22 @@ export default function Settings({ onClose, onWorkspaceChanged }: {
     } finally {
       setBusySpace(false);
     }
+  };
+
+  // 打开已有文件夹当工作区：桌面端用系统选择框；网页端退化为主输路径
+  const openFolder = async () => {
+    if (pickFolder) {
+      const dir = await pickFolder();
+      if (dir) await switchTo(dir);
+      return;
+    }
+    setMsg("网页预览版没有系统选择框；请在下面输入文件夹路径后点「打开」。");
+  };
+
+  const openManual = async () => {
+    if (!manualPath.trim()) return;
+    await switchTo(manualPath.trim());
+    setManualPath("");
   };
 
   return (
@@ -154,9 +173,17 @@ export default function Settings({ onClose, onWorkspaceChanged }: {
               <button className="btn ghost" onClick={() => void createWorkspace()}
                 disabled={busySpace || !newName.trim()}>新建</button>
             </div>
-            <p className="set-hint set-hint-sm">
-              新建会在默认目录建一个文件夹。“打开已有文件夹当工作区”在桌面版里用系统选择框（下一步做）。
-            </p>
+
+            <div className="set-row">
+              <button className="btn ghost" onClick={() => void openFolder()} disabled={busySpace}>
+                <IconFolder size={13} />打开已有文件夹
+              </button>
+              <input className="set-newspace" value={manualPath} placeholder="或输入文件夹路径"
+                onChange={(e) => setManualPath(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") void openManual(); }} />
+              <button className="btn ghost sm" onClick={() => void openManual()}
+                disabled={busySpace || !manualPath.trim()}>打开</button>
+            </div>
           </section>
         </div>
       </div>

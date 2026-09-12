@@ -12,17 +12,18 @@
     "lint": "oxlint"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.7.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router-dom": "^7.18.3",
-    "@tauri-apps/api": "^2"
+    "react-router-dom": "^7.18.3"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",
-    "@tauri-apps/cli": "^2",
     "oxlint": "^1.79.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.2"

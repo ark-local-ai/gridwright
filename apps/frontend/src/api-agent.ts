@@ -165,6 +165,48 @@ export interface SettingsDto {
   pollSeconds: number;
 }
 
+export interface ProposalItem {
+  file: string;
+  sheet: string;
+  ref: string;
+  row: number;
+  col: number;
+  key?: Record<string, string>;
+  month?: string;
+  field: string;
+  op: string;
+  old: unknown;
+  new: unknown;
+  reason?: string;
+  affects?: string[];
+}
+
+export interface ProposalBlocked {
+  sheet?: string;
+  ref?: string;
+  field?: string;
+  reason: string;
+}
+
+export interface Proposal {
+  id: string;
+  root: string;
+  target: string;
+  summary: string;
+  items: ProposalItem[];
+  blocked?: ProposalBlocked[];
+}
+
+export interface ApplyResult {
+  ref: string;
+  sheet: string;
+  field: string;
+  old: unknown;
+  new: unknown;
+  status: "ok" | "rejected";
+  note?: string;
+}
+
 export const agentApi = {
   health: () => get<{ ok: boolean; workspace: string }>("/api/v1/health"),
   workspace: () => get<WorkspaceInfo>("/api/v1/workspace"),
@@ -193,4 +235,39 @@ export const agentApi = {
   settings: () => get<SettingsDto>("/api/v1/settings"),
   saveSettings: (p: { baseUrl?: string; apiKey?: string; model?: string }) =>
     put<{ ok: boolean; brainReady: boolean }>("/api/v1/settings", p),
+  // 待确认闭环：计划 → 确认 → 执行
+  plan: (instruction: string, file?: string) =>
+    post<{ id: string; proposal: Proposal }>("/api/v1/plan", { instruction, file }),
+  apply: (id: string) =>
+    post<{ ok: boolean; applied: number; rejected: number; results: ApplyResult[] }>("/api/v1/apply", { id }),
+  // 会话
+  chat: (message: string, conversationId?: string) =>
+    post<{ conversationId: string; conversation: ConvoDto }>("/api/v1/chat", { message, conversationId }),
+  conversations: () => get<{ items: ConvoSummary[] }>("/api/v1/conversations"),
+  conversation: (id: string) => get<ConvoDto>(`/api/v1/conversation?id=${encodeURIComponent(id)}`),
 };
+
+export interface ConvoSummary {
+  id: string;
+  title: string;
+  created: string;
+  updated: string;
+}
+
+export interface ConvoMsgDto {
+  role: "user" | "agent" | "system";
+  text: string;
+  time: string;
+  proposal?: {
+    kind: string; title: string; detail: string; schedule?: string;
+    action?: string; tools?: string[]; options?: string[];
+  };
+}
+
+export interface ConvoDto {
+  id: string;
+  title: string;
+  messages: ConvoMsgDto[];
+  created: string;
+  updated: string;
+}

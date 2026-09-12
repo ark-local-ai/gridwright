@@ -2,6 +2,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Dashboard from '../../frontend/src/pages/Dashboard'
 import Site from '../../frontend/src/pages/Site'
 import TitleBar from './TitleBar'
+import { pickFolder } from './native'
 
 // 桌面端 = 数据管家（只做这一件事）。
 // Tauri 通过自定义协议加载（不是 HTTP 服务），没有 History API，故用 HashRouter。
@@ -14,7 +15,8 @@ export default function App() {
         <TitleBar />
         <div className="desktop-body">
           <Routes>
-            <Route path="/app" element={<Dashboard />} />
+            {/* 传入原生文件夹选择框：桌面端能弹系统对话框选工作区 */}
+            <Route path="/app" element={<Dashboard pickFolder={pickFolder} />} />
             {/* 官网（关于/引导页）保留 */}
             <Route path="/about" element={<Site />} />
             <Route path="*" element={<Navigate to="/app" replace />} />

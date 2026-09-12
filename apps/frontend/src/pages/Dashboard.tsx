@@ -1,10 +1,11 @@
 import { useEffect, useCallback, useState } from "react";
 import "./dashboard.css";
 import { agentApi, nodeId } from "../api-agent";
-import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, WorkspaceListItem } from "../api-agent";
+import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, WorkspaceListItem, Proposal } from "../api-agent";
 import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder } from "../components/icons";
 import SheetView from "./SheetView";
 import Settings from "./Settings2";
+import { PendingList, ChatPane } from "./Pending";
 
 /* 数据管家 · 主看板（见 docs/agent-architecture/14-第一屏设计.md、17-工作区与跨文件联动.md）
    一屏答一个问题：「我的表，有没有事？它要动什么？」
@@ -12,7 +13,7 @@ import Settings from "./Settings2";
 
 type Load = "idle" | "loading" | "ready" | "error";
 
-export default function Dashboard() {
+export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<string | null> } = {}) {
   const [load, setLoad] = useState<Load>("loading");
   const [err, setErr] = useState("");
   const [wsName, setWsName] = useState("");
@@ -23,13 +24,16 @@ export default function Dashboard() {
   const [counts, setCounts] = useState({ error: 0, warn: 0 });
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [active, setActive] = useState<GraphNode | null>(null);
-  const [tab, setTab] = useState<"confirm" | "scan">("confirm");
+  const [tab, setTab] = useState<"confirm" | "scan" | "chat">("confirm");
   const [zoomed, setZoomed] = useState(false);
   // 打开表格：{sheet, file, highlight} —— 表预览整屏覆盖（表数据要看全）
   const [opened, setOpened] = useState<{ sheet: string; file?: string; ref?: string } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [brainReady, setBrainReady] = useState(true);
+  // 待确认清单（A）与应用结果提示
+  const [proposal, setProposal] = useState<Proposal | null>(null);
+  const [appliedNote, setAppliedNote] = useState("");
 
   const refresh = useCallback(async () => {
     setLoad("loading");
@@ -119,6 +123,7 @@ export default function Dashboard() {
             <IconChevD size={13} />
           </button>
           {!brainReady && <span className="dash-offline" title="未配置模型：看表/体检可用，改表需联网配置">离线</span>}
+          {appliedNote && <span className="dash-applied"><IconCheck size={12} />{appliedNote}</span>}
           {switcherOpen && (
             <WorkspaceSwitcher
               onPick={() => { setSwitcherOpen(false); void refresh(); }}
@@ -134,7 +139,7 @@ export default function Dashboard() {
       </header>
 
       {settingsOpen && (
-        <Settings onClose={() => setSettingsOpen(false)} onWorkspaceChanged={() => void refresh()} />
+        <Settings onClose={() => setSettingsOpen(false)} onWorkspaceChanged={() => void refresh()} pickFolder={pickFolder} />
       )}
 
       {/* 空地盘：只有这一块，但顶栏在，能换工作区 */}
@@ -218,19 +223,30 @@ export default function Dashboard() {
           )}
 
           <div className="dash-tabs">
-            <button className={tab === "confirm" ? "on" : ""} onClick={() => setTab("confirm")}>需要确认</button>
+            <button className={tab === "confirm" ? "on" : ""} onClick={() => setTab("confirm")}>
+              待确认{proposal && proposal.items.length > 0 && <em>{proposal.items.length}</em>}
+            </button>
             <button className={tab === "scan" ? "on" : ""} onClick={() => setTab("scan")}>
               体检发现{(counts.error + counts.warn) > 0 && <em>{counts.error + counts.warn}</em>}
             </button>
+            <button className={tab === "chat" ? "on" : ""} onClick={() => setTab("chat")}>对话</button>
           </div>
 
           {tab === "confirm" ? (
             <div className="dash-pane">
-              <div className="dash-none">
-                <IconCheck size={18} />
-                <p>没有待确认的改动</p>
-                <span>把新数据放进 inbox，或到对话里下达任务</span>
-              </div>
+              <PendingList
+                proposal={proposal}
+                onApplied={(r) => {
+                  setProposal(null);
+                  setAppliedNote(`${r.applied} 处已应用${r.rejected ? `，${r.rejected} 处被拒` : ""}`);
+                  void refresh();
+                }}
+                onDiscarded={() => setProposal(null)}
+              />
+            </div>
+          ) : tab === "chat" ? (
+            <div className="dash-pane">
+              <ChatPane onPlanReady={(p) => { setProposal(p); setTab("confirm"); }} />
             </div>
           ) : (
             <div className="dash-pane">
