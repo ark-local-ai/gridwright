@@ -7,6 +7,7 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/ledger"
+	"github.com/ark-local-ai/ark/apps/agent/internal/safety"
 	"github.com/ark-local-ai/ark/apps/agent/internal/xl"
 )
 
@@ -35,6 +36,14 @@ func Apply(p *Proposal, led *ledger.Ledger, model string) ([]ApplyResult, error)
 	// 防盲改：确认期间文件被换过就不动
 	if Changed(p.Target, p.Finger) {
 		return nil, fmt.Errorf("目标表在确认期间被改动过，为避免覆盖你的修改，已取消本次操作；请重新体检再改")
+	}
+
+	// 写入安全：含宏这类 excelize 会破坏的内容，**默认拒绝写**
+	// （见 docs/agent-architecture/24-语义映射与安全边界.md）
+	if rep, err := safety.Check(p.Target); err == nil {
+		if !rep.CanWrite {
+			return nil, fmt.Errorf("这张表含程序无法安全处理的内容，已拒绝写入：%s", rep.Describe())
+		}
 	}
 
 	f, err := excelize.OpenFile(p.Target)

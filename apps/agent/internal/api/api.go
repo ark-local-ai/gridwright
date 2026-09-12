@@ -135,6 +135,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/impact", s.handleImpact)
 	mux.HandleFunc("/api/v1/impact/learn", s.handleImpactLearn)
 	mux.HandleFunc("/api/v1/relations", s.handleRelations)
+	mux.HandleFunc("/api/v1/safety", s.handleSafety)
 	mux.HandleFunc("/api/v1/graph", s.handleGraph)
 	mux.HandleFunc("/api/v1/scan", s.handleScan)
 	mux.HandleFunc("/api/v1/scan/run", s.handleScanRun)

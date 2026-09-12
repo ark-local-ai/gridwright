@@ -1,8 +1,9 @@
 // Package propose 是"待改清单"模型（见 docs/agent-architecture/19-界面设计.md 阶段 4）。
 //
 // 用户的规则：**看清单 → 你确认 → 才改**。所以改动分两步：
-//   Plan  ：算出"要改哪些格、旧值新值、会牵动谁"，**不落盘**，产出 Proposal。
-//   Apply ：用户确认后，按 Proposal 执行：备份 → 写 → 记账。
+//
+//	Plan  ：算出"要改哪些格、旧值新值、会牵动谁"，**不落盘**，产出 Proposal。
+//	Apply ：用户确认后，按 Proposal 执行：备份 → 写 → 记账。
 //
 // Proposal 存在服务端（带文件指纹与过期），Apply 只认 ID。
 // 这样用户确认的是**服务端算出来的那份**，客户端无法篡改；
@@ -29,9 +30,9 @@ type Item struct {
 	Col   int    `json:"col"`
 
 	// 语义坐标（人能看懂的部分，界面按这个展示）
-	Key    map[string]string `json:"key,omitempty"` // 铺位/租户 等
-	Month  string            `json:"month,omitempty"`
-	Field  string            `json:"field"`         // 字段列名
+	Key   map[string]string `json:"key,omitempty"` // 铺位/租户 等
+	Month string            `json:"month,omitempty"`
+	Field string            `json:"field"` // 字段列名
 
 	Op     string `json:"op"`  // set | add
 	Old    any    `json:"old"` // 旧值（算出来的）
@@ -52,8 +53,8 @@ type Proposal struct {
 	Summary string `json:"summary"` // 一句话说明
 	Items   []Item `json:"items"`
 	// 被挡下的条目（命中 forbid / 定位失败等），要让人看见，不静默
-	Blocked  []Blocked `json:"blocked,omitempty"`
-	Created  time.Time `json:"created"`
+	Blocked []Blocked `json:"blocked,omitempty"`
+	Created time.Time `json:"created"`
 }
 
 // Blocked 是一条"想改但没让改"的记录。
