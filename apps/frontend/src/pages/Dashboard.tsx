@@ -250,35 +250,38 @@ function GraphOverlay({ graph, active, hot, onPick, onClose }: {
   graph: GraphData; active: GraphNode | null; hot: Set<string>;
   onPick: (n: GraphNode) => void; onClose: () => void;
 }) {
+  // "相关就连，不相关留白"：只把有边的节点画进图里，孤立的单独留白区。
+  // 留白本身是信息（这些表目前互不相关），也是将来权重计算的观察起点。
+  const related = new Set<string>();
+  for (const e of graph.edges) {
+    related.add(nodeId(e.from));
+    related.add(nodeId(e.to));
+  }
+  const linked: GraphNode[] = [];
+  const isolated: GraphNode[] = [];
+  for (const n of graph.nodes) {
+    (related.has(nodeId(n)) ? linked : isolated).push(n);
+  }
+  const linkedGroups = groupNodes(graph, linked);
+  const isolatedGroups = groupNodes(graph, isolated);
+
   return (
     <div className="gv-overlay" onClick={onClose}>
       <div className="gv-panel" onClick={(e) => e.stopPropagation()}>
         <header className="gv-head">
           <b>联动图</b>
-          <span className="dash-muted">{graph.files.length} 个文件 · {graph.nodes.length} 张表 · {graph.edges.length} 条关联</span>
+          <span className="dash-muted">
+            {graph.files.length} 个文件 · {linked.length} 张有关联 · {isolated.length} 张暂无关联 · {graph.edges.length} 条边
+          </span>
           <button className="btn ghost sm" onClick={onClose}>关闭</button>
         </header>
         <div className="gv-body">
-          {groupByFile(graph).map((grp) => (
-            <div key={grp.file} className="gv-file">
-              <div className="gv-file-head"><IconXls size={13} />{grp.file}</div>
-              <div className="gv-nodes">
-                {grp.items.map((n) => {
-                  const id = nodeId(n);
-                  const isActive = active && nodeId(active) === id;
-                  const isHot = hot.has(id);
-                  return (
-                    <button key={id}
-                      className={`gv-node${isHot ? " hot" : ""}${isActive ? " on" : ""}`}
-                      onClick={() => onPick(n)} title={`${n.file}!${n.sheet}`}>
-                      {n.sheet}
-                      {grp.refs[id] > 0 && <span className="gv-count">{grp.refs[id]}</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+          <div className="gv-section-h">有关联</div>
+          {linkedGroups.map((grp) => (
+            <FileGroup key={grp.file} grp={grp} active={active} hot={hot} onPick={onPick} />
           ))}
+          {linked.length === 0 && <p className="dash-muted">未发现表间关联</p>}
+
           {graph.edges.length > 0 && (
             <div className="gv-edges">
               <div className="gv-edges-h">关联明细</div>
@@ -296,7 +299,44 @@ function GraphOverlay({ graph, active, hot, onPick, onClose }: {
               ))}
             </div>
           )}
+
+          {isolated.length > 0 && (
+            <div className="gv-isolated">
+              <div className="gv-edges-h">
+                暂无关联 <span className="dash-muted">（先留白 · 等权重出来再看是否连上）</span>
+              </div>
+              {isolatedGroups.map((grp) => (
+                <FileGroup key={grp.file} grp={grp} active={active} hot={hot} onPick={onPick} muted />
+              ))}
+            </div>
+          )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function FileGroup({ grp, active, hot, onPick, muted }: {
+  grp: Group; active: GraphNode | null; hot: Set<string>;
+  onPick: (n: GraphNode) => void; muted?: boolean;
+}) {
+  return (
+    <div className={`gv-file${muted ? " muted" : ""}`}>
+      <div className="gv-file-head"><IconXls size={13} />{grp.file}</div>
+      <div className="gv-nodes">
+        {grp.items.map((n) => {
+          const id = nodeId(n);
+          const isActive = active && nodeId(active) === id;
+          const isHot = hot.has(id);
+          return (
+            <button key={id}
+              className={`gv-node${isHot ? " hot" : ""}${isActive ? " on" : ""}`}
+              onClick={() => onPick(n)} title={`${n.file}!${n.sheet}`}>
+              {n.sheet}
+              {grp.refs[id] > 0 && <span className="gv-count">{grp.refs[id]}</span>}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -331,10 +371,15 @@ type Group = { file: string; items: GraphNode[]; refs: Record<string, number> };
 
 /** 按文件分组节点，并统计每个节点被引用次数（用于徽标）。limit=0 表示不截断。 */
 function groupByFile(g: GraphData, limit = 0): Group[] {
+  return groupNodes(g, g.nodes, limit);
+}
+
+/** 把给定节点按文件分组（用于"有关联 / 留白"分区渲染）。 */
+function groupNodes(g: GraphData, nodes: GraphNode[], limit = 0): Group[] {
   const refs: Record<string, number> = {};
   for (const e of g.edges) refs[nodeId(e.to)] = (refs[nodeId(e.to)] ?? 0) + e.count;
   const byFile = new Map<string, GraphNode[]>();
-  for (const n of g.nodes) {
+  for (const n of nodes) {
     const key = n.file || "（外部文件）";
     if (!byFile.has(key)) byFile.set(key, []);
     byFile.get(key)!.push(n);

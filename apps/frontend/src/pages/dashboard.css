@@ -107,6 +107,13 @@
 .gv-body { overflow: auto; padding: 20px; display: flex; flex-direction: column; gap: 18px; }
 
 .gv-file { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 12px 14px; background: var(--surface-2); }
+.gv-file.muted { background: transparent; border-style: dashed; }
+.gv-file.muted .gv-node { color: var(--text-3); }
+.gv-section-h {
+  font-size: 12px; font-weight: var(--fw-h); color: var(--text-1);
+  margin-bottom: -4px;
+}
+.gv-isolated { display: flex; flex-direction: column; gap: 10px; border-top: 1px dashed var(--line-strong); padding-top: 16px; }
 .gv-file-head {
   display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: var(--fw-h);
   color: var(--text-2); margin-bottom: 10px;
