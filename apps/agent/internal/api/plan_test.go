@@ -23,9 +23,9 @@ func TestApplyWritesAndLedgers(t *testing.T) {
 	}
 	// 直接构造一份清单（不走模型）：把 E2（本月实收）改成 20000
 	prop := &propose.Proposal{
-		Root:   s.Layout.Root,
-		Target: path,
-		Finger: finger,
+		Root:    s.Layout.Root,
+		Target:  path,
+		Finger:  finger,
 		Summary: "测试",
 		Items: []propose.Item{
 			{File: "测试表.xlsx", Sheet: "Sheet1", Ref: "E2", Row: 2, Col: 5,

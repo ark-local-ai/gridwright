@@ -60,7 +60,14 @@ func (c *Client) Plan(ctx context.Context, prompt string) (*plan.Plan, error) {
 	return p, nil
 }
 
-// SemanticResponse 是"语义坐标"版的模型输出（见 docs/agent-architecture/5-编辑语义.md）。
+// ChatJSON 用"会话"契约问脑：返回 reply + 结构化 proposal 的原始 JSON。
+func (c *Client) ChatJSON(ctx context.Context, prompt string) (string, error) {
+	return c.chat(ctx, chatSystemPrompt, prompt)
+}
+
+const chatSystemPrompt = `你是 gridwright「数据管家」的配置入口，负责把用户的自然语言变成可执行的安排。
+你只输出一个 JSON 对象，不要解释、不要 markdown。`
+
 // 注意 edits 的具体形状由 agent 包定义（semanticEdit）；这里只保留原始 JSON，
 // 由上层解析，避免 llm 包反向依赖 agent。
 type SemanticResponse struct {
