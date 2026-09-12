@@ -60,6 +60,29 @@ func (s *Server) handleWeights(w http.ResponseWriter, r *http.Request) {
 		Graph: g, Formulas: formulas, Activity: activity, WindowDays: 30,
 	})
 	hasUsage := len(activity) > 0
+
+	// ?format=text：命令行直接可读（.bat 里不用再塞 Python 解析 JSON）
+	if wantsText(r) {
+		var b strings.Builder
+		b.WriteString(line("权重（%s）", layout.Root))
+		if hasUsage {
+			b.WriteString(line("使用数据：有（综合结构与最近使用）"))
+		} else {
+			b.WriteString(line("使用数据：暂无（当前只按结构重要性排序）"))
+		}
+		b.WriteString("\n")
+		for _, sc := range scores {
+			why := strings.Join(sc.Reasons, " · ")
+			if why == "" {
+				why = "—"
+			}
+			b.WriteString(line("%5.2f  %-28s  结构%.2f 活跃%.2f  | %s",
+				sc.Attention, sc.Node.Sheet, sc.Structural, sc.Activity, why))
+		}
+		writeText(w, b.String())
+		return
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"scores":   scores,
 		"hasUsage": hasUsage,

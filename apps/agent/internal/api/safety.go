@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/safety"
 )
@@ -22,6 +23,16 @@ func (s *Server) handleSafety(w http.ResponseWriter, r *http.Request) {
 	rep, err := safety.Check(target)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if wantsText(r) {
+		var b strings.Builder
+		b.WriteString(line("写入安全：%s（可写：%v）", rep.Level, rep.CanWrite))
+		b.WriteString(line("%s", rep.Describe()))
+		for _, r := range rep.Risks {
+			b.WriteString(line("  [%s] %s：%s", r.Level, r.Kind, r.Detail))
+		}
+		writeText(w, b.String())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{

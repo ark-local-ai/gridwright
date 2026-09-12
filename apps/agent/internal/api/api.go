@@ -214,6 +214,19 @@ func (s *Server) handleWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	inbox, _ := layout.InboxFiles()
+	if wantsText(r) {
+		var b strings.Builder
+		b.WriteString(line("工作区：%s", layout.Root))
+		b.WriteString(line("表：%d 张", len(tables)))
+		b.WriteString(line("inbox 待处理：%d", len(inbox)))
+		if cfg.BrainReady() {
+			b.WriteString(line("模型：已配置（可改表/对话）"))
+		} else {
+			b.WriteString(line("模型：未配置（看表/体检/联动图/账目可用，改表需先配模型）"))
+		}
+		writeText(w, b.String())
+		return
+	}
 	writeJSON(w, http.StatusOK, workspaceInfo{
 		Root:       layout.Root,
 		Tables:     len(tables),
@@ -359,6 +372,26 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	errs, warns, infos := rep.CountBySeverity()
+	if wantsText(r) {
+		var b strings.Builder
+		b.WriteString(line("体检：%d 张表 / %d 格 / 耗时 %s", rep.Sheets, rep.Cells, rep.Elapsed))
+		b.WriteString(line("发现：错误 %d、存疑 %d", errs, warns))
+		b.WriteString("\n")
+		shown := 0
+		for _, it := range rep.Issues {
+			if shown >= 20 {
+				b.WriteString(line("…（还有 %d 条，用界面查看全部）", len(rep.Issues)-shown))
+				break
+			}
+			b.WriteString(line("[%s] %s!%s  %s", it.Severity, it.Sheet, it.Ref, it.Message))
+			shown++
+		}
+		if len(rep.Issues) == 0 {
+			b.WriteString("未发现问题\n")
+		}
+		writeText(w, b.String())
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"report": rep,
 		"counts": map[string]int{"error": errs, "warn": warns, "info": infos},
@@ -434,6 +467,20 @@ func (s *Server) handleLedger(w http.ResponseWriter, r *http.Request) {
 	}
 	if entries == nil {
 		entries = []ledger.Entry{}
+	}
+	if wantsText(r) {
+		var b strings.Builder
+		if len(entries) == 0 {
+			b.WriteString("账目：还没有改动记录\n")
+		} else {
+			b.WriteString(line("账目（最近 %d 条）：", len(entries)))
+			for _, e := range entries {
+				b.WriteString(line("%s  %s %s!%s  %s -> %s  [%s]",
+					e.Ts, e.Table, e.Sheet, e.Cell, e.Old, e.New, e.Status))
+			}
+		}
+		writeText(w, b.String())
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"entries": entries, "limit": limit})
 }
