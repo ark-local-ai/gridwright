@@ -9,14 +9,17 @@ import {
 const RELEASES = "https://github.com/ark-local-ai/ark/releases";
 const DL = `${RELEASES}/download/v0.1.0`;
 
-/* 按系统版本提供不同构建：
-   Win10/11 = 完整客户端（Tauri 图形界面，全功能）；
-   Win7/8   = 单文件版（无 WebView2，跑 Go 内核，盯表/改表/记账/通知）。 */
+/* 按系统版本提供不同构建。产物名与 scripts/build-single.sh 的输出一致：
+   Win10/11 = 桌面客户端（Tauri 壳，图形界面）；
+   Win7/8   = 单文件版（无 WebView2，Go 内核 + 界面已嵌进 exe，双击即用）。
+   ⚠️ 目前还没上传到 Releases（打包脚本已能产出，见 docs 里的打包说明），
+   所以这里标注"下载暂未开放"，避免点开是 404。 */
+const BUILT = false; // 上传 Releases 后置 true
 type DownloadOS = { os: string; label: string; kind: string; note: string; file: string; url: string };
 const DOWNLOADS: DownloadOS[] = [
-  { os: "win10", label: "Windows 10 / 11", kind: "完整客户端", note: "图形界面 · 全功能", file: "gridwright-setup-x64.exe", url: `${DL}/gridwright-setup-x64.exe` },
-  { os: "win7",  label: "Windows 7",        kind: "单文件版",   note: "老机器 · 无界面依赖", file: "gridwright-win7.exe",  url: `${DL}/gridwright-win7.exe` },
-  { os: "win8",  label: "Windows 8 / 8.1",  kind: "单文件版",   note: "老机器 · 无界面依赖", file: "gridwright-win8.exe",  url: `${DL}/gridwright-win8.exe` },
+  { os: "win10", label: "Windows 10 / 11", kind: "桌面客户端", note: "图形界面 · 全功能", file: "gridwright-windows-amd64.exe", url: `${DL}/gridwright-windows-amd64.exe` },
+  { os: "win7",  label: "Windows 7",        kind: "单文件版",   note: "免安装 · 界面已内嵌", file: "gridwright-windows-amd64.exe", url: `${DL}/gridwright-windows-amd64.exe` },
+  { os: "win8",  label: "Windows 8 / 8.1",  kind: "单文件版",   note: "免安装 · 界面已内嵌", file: "gridwright-windows-amd64.exe", url: `${DL}/gridwright-windows-amd64.exe` },
 ];
 
 export default function Site() {
@@ -191,10 +194,21 @@ export default function Site() {
             </button>
           ))}
         </div>
-        <a className="btn primary lg dl-btn" href={sel.url} target="_blank" rel="noreferrer">
-          下载 {sel.kind} · {sel.file}
-        </a>
-        <p className="dl-meta">{sel.note} · 免安装 · 规矩你定 · <a href={RELEASES} target="_blank" rel="noreferrer">查看全部版本</a></p>
+        {BUILT ? (
+          <a className="btn primary lg dl-btn" href={sel.url} target="_blank" rel="noreferrer">
+            下载 {sel.kind} · {sel.file}
+          </a>
+        ) : (
+          <a className="btn ghost lg dl-btn" href={RELEASES} target="_blank" rel="noreferrer"
+            title="打包脚本已能产出，还没上传到 Releases">
+            下载暂未开放 · 去 Releases 看进度
+          </a>
+        )}
+        <p className="dl-meta">
+          {sel.note} · 免安装 · 数据不出本机
+          {!BUILT && " · 安装包正在准备"}
+          {" · "}<a href={RELEASES} target="_blank" rel="noreferrer">查看全部版本</a>
+        </p>
       </section>
 
       <footer className="site-foot">
