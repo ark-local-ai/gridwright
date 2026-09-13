@@ -55,10 +55,10 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
 
   if (!proposal) {
     return (
-      <div className="dash-none">
-        <IconCheck size={18} />
-        <p>没有待确认的改动</p>
-        <span>在「对话」里说一句（如"记一笔收款"），它会算出清单让你确认</span>
+      <div className="act-empty">
+        <IconCheck size={14} />
+        <span>没有待确认的改动</span>
+        <span className="act-empty-hint">在「对话」里说一句，它会算出清单让你确认</span>
       </div>
     );
   }

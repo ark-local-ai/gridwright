@@ -13,18 +13,41 @@
 
 /* ---------- 顶栏 ---------- */
 .dash-top {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 24px; border-bottom: 1px solid var(--line); flex: none;
+  display: flex; align-items: center; gap: 20px;
+  padding: 0 22px; height: 58px; flex: none;
+  background: var(--surface); box-shadow: var(--panel-hi);
+  border-bottom: 1px solid var(--line);
 }
-.dash-title { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: var(--fw-h); color: var(--text-1); position: relative; }
+.dash-ident { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ws-name {
+  font-size: var(--fs-display); font-weight: var(--fw-title);
+  letter-spacing: var(--ls-display); color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 320px;
+}
+
+/* 读数：小标注（拉字距）+ 等宽数字 —— 仪器面板的语汇 */
+.dash-readout { display: flex; align-items: center; gap: 22px; margin-left: auto; }
+.readout { display: flex; align-items: baseline; gap: 6px; }
+.ro-label {
+  font-size: 10.5px; font-weight: var(--fw-h); letter-spacing: var(--ls-label);
+  color: var(--text-3); text-transform: uppercase;
+}
+.ro-value {
+  font-family: var(--mono); font-size: 15px; font-weight: var(--fw-title);
+  color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.readout.act .ro-value { color: var(--brand); }
+.readout.warn .ro-value { color: var(--warn); }
+.dash-actions { display: flex; align-items: center; gap: 8px; flex: none; }
 
 /* 工作区切换器 */
 .ws-switch {
-  display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px;
-  border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent;
-  font-family: var(--font); font-size: 14px; font-weight: var(--fw-h); color: var(--text-1);
-  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px;
+  border: 1px solid transparent; border-radius: var(--radius-md); background: transparent;
+  cursor: pointer; color: var(--text-2);
 }
+.ws-switch:hover { background: var(--surface-2); color: var(--text-1); }
 .ws-switch:hover { background: var(--surface-2); border-color: var(--line); }
 .dash-offline {
   font-size: 11px; font-weight: var(--fw-med); color: var(--warn);
@@ -71,11 +94,15 @@
   flex: 1; min-height: 0; display: grid; grid-template-columns: 300px 1fr; gap: 0;
 }
 .dash-left {
-  border-right: 1px solid var(--line); padding: 22px 24px;
+  border-right: 1px solid var(--line); padding: var(--sp-5) var(--sp-6);
+  background: var(--surface); box-shadow: var(--hi);
   display: flex; flex-direction: column; min-height: 0; overflow: auto;
 }
-.dash-h { font-size: 13px; font-weight: var(--fw-h); color: var(--text-1); margin: 0 0 4px; }
-.dash-sub { font-size: 11.5px; color: var(--text-2); margin: 0 0 16px; line-height: 1.5; }
+.dash-h {
+  font-size: var(--fs-h); font-weight: var(--fw-title); letter-spacing: var(--ls-tight);
+  color: var(--ink); margin: 0 0 var(--sp-1);
+}
+.dash-sub { font-size: var(--fs-2xs); color: var(--text-3); margin: 0 0 var(--sp-5); line-height: 1.5; }
 .dash-muted { font-size: 11.5px; color: var(--text-2); }
 .dash-foot { margin-top: auto; padding-top: 16px; }
 
@@ -181,10 +208,6 @@
   font-family: var(--mono); color: var(--brand); font-size: 11.5px; text-align: left;
 }
 .si-ref-btn:hover { text-decoration: underline; }
-.dash-count {
-  font-style: normal; font-size: 11px; color: var(--text-3); font-weight: var(--fw-med);
-  margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: var(--surface-2);
-}
 
 /* ---------- 联动大图 ---------- */
 .gv-overlay {
@@ -245,7 +268,7 @@
 .gv-edge .gv-kind { margin-left: auto; font-size: 11px; color: var(--text-3); }
 
 /* ---------- 右：待确认 / 体检 ---------- */
-.dash-right { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.dash-right { display: flex; flex-direction: column; min-height: 0; overflow: hidden; background: var(--bg); }
 .dash-tabs { display: flex; gap: 4px; padding: 14px 24px 0; flex: none; }
 .dash-tabs button {
   border: 1px solid transparent; background: transparent; color: var(--text-2);
@@ -259,16 +282,16 @@
   font-style: normal; background: rgba(255,255,255,.24); border-radius: 999px;
   padding: 0 6px; font-size: 10.5px; font-variant-numeric: tabular-nums;
 }
-.dash-pane { flex: 1; min-height: 0; overflow: auto; padding: 16px 24px 24px; }
+.dash-pane { flex: 1; min-height: 0; overflow: auto; padding: var(--sp-5) var(--sp-6); }
 
-/* 无待确认 */
-.dash-none {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 6px; height: 100%; min-height: 200px; color: var(--text-3); text-align: center;
+/* 无待确认：一行内说清，不占大块（空态不该比有内容时更占地） */
+.act-empty {
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--fs-sm); color: var(--text-2);
+  padding: var(--sp-1) 0;
 }
-.dash-none svg { color: var(--ok); }
-.dash-none p { font-size: 13.5px; color: var(--text-2); margin: 4px 0 0; font-weight: var(--fw-med); }
-.dash-none span { font-size: 11.5px; }
+.act-empty > svg { color: var(--ok); flex: none; }
+.act-empty-hint { color: var(--text-3); font-size: var(--fs-2xs); }
 
 /* 体检汇总 + 列表 */
 .scan-sum {
@@ -294,8 +317,10 @@
 /* ---------- 底：账目 ---------- */
 .dash-ledger {
   flex: none; border-top: 1px solid var(--line); background: var(--surface);
-  padding: 10px 24px; display: flex; align-items: center; gap: 18px;
-  font-size: 11.5px; overflow-x: auto; white-space: nowrap;
+  box-shadow: var(--hi);
+  padding: 0 var(--sp-6); height: 38px;
+  display: flex; align-items: center; gap: var(--sp-5);
+  font-size: var(--fs-2xs); overflow-x: auto; white-space: nowrap;
 }
 .dash-ledger .dl-h { display: inline-flex; align-items: center; gap: 6px; color: var(--text-3); font-weight: var(--fw-h); flex: none; }
 .dash-ledger .dl-row { color: var(--text-2); font-variant-numeric: tabular-nums; }
@@ -442,3 +467,50 @@
 .scan-grp.error > .sg-head { border-left: 2px solid var(--danger); }
 .scan-grp > .scan-list { padding-left: 12px; margin-top: 2px; }
 .scan-more { padding: 4px 10px; font-size: 11.5px; }
+
+/* ===== 右栏两块堆叠（「需要你处理」最强，体检次之） ===== */
+.act-block, .scan-block {
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  background: var(--surface); box-shadow: var(--shadow-1);
+  padding: 14px 16px; margin-bottom: 14px;
+}
+/* 有待办时，这块是"要你动"的地方 —— 给它更实的层级与唯一的蓝边 */
+.act-block.has-work {
+  border-color: var(--brand-line); box-shadow: var(--shadow-2);
+  border-left: 3px solid var(--brand);
+}
+.scan-block { box-shadow: none; background: transparent; border-color: var(--line); }
+
+.blk-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.blk-head h4 {
+  margin: 0; font-size: var(--fs-h); font-weight: var(--fw-title);
+  letter-spacing: var(--ls-tight); color: var(--ink);
+}
+.blk-n { font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.blk-n.act { color: var(--brand); font-weight: var(--fw-h); }
+.blk-meta { margin-left: auto; font-size: 11px; color: var(--text-3); font-family: var(--mono); }
+
+/* 对话抽屉：从右侧滑入，不占主界面 */
+.chat-drawer {
+  position: absolute; top: 58px; right: 0; bottom: 0; width: min(460px, 92%);
+  z-index: 60; display: flex; flex-direction: column;
+  background: var(--surface); border-left: 1px solid var(--line);
+  box-shadow: var(--shadow-2);
+  animation: drawer-in .18s var(--ease-out);
+}
+@keyframes drawer-in { from { transform: translateX(12px); opacity: .6; } to { transform: none; opacity: 1; } }
+.cd-head {
+  display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+  border-bottom: 1px solid var(--line); flex: none;
+}
+.cd-head b { font-size: var(--fs-h); font-weight: var(--fw-h); color: var(--ink); }
+.cd-hint { flex: 1; font-size: 11.5px; color: var(--text-3); }
+.cd-x {
+  border: none; background: none; cursor: pointer; padding: 4px;
+  border-radius: var(--radius-xs); color: var(--text-3);
+}
+.cd-x:hover { background: var(--surface-2); color: var(--text-1); }
+.cd-body { flex: 1; min-height: 0; display: flex; padding: 12px 16px; }
+.cd-body > * { flex: 1; min-width: 0; }
+
+.dash { position: relative; } /* 抽屉的定位基准 */

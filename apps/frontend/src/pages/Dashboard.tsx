@@ -2,7 +2,7 @@ import { useEffect, useCallback, useState } from "react";
 import "./dashboard.css";
 import { agentApi, nodeId } from "../api-agent";
 import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, WorkspaceListItem, Proposal, WeightScore, ScanIssue, SafetyReport, SelfCheckReport } from "../api-agent";
-import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink } from "../components/icons";
+import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark } from "../components/icons";
 import SheetView from "./SheetView";
 import Settings from "./Settings2";
 import { PendingList, ChatPane } from "./Pending";
@@ -27,7 +27,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   const [counts, setCounts] = useState({ error: 0, warn: 0 });
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [active, setActive] = useState<GraphNode | null>(null);
-  const [tab, setTab] = useState<"confirm" | "scan" | "chat">("confirm");
+  const [chatOpen, setChatOpen] = useState(false);
   const [zoomed, setZoomed] = useState(false);
   // 打开表格：{sheet, file, highlight} —— 表预览整屏覆盖（表数据要看全）
   const [opened, setOpened] = useState<{ sheet: string; file?: string; ref?: string } | null>(null);
@@ -130,22 +130,15 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
 
   return (
     <div className="dash">
+      {/* 仪表头：一眼看完这张表的"读数" —— 工作区、表数、待办、问题。
+          高级感来自"读数排布"，不是装饰。 */}
       <header className="dash-top">
-        <div className="dash-title">
+        <div className="dash-ident">
           <button className="ws-switch" onClick={() => setSwitcherOpen((v) => !v)} title="切换工作区">
-            <IconXls size={16} />
-            <span>{wsName || "工作区"}</span>
-            <em className="dash-count">{isFirstRun ? "未选工作区" : isEmpty ? "空" : `${tableCount} 个表`}</em>
-            <IconChevD size={13} />
+            <span className="ws-name">{wsName || "工作区"}</span>
+            <IconChevD size={14} />
           </button>
-          {!brainReady && <span className="dash-offline" title="未配置模型：看表/体检可用，改表需联网配置">离线</span>}
-          {appliedNote && <span className="dash-applied"><IconCheck size={12} />{appliedNote}</span>}
-          {lastSelfCheck && (
-            <span className={`dash-self ${lastSelfCheck.level}`} title={lastSelfCheck.summary}>
-              {lastSelfCheck.level === "ok" ? <IconCheck size={12} /> : "!"}
-              {lastSelfCheck.level === "ok" ? "改动已同步" : `自检 ${lastSelfCheck.findings.length} 项待看`}
-            </span>
-          )}
+          {!brainReady && <span className="dash-offline" title="未配置模型：看表/体检可用，改表需先在设置里配">未配模型</span>}
           {switcherOpen && (
             <WorkspaceSwitcher
               onPick={() => { setSwitcherOpen(false); void refresh(); }}
@@ -153,12 +146,47 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
             />
           )}
         </div>
+
+        <div className="dash-readout">
+          <Readout label="表" value={isFirstRun ? "—" : String(tableCount)} />
+          <Readout label="待办" value={String(proposal?.items.length ?? 0)} tone={proposal && proposal.items.length > 0 ? "act" : undefined} />
+          <Readout label="问题" value={String(counts.error + counts.warn)} tone={counts.error + counts.warn > 0 ? "warn" : undefined} />
+        </div>
+
         <div className="dash-actions">
-          {!isEmpty && <button className="btn ghost sm" onClick={() => setZoomed(true)}>展开联动图</button>}
-          {!isEmpty && <button className="btn ghost sm" onClick={() => void refresh()}><IconRefresh size={13} />体检</button>}
+          {appliedNote && <span className="dash-applied"><IconCheck size={12} />{appliedNote}</span>}
+          {lastSelfCheck && lastSelfCheck.level !== "ok" && (
+            <span className={`dash-self ${lastSelfCheck.level}`} title={lastSelfCheck.summary}>
+              自检 {lastSelfCheck.findings.length} 项待看
+            </span>
+          )}
+          {!isEmpty && !isFirstRun && (
+            <button className="btn ghost sm" onClick={() => setZoomed(true)}><IconLink size={13} />联动图</button>
+          )}
+          {!isEmpty && !isFirstRun && (
+            <button className="btn ghost sm" onClick={() => void refresh()}><IconRefresh size={13} />体检</button>
+          )}
+          <button className="btn ghost sm" onClick={() => setChatOpen((v) => !v)}>
+            <IconSpark size={13} />对话
+          </button>
           <button className="btn ghost sm" onClick={() => setSettingsOpen(true)}><IconGear size={13} />设置</button>
         </div>
       </header>
+
+      {/* 对话：配置手段（说一句 → 出提案），不是常驻主界面 */}
+      {chatOpen && (
+        <div className="chat-drawer">
+          <header className="cd-head">
+            <IconSpark size={14} />
+            <b>对话</b>
+            <span className="cd-hint">说一句让它安排工作；它只建议，改表要你确认</span>
+            <button className="cd-x" onClick={() => setChatOpen(false)} aria-label="关闭对话"><IconX size={14} /></button>
+          </header>
+          <div className="cd-body">
+            <ChatPane onPlanReady={(p) => { setProposal(p); setChatOpen(false); }} />
+          </div>
+        </div>
+      )}
 
       {settingsOpen && (
         <Settings onClose={() => setSettingsOpen(false)} onWorkspaceChanged={() => void refresh()} pickFolder={pickFolder} />
@@ -246,18 +274,16 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
             </div>
           )}
 
-          <div className="dash-tabs">
-            <button className={tab === "confirm" ? "on" : ""} onClick={() => setTab("confirm")}>
-              待确认{proposal && (proposal.items?.length ?? 0) > 0 && <em>{proposal.items.length}</em>}
-            </button>
-            <button className={tab === "scan" ? "on" : ""} onClick={() => setTab("scan")}>
-              体检发现{(counts.error + counts.warn) > 0 && <em>{counts.error + counts.warn}</em>}
-            </button>
-            <button className={tab === "chat" ? "on" : ""} onClick={() => setTab("chat")}>对话</button>
-          </div>
-
-          {tab === "confirm" ? (
-            <div className="dash-pane">
+          {/* 两块堆叠，不是一个平级 tab 组：
+              上=「需要你处理」唯一要你动手的地方，给最强视觉权重；
+              下=「体检」信息，安静呈现。
+              （以前三个 tab 等权，用户得自己点进去才知道有没有事。） */}
+          <div className="dash-pane">
+            <section className={`act-block${proposal && proposal.items.length > 0 ? " has-work" : ""}`}>
+              <div className="blk-head">
+                <h4>需要你处理</h4>
+                {proposal && proposal.items.length > 0 && <span className="blk-n act">{proposal.items.length} 处待确认</span>}
+              </div>
               <PendingList
                 proposal={proposal}
                 safety={safetyRep}
@@ -270,24 +296,26 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
                 }}
                 onDiscarded={() => setProposal(null)}
               />
-            </div>
-          ) : tab === "chat" ? (
-            <div className="dash-pane">
-              <ChatPane onPlanReady={(p) => { setProposal(p); setTab("confirm"); }} />
-            </div>
-          ) : (
-            <div className="dash-pane">
-              <div className="scan-sum">
-                <span className="scan-err">{counts.error} 处错误</span>
-                <span className="scan-warn">{counts.warn} 处存疑</span>
-                <span className="scan-cells">{scan?.cells.toLocaleString() ?? 0} 格 · {scan?.sheets ?? 0} 表 · {scan?.elapsed ?? "—"}</span>
-              </div>
-              <ScanList
-                issues={sortedIssues(issues, weights)}
-                onOpen={(it) => setOpened({ sheet: it.sheet, file: it.file, ref: it.ref })}
-              />
-            </div>
-          )}
+            </section>
+
+            {!isEmpty && (
+              <section className="scan-block">
+                <div className="blk-head">
+                  <h4>体检</h4>
+                  <span className="blk-n">
+                    {counts.error + counts.warn > 0
+                      ? `${counts.error + counts.warn} 处`
+                      : "无问题"}
+                  </span>
+                  <span className="blk-meta">{scan?.cells.toLocaleString() ?? 0} 格 · {scan?.elapsed ?? "—"}</span>
+                </div>
+                <ScanList
+                  issues={sortedIssues(issues, weights)}
+                  onOpen={(it) => setOpened({ sheet: it.sheet, file: it.file, ref: it.ref })}
+                />
+              </section>
+            )}
+          </div>
         </section>
       </div>
 
@@ -311,6 +339,16 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
         <GraphOverlay graph={graph} active={active} hot={hot} onPick={(n) => void pickNode(n)} onClose={() => setZoomed(false)} />
       )}
     </div>
+  );
+}
+
+/* ---------- 仪表读数 ---------- */
+function Readout({ label, value, tone }: { label: string; value: string; tone?: "act" | "warn" }) {
+  return (
+    <span className={`readout${tone ? " " + tone : ""}`}>
+      <span className="ro-label">{label}</span>
+      <span className="ro-value">{value}</span>
+    </span>
   );
 }
 
@@ -349,7 +387,12 @@ function ScanList({ issues, onOpen }: {
   return (
     <ul className="scan-groups">
       {sorted.map(([kind, items]) => {
-        const isOpen = open[kind] ?? kind === "mismatch"; // 账对不上默认摊开
+        // 账对不上默认摊开，但**限量**——71 行全开会把页面拉成一条长卷
+        // 账对不上默认摊开，但**限量**——71 行全开会把页面拉成一条长卷。
+        // 显式展开过（open[kind]===true）才给全部。
+        const explicit = open[kind] === true;
+        const isOpen = open[kind] ?? kind === "mismatch";
+        const cap = explicit ? items.length : kind === "mismatch" ? 8 : 40;
         const sev = items[0].severity;
         return (
           <li key={kind} className={`scan-grp ${sev}`}>
@@ -360,7 +403,7 @@ function ScanList({ issues, onOpen }: {
             </button>
             {isOpen && (
               <ul className="scan-list">
-                {items.slice(0, 60).map((it, i) => (
+                {items.slice(0, cap).map((it, i) => (
                   <li key={i} className={`scan-item ${it.severity}`}>
                     <div className="si-main">
                       <button
@@ -374,8 +417,12 @@ function ScanList({ issues, onOpen }: {
                     </div>
                   </li>
                 ))}
-                {items.length > 60 && (
-                  <li className="dash-muted scan-more">还有 {items.length - 60} 处同类，打开表格查看</li>
+                {items.length > cap && (
+                  <li className="scan-more-row">
+                    <button className="chain-more" onClick={() => setOpen((o) => ({ ...o, [kind]: true }))}>
+                      还有 {items.length - cap} 处，展开全部
+                    </button>
+                  </li>
                 )}
               </ul>
             )}

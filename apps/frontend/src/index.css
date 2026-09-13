@@ -51,14 +51,22 @@
   --fw-h: 600;       /* 卡片 / 区块标题 */
   --fw-title: 700;   /* 页头 / 大数字 */
 
-  /* ---------- 文字阶（紧凑排版基准） ---------- */
+  /* ---------- 文字阶 ----------
+     要点：**拉开对比**。以前 13px 标题配 12.5px 正文，层级几乎看不出，
+     整页就显得"平"。现在显示级与标注级差一倍，层级一眼可辨。 */
   --fs-hero: 26px;     /* 首页主标题 */
+  --fs-display: 21px;  /* 页面大标题（看板工作区名） */
   --fs-title: 19px;    /* 区块标题 */
   --fs-h: 15px;        /* 卡片标题 */
   --fs-body: 14px;     /* 正文 */
   --fs-sm: 13px;       /* 次要正文 */
   --fs-xs: 12px;       /* 辅助 / 元信息 */
   --fs-2xs: 11px;      /* 标注 / 标签 */
+
+  /* 字距：中文没有大小写，高级感来自"小字拉距 + 大字收紧" */
+  --ls-display: -0.025em;   /* 大标题收紧 */
+  --ls-tight: -0.01em;
+  --ls-label: 0.08em;       /* 小标注拉开 → 仪器感 */
 
   --lh-tight: 1.2;
   --lh-body: 1.55;
@@ -72,10 +80,53 @@
   --radius-sm: 5px;
   --radius-xs: 4px;
 
-  /* ---------- 阴影：更克制的冷调 ---------- */
+  /* ---------- 阴影：分两级，表达真实层级 ----------
+     一级 = 贴着画布的常规面板；二级 = 浮起来的（弹层/当前焦点）。
+     以前只有一种阴影，所有东西看着一样重，所以"平"。 */
   --shadow-sm: 0 1px 2px rgba(20, 24, 30, 0.05);
   --shadow-md: 0 2px 6px rgba(20, 24, 30, 0.05), 0 10px 30px rgba(20, 24, 30, 0.08);
+  --shadow-1: 0 1px 1px rgba(16, 20, 26, 0.04), 0 1px 3px rgba(16, 20, 26, 0.06);
+  --shadow-2: 0 1px 2px rgba(16, 20, 26, 0.05), 0 8px 24px -6px rgba(16, 20, 26, 0.12);
+  /* 面板顶部 1px 高光：让白面有"厚度"，不靠加边框 */
+  --panel-hi: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  /* 比主文字更沉一档，给大标题 */
+  --ink: #0e1116;
   --focus-ring: 0 0 0 3px var(--brand-soft);
+
+  /* =====================================================================
+     设计体系（C+A 杂糅：成体系的尺度 + 精密仪器的冷调克制）
+     为什么要这套：此前间距用了 4/5/6/7/8/9/10/12/14/16/18 十一种值，
+     圆角 7/6/4/3/2 混用——**没有体系的界面，怎么调色都不会高级**。
+     现在收成 4 的整数倍 + 有限档位，全站只用这些。
+     ===================================================================== */
+
+  /* 间距：4px 基准，7 档（够用，且强制一致） */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+
+  /* 圆角：只留 3 档 + 全圆。小=控件，中=面板，大=浮层 */
+  --r-ctl: 4px;     /* 控件：按钮/输入/标签 */
+  --r-panel: 8px;   /* 面板：卡片/分区 */
+  --r-overlay: 12px;/* 浮层：弹窗/抽屉 */
+  --r-full: 999px;
+
+  /* 层级：3 级，各有明确语义（以前只有一种阴影，所以"平"） */
+  --el-0: none;                                             /* 平铺在画布上 */
+  --el-1: 0 1px 1px rgba(16,20,26,.04), 0 1px 3px rgba(16,20,26,.06);   /* 常规面板 */
+  --el-2: 0 1px 2px rgba(16,20,26,.05), 0 8px 24px -6px rgba(16,20,26,.12); /* 浮起/焦点 */
+  --el-3: 0 2px 4px rgba(16,20,26,.06), 0 20px 48px -12px rgba(16,20,26,.18); /* 弹层/抽屉 */
+  /* 白面顶高光：让面板有"厚度"，不用加边框 */
+  --hi: inset 0 1px 0 rgba(255,255,255,.85);
+
+  /* 控件高度：小控件统一 26，常规 32，大 38 —— 一排控件必须等高 */
+  --h-sm: 26px;
+  --h-md: 32px;
+  --h-lg: 38px;
 
   /* ---------- 动效 ---------- */
   --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
@@ -123,26 +174,35 @@ button { font-family: inherit; cursor: pointer; }
    组件基元（统一视觉语言 · 锐利 · 权重）
    ===================================================================== */
 
-/* 按钮 */
+/* 按钮：统一高度体系（--h-*），一排里必须等高；圆角走 --r-ctl */
 .btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 6px 12px; border-radius: var(--radius-sm); cursor: pointer;
-  font-size: 12.5px; font-weight: var(--fw-med); transition: background 0.15s var(--ease-out),
-    border-color 0.15s var(--ease-out), color 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out),
-    transform 0.1s var(--ease-out);
-  border: 1px solid transparent; white-space: nowrap; line-height: 1.25;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  height: var(--h-md); padding: 0 var(--sp-3); border-radius: var(--r-ctl); cursor: pointer;
+  font-size: var(--fs-xs); font-weight: var(--fw-med);
+  transition: background .15s var(--ease-out), border-color .15s var(--ease-out),
+    color .15s var(--ease-out), box-shadow .15s var(--ease-out), transform .1s var(--ease-out);
+  border: 1px solid transparent; white-space: nowrap; line-height: 1;
 }
+.btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .btn:active:not(:disabled) { transform: translateY(1px); }
-.btn:disabled { opacity: 0.55; cursor: not-allowed; }
-.btn.primary { background: var(--brand); color: #fff; box-shadow: 0 1px 2px rgba(20, 24, 30, 0.18); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.primary {
+  background: var(--brand); color: #fff;
+  box-shadow: 0 1px 2px rgba(16,20,26,.18), var(--hi);
+}
 .btn.primary:hover:not(:disabled) { background: var(--brand-strong); }
-.btn.ghost { background: var(--surface); border-color: var(--line); color: var(--text-1); }
+.btn.ghost {
+  background: var(--surface); border-color: var(--line); color: var(--text-1);
+  box-shadow: 0 1px 1px rgba(16,20,26,.03);
+}
 .btn.ghost:hover:not(:disabled) { background: var(--surface-2); border-color: var(--line-strong); }
 .btn.soft { background: var(--brand-soft); color: var(--brand); }
 .btn.soft:hover:not(:disabled) { background: #e3eaf3; }
 .btn.danger { background: var(--surface); border-color: var(--line); color: var(--danger); }
 .btn.danger:hover:not(:disabled) { background: var(--danger-bg); border-color: transparent; }
-.btn.sm { padding: 4px 9px; font-size: 11.5px; }
+/* 三档高度：sm 与输入框等高，md 常规，lg 主行动 */
+.btn.sm { height: var(--h-sm); padding: 0 var(--sp-2); font-size: var(--fs-2xs); }
+.btn.lg { height: var(--h-lg); padding: 0 var(--sp-4); font-size: var(--fs-sm); }
 
 /* 图标（圆头 · 细线条 · 精确） */
 .ic {
@@ -164,12 +224,13 @@ button { font-family: inherit; cursor: pointer; }
 .pill.ghost { background: var(--surface); border-color: var(--line); }
 .pill.ghost:hover { background: var(--surface-2); }
 
-/* 卡片：扁平优先 */
+/* 卡片：面板圆角 + 一级层级（扁平优先，需要浮起再加 .raised） */
 .card {
   background: var(--surface); border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--r-panel); box-shadow: var(--el-1);
 }
 .card.flat { box-shadow: none; }
+.card.raised { box-shadow: var(--el-2); }
 
 /* 状态徽标 */
 .badge {
@@ -183,7 +244,7 @@ button { font-family: inherit; cursor: pointer; }
 
 /* 文件类型徽标 */
 .ftext {
-  width: 30px; height: 30px; border-radius: var(--radius-sm); flex: none;
+  width: 30px; height: 30px; border-radius: var(--r-ctl); flex: none;
   display: grid; place-items: center; font-size: 10px; font-weight: var(--fw-title); color: #fff;
 }
 
