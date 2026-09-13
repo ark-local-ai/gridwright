@@ -60,6 +60,9 @@ func main() {
 	}
 	ag := agent.New(cfg, layout, led, brain)
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	// 本地 API（界面用的通用契约，见 docs/agent-architecture/13-接口契约.md）
 	if *apiAddr != "" {
 		srv := api.New(cfg, layout, led, *apiAddr)
@@ -72,15 +75,15 @@ func main() {
 		} else {
 			log.Printf("工作区注册表不可用（切换功能将禁用）: %v", rerr)
 		}
+		// 自动化任务调度器：每分钟检查到点任务（见 internal/api/jobs.go）
+		// 必须跟在 ctx 之后 —— 引擎退出时调度器一起停。
+		srv.StartScheduler(ctx)
 		go func() {
 			if err := srv.ListenAndServe(); err != nil {
 				log.Printf("API 服务退出: %v", err)
 			}
 		}()
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	// 若由桌面壳拉起，监视父进程：壳没了就退出，避免留下占着端口的孤儿进程
 	proc.WatchParent(*parentPID, stop)
