@@ -45,23 +45,68 @@ fn engine_up() -> bool {
     false
 }
 
-/// 拉起随包的 Go 引擎（sidecar `gridwright`），工作区落在 per-user 应用数据目录。
-fn spawn_engine(app: &tauri::App) -> Option<Spawned> {
-    let data_dir = app.path().app_data_dir().ok()?;
-    let ws_dir = data_dir.join("workspace");
-    let _ = std::fs::create_dir_all(&ws_dir);
+/// 拉起随包的 Go 引擎（sidecar `gridwright`）。
+///
+/// **不要传 WORKSPACE**：工作区由用户在界面里选，引擎自己记在配置文件里
+/// （%APPDATA%\gridwright\config.yaml）。早期版本在这里固定传一个默认目录，
+/// 会把用户选的工作区覆盖掉——每次打开都回到默认目录，用户等于白选。
+/// 只在首次运行（用户还没选）时，引擎自己落到临时目录并引导去选。
+/// 写一行日志到 %APPDATA%\gridwright\shell.log。
+/// GUI 程序没有控制台，eprintln 看不到——排障必须落文件。
+fn log_line(msg: &str) {
+    use std::io::Write;
+    let dir = std::env::var("APPDATA").unwrap_or_else(|_| ".".into());
+    let dir = std::path::Path::new(&dir).join("gridwright");
+    let _ = std::fs::create_dir_all(&dir);
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("shell.log")) {
+        let _ = writeln!(f, "[{}] {}", chrono_like(), msg);
+    }
+}
 
-    let cmd = app
-        .shell()
-        .sidecar("gridwright")
-        .ok()?
-        // 把本壳的 PID 传给引擎：壳退出（含被强杀）时引擎监视到父进程消失会自行退出，
-        // 不会留下占着 7700 端口的孤儿进程。
-        .args(["-api", &format!("127.0.0.1:{ENGINE_PORT}"), "-parent-pid", &std::process::id().to_string()])
-        .env("WORKSPACE", ws_dir.to_string_lossy().to_string());
-    match cmd.spawn() {
-        Ok(child) => Some(child),
+/// 简单的本地时间串（避免为一行日志引入时间库）。
+fn chrono_like() -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    format!("unix:{}", now)
+}
+
+fn spawn_engine(app: &tauri::App) -> Option<Spawned> {
+    // 配置目录**明确指定**给引擎：%APPDATA%\gridwright
+    // （引擎默认也是这里，但不能靠"默认恰好一致"——早期版本里壳用的
+    //   app_config_dir 是反向域名 com.gridwright.app，于是配置被分成两个目录，
+    //   用户看到"设置没保留"却找不到原因。）
+    let cfg_dir = std::env::var("APPDATA")
+        .map(|a| std::path::Path::new(&a).join("gridwright"))
+        .unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let _ = std::fs::create_dir_all(&cfg_dir);
+    log_line(&format!("config_dir={:?}", cfg_dir));
+
+    let sidecar = match app.shell().sidecar("gridwright") {
+        Ok(c) => c,
         Err(e) => {
+            log_line(&format!("sidecar 解析失败: {e}"));
+            return None;
+        }
+    };
+    // 把本壳的 PID 传给引擎：壳退出（含被强杀）时引擎监视到父进程消失会自行退出，
+    // 不会留下占着 7700 端口的孤儿进程。
+    let cmd = sidecar
+        .args([
+            "-api",
+            &format!("127.0.0.1:{ENGINE_PORT}"),
+            "-parent-pid",
+            &std::process::id().to_string(),
+        ])
+        .env("GRIDWRIGHT_CONFIG_DIR", cfg_dir.to_string_lossy().to_string());
+    match cmd.spawn() {
+        Ok(child) => {
+            log_line(&format!("引擎已拉起 pid={}", child.1.pid()));
+            Some(child)
+        }
+        Err(e) => {
+            log_line(&format!("引擎启动失败: {e}"));
             eprintln!("[gridwright] 引擎启动失败: {e}");
             None
         }
@@ -81,16 +126,22 @@ pub fn run() {
         }))
         .manage(EngineProcess(Mutex::new(None)))
         .setup(|app| {
+            log_line("=== 应用启动 ===");
             if !engine_up() {
+                log_line("引擎未就绪，尝试拉起");
                 let child = spawn_engine(app);
                 *app.state::<EngineProcess>().0.lock().unwrap() = child;
-                // 短等就绪；前端会自己轮询并显示「正在启动」状态
+                let mut ok = false;
                 for _ in 0..16 {
                     if engine_up() {
+                        ok = true;
                         break;
                     }
                     std::thread::sleep(Duration::from_millis(500));
                 }
+                log_line(if ok { "引擎就绪" } else { "等待引擎超时（8s）" });
+            } else {
+                log_line("引擎已在运行");
             }
             Ok(())
         })

@@ -9,17 +9,16 @@ import {
 const RELEASES = "https://github.com/ark-local-ai/ark/releases";
 const DL = `${RELEASES}/download/v0.1.0`;
 
-/* 按系统版本提供不同构建。产物名与 scripts/build-single.sh 的输出一致：
-   Win10/11 = 桌面客户端（Tauri 壳，图形界面）；
-   Win7/8   = 单文件版（无 WebView2，Go 内核 + 界面已嵌进 exe，双击即用）。
-   ⚠️ 目前还没上传到 Releases（打包脚本已能产出，见 docs 里的打包说明），
-   所以这里标注"下载暂未开放"，避免点开是 404。 */
+/* 发布渠道。
+   现在只做 Windows 桌面客户端（Tauri 安装包，见 scripts/build-desktop.sh）：
+   双击安装、有窗口、引擎随包，用户不需要另装东西。
+   免安装的单文件版仍保留（同一个引擎 + 界面已内嵌），给"不想装"的场景用。
+   ⚠️ 还没上传到 Releases（打包脚本已能产出），所以标注"暂未开放"，避免点开 404。 */
 const BUILT = false; // 上传 Releases 后置 true
 type DownloadOS = { os: string; label: string; kind: string; note: string; file: string; url: string };
 const DOWNLOADS: DownloadOS[] = [
-  { os: "win10", label: "Windows 10 / 11", kind: "桌面客户端", note: "图形界面 · 全功能", file: "gridwright-windows-amd64.exe", url: `${DL}/gridwright-windows-amd64.exe` },
-  { os: "win7",  label: "Windows 7",        kind: "单文件版",   note: "免安装 · 界面已内嵌", file: "gridwright-windows-amd64.exe", url: `${DL}/gridwright-windows-amd64.exe` },
-  { os: "win8",  label: "Windows 8 / 8.1",  kind: "单文件版",   note: "免安装 · 界面已内嵌", file: "gridwright-windows-amd64.exe", url: `${DL}/gridwright-windows-amd64.exe` },
+  { os: "setup", label: "Windows 安装版", kind: "安装包", note: "双击安装 · 有窗口 · 引擎随包", file: "gridwright_0.1.0_x64-setup.exe", url: `${DL}/gridwright_0.1.0_x64-setup.exe` },
+  { os: "portable", label: "免安装版", kind: "单文件", note: "不装 · 双击运行 · 浏览器打开", file: "gridwright-windows-amd64.exe", url: `${DL}/gridwright-windows-amd64.exe` },
 ];
 
 export default function Site() {
@@ -38,7 +37,7 @@ export default function Site() {
             <a href="#watch">盯表</a>
             <a href="#rules">规则</a>
             <a href="#ledger">账目</a>
-            <a href="#legacy">老机器</a>
+            <a href="#legacy">本地</a>
             <a href="#download">下载</a>
           </div>
         </div>
@@ -59,7 +58,7 @@ export default function Site() {
             <a className="btn primary lg" href="#download">下载 Gridwright</a>
             <a className="btn ghost lg" href="#watch">看它怎么守表</a>
           </div>
-          <p className="hero-meta">Windows 7 / 8 / 10 · 单文件免安装 · 规矩你定、账你看得见</p>
+          <p className="hero-meta">Windows 桌面客户端 · 装完即用 · 规矩你定、账你看得见</p>
         </div>
 
         <div className="hero-pipe" aria-label="数据管家运行示意">
@@ -163,25 +162,26 @@ export default function Site() {
         </div>
       </section>
 
-      {/* 老机器 + 脑手分离 */}
+      {/* 本地优先 + 脑可换 */}
       <section id="legacy" className="site-section site-alt">
-        <h2 className="sec-title">老机器也能跑，脑可以换</h2>
+        <h2 className="sec-title">数据不出本机，脑可以换</h2>
         <p className="sec-sub">
-          手脑分离：办公机只当"手"，"脑"放云端（OpenAI 兼容接口，换模型只改一个 baseUrl，
-          将来想换本地也照样接）。发什么给脑你看得见——表结构、新数据、账目、规则，表本体不打包上传。
+          手脑分离：你的电脑只当"手"，负责盯表、改表、记账、备份；
+          "脑"负责判断（OpenAI 兼容接口，换模型只改一个 baseUrl）。
+          发给脑的只有表结构、新数据、账目、规则——表本体不打包上传。
         </p>
         <div className="site-grid cols-3">
-          <div className="site-card"><div className="k">Win7 / 8 单文件版</div><p>老机器没有 WebView2，跑 Go 内核的单文件程序，盯表、改表、记账、通知一样不少。</p></div>
-          <div className="site-card"><div className="k">Win10 / 11 完整客户端</div><p>新机器用图形界面完整客户端，账目流水、运行状态、开关一屏看全。</p></div>
-          <div className="site-card"><div className="k">脑是替换件</div><p>默认云端 API；接口统一，换本地模型只改配置。手永远在本机。</p></div>
+          <div className="site-card"><div className="k">桌面客户端</div><p>Windows 安装包，双击安装、有窗口，引擎随包一起装好，不用另外配环境。</p></div>
+          <div className="site-card"><div className="k">离线也能用</div><p>看表、体检、联动图、账目都不需要联网；只有"要它判断"时才用到脑。</p></div>
+          <div className="site-card"><div className="k">脑是替换件</div><p>默认云端 API；接口统一，想换本地模型只改配置。手永远在本机。</p></div>
         </div>
       </section>
 
       {/* 下载：按系统版本选构建 */}
       <section id="download" className="site-cta-end">
         <h2>把看表的活，交给 Gridwright</h2>
-        <p>选你的系统版本。Win10/11 推荐完整客户端（图形界面）；Win7/8 用单文件版（老机器无界面依赖）。</p>
-        <div className="dl-picker" role="group" aria-label="选择系统版本">
+        <p>推荐安装版（双击安装、有窗口）。不想装就用免安装版，双击运行后用浏览器打开。</p>
+        <div className="dl-picker" role="group" aria-label="选择下载方式">
           {DOWNLOADS.map((d) => (
             <button
               key={d.os}
@@ -213,7 +213,7 @@ export default function Site() {
 
       <footer className="site-foot">
         <span>Gridwright — 你的表，有人替你看着</span>
-        <span>Windows 7 / 8 / 10 · 单文件免安装 · 免费开源</span>
+        <span>Windows 桌面客户端 · 数据不出本机 · 免费开源</span>
       </footer>
     </div>
   );
