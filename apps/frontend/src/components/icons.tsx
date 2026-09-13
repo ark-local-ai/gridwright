@@ -94,10 +94,12 @@ export const IconSearch = (p: P) => (
 export const IconCheck = (p: P) => (
   <svg {...base(p.size, p.className)} style={{ strokeWidth: 2.6 }}><path d="M5 12.6l4.2 4.2L19 7" /></svg>
 );
+/* 关闭 / 移除：一条干净的叉。线长与其它图标一致（两端留 5.5 的边距），
+   线帽圆头，和全站线条语汇统一。
+   （旧版在叉之外还画了一圈小刻度，看着像"坏掉的图标"，已去掉。） */
 export const IconX = (p: P) => (
   <svg {...base(p.size, p.className)}>
-    <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />
-    <path d="M6.5 3.5v2.2M18.5 3.5v2.2M3.5 6.5h2.2M3.5 12h2.2M3.5 17.5h2.2M18.5 6.5h2.2M18.5 12h2.2M18.5 17.5h2.2" />
+    <path d="M6.6 6.6l10.8 10.8M17.4 6.6L6.6 17.4" />
   </svg>
 );
 export const IconTrash = (p: P) => (

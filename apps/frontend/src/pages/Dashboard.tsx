@@ -180,38 +180,19 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
         {/* 左：联动摘要（按文件分组） */}
         <section className="dash-left">
           <h3 className="dash-h">表的联动</h3>
-          <p className="dash-sub">点表看它牵动到谁 · 跨文件关联用虚线</p>
+          <p className="dash-sub">点表看它牵动到谁</p>
 
           {graph ? (
             <div className="chain-groups">
-              {groupByFile(graph, 8, weights).map((grp) => (
-                <div key={grp.file} className="chain-group">
-                  <div className="cg-file">
-                    <IconXls size={12} />
-                    <span>{grp.file}</span>
-                  </div>
-                  {grp.items.map((n) => {
-                    const id = nodeId(n);
-                    const isActive = active && nodeId(active) === id;
-                    const isHot = hot.has(id);
-                    return (
-                      <button
-                        key={id}
-                        className={`chain-node${isHot ? " hot" : ""}${isActive ? " on" : ""}`}
-                        onClick={() => void pickNode(n)}
-                        title={`${n.file}!${n.sheet}`}
-                      >
-                        <span className="cn-name">{shortName(n.sheet)}</span>
-                        {grp.refs[id] > 0 && <span className="cn-count">{grp.refs[id]}</span>}
-                        {weights[id] && weights[id].attention >= 0.15 && (
-                          <span className="cn-weight" title={weights[id].reasons.join(" · ")}>
-                            {(weights[id].attention * 100).toFixed(0)}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+              {groupByFile(graph, 0, weights).map((grp) => (
+                <SheetGroup
+                  key={grp.file}
+                  grp={grp}
+                  weights={weights}
+                  active={active}
+                  hot={hot}
+                  onPick={(n) => void pickNode(n)}
+                />
               ))}
             </div>
           ) : <p className="dash-muted">未发现表间依赖</p>}
@@ -239,18 +220,29 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
                 </button>
               </div>
               <NodeStats node={active} />
-              <div className="nd-links">
-                <span className="nd-lab">牵动它</span>
-                {hot.size === 0
-                  ? <span className="dash-muted">无（改它不影响其他表）</span>
-                  : [...hot].map((id) => <span key={id} className="nd-chip">{shortId(id)}</span>)}
-              </div>
-              <div className="nd-links">
-                <span className="nd-lab">它依赖</span>
-                {incoming(graph, active).length === 0
-                  ? <span className="dash-muted">无</span>
-                  : incoming(graph, active).map((id) => <span key={id} className="nd-chip dep">{shortId(id)}</span>)}
-              </div>
+              {/* 关联只在其一时才显示对应那行；两边都空就整块不要——
+                  避免两行"无"白占两百像素。 */}
+              {(() => {
+                const dependsOn = incoming(graph, active);
+                const affects = [...hot];
+                if (dependsOn.length === 0 && affects.length === 0) return null;
+                return (
+                  <div className="nd-links">
+                    {affects.length > 0 && (
+                      <>
+                        <span className="nd-lab">牵动</span>
+                        {affects.map((id) => <span key={id} className="nd-chip">{shortId(id)}</span>)}
+                      </>
+                    )}
+                    {dependsOn.length > 0 && (
+                      <>
+                        <span className="nd-lab">依赖</span>
+                        {dependsOn.map((id) => <span key={id} className="nd-chip dep">{shortId(id)}</span>)}
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -290,24 +282,10 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
                 <span className="scan-warn">{counts.warn} 处存疑</span>
                 <span className="scan-cells">{scan?.cells.toLocaleString() ?? 0} 格 · {scan?.sheets ?? 0} 表 · {scan?.elapsed ?? "—"}</span>
               </div>
-              <ul className="scan-list">
-                {sortedIssues(issues, weights).slice(0, 80).map((it, i) => (
-                  <li key={i} className={`scan-item ${it.severity}`}>
-                    <span className="si-dot" />
-                    <div className="si-main">
-                      <button
-                        className="si-ref si-ref-btn"
-                        onClick={() => setOpened({ sheet: it.sheet, file: it.file, ref: it.ref })}
-                        title="打开表格并定位到该格"
-                      >
-                        {shortName(it.sheet)}!{it.ref}
-                      </button>
-                      <span className="si-msg">{it.message}</span>
-                    </div>
-                  </li>
-                ))}
-                {issues.length === 0 && <li className="dash-muted">本次未发现问题</li>}
-              </ul>
+              <ScanList
+                issues={sortedIssues(issues, weights)}
+                onOpen={(it) => setOpened({ sheet: it.sheet, file: it.file, ref: it.ref })}
+              />
             </div>
           )}
         </section>
@@ -334,6 +312,181 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
       )}
     </div>
   );
+}
+
+/* ---------- 体检结果（按种类分组，别让 196 条同类淹掉 45 条真问题） ---------- */
+
+/* 后端 kind 是下划线风格（bad_value / mismatch …），标签要与之对应 */
+const KIND_LABEL: Record<string, string> = {
+  mismatch: "账对不上（上月欠款 ≠ 本月上期）",
+  bad_ref: "公式引用已失效（#REF!）",
+  bad_value: "单元格是错误值",
+  sheet_missing: "月表缺失（跨月核对已跳过）",
+  sheet_unfit: "表缺关键列",
+  scan_error: "该表扫描出错",
+};
+
+function ScanList({ issues, onOpen }: {
+  issues: ScanIssue[];
+  onOpen: (it: ScanIssue) => void;
+}) {
+  // 按 kind 归类，**账对不上（mismatch）排最前**——它才是需要人判断的，
+  // 196 条同质的 #REF! 收成一行，不让它淹没有价值的信息。
+  // 账对不上放最前：它需要人判断；196 条同质的 #REF! 收成一行，不淹没它
+  const order = ["mismatch", "sheet_missing", "sheet_unfit", "bad_ref", "bad_value", "scan_error"];
+  const groups = new Map<string, ScanIssue[]>();
+  for (const it of issues) {
+    if (!groups.has(it.kind)) groups.set(it.kind, []);
+    groups.get(it.kind)!.push(it);
+  }
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const sorted = [...groups.entries()].sort(
+    (a, b) => (order.indexOf(a[0]) + 1 || 99) - (order.indexOf(b[0]) + 1 || 99),
+  );
+
+  if (issues.length === 0) return <p className="dash-muted">本次未发现问题</p>;
+
+  return (
+    <ul className="scan-groups">
+      {sorted.map(([kind, items]) => {
+        const isOpen = open[kind] ?? kind === "mismatch"; // 账对不上默认摊开
+        const sev = items[0].severity;
+        return (
+          <li key={kind} className={`scan-grp ${sev}`}>
+            <button className="sg-head" onClick={() => setOpen((o) => ({ ...o, [kind]: !isOpen }))}>
+              <span className="sg-arrow">{isOpen ? "▾" : "▸"}</span>
+              <span className="sg-label">{KIND_LABEL[kind] ?? kind}</span>
+              <span className="sg-n">{items.length} 处</span>
+            </button>
+            {isOpen && (
+              <ul className="scan-list">
+                {items.slice(0, 60).map((it, i) => (
+                  <li key={i} className={`scan-item ${it.severity}`}>
+                    <div className="si-main">
+                      <button
+                        className="si-ref si-ref-btn"
+                        onClick={() => onOpen(it)}
+                        title="打开表格并定位到该格"
+                      >
+                        {shortName(it.sheet)}!{it.ref}
+                      </button>
+                      <span className="si-msg">{it.message}</span>
+                    </div>
+                  </li>
+                ))}
+                {items.length > 60 && (
+                  <li className="dash-muted scan-more">还有 {items.length - 60} 处同类，打开表格查看</li>
+                )}
+              </ul>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/* ---------- 联动链（按文件分组 → 同系列折叠） ---------- */
+
+/** 同系列判断：表名去掉期数（年/月/日等数字）后相同 → 视为同一系列。 */
+function seriesKey(sheet: string): string {
+  return sheet.replace(/\d+/g, "#").replace(/\s+/g, "");
+}
+
+function SheetGroup({ grp, weights, active, hot, onPick }: {
+  grp: Group;
+  weights: Record<string, WeightScore>;
+  active: GraphNode | null;
+  hot: Set<string>;
+  onPick: (n: GraphNode) => void;
+}) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  // 把同"系列"的收成一组（如 2026年9月租金 / 2026年10月租金 → 「租金（日）」系列 12 张）
+  const series: { key: string; label: string; items: GraphNode[] }[] = [];
+  const byKey = new Map<string, GraphNode[]>();
+  for (const n of grp.items) {
+    const k = seriesKey(n.sheet);
+    if (!byKey.has(k)) byKey.set(k, []);
+    byKey.get(k)!.push(n);
+  }
+  for (const [k, items] of byKey) {
+    series.push({ key: k, label: seriesLabel(items[0].sheet), items });
+  }
+  // 张数多的系列排前面（它们是这块的主体）
+  series.sort((a, b) => b.items.length - a.items.length);
+
+  return (
+    <div className="chain-group">
+      <div className="cg-file">
+        <IconXls size={12} />
+        <span>{grp.file}</span>
+      </div>
+      <ul className="chain-list">
+        {series.map((sr) => {
+          const single = sr.items.length === 1;
+          const open = expanded[sr.key] ?? false;
+          const shown = single || open ? sr.items : sr.items.slice(0, 1);
+          const hidden = sr.items.length - shown.length;
+          return (
+            <li key={sr.key}>
+              {shown.map((n) => {
+                const id = nodeId(n);
+                const isActive = active && nodeId(active) === id;
+                const isHot = hot.has(id);
+                const w = weights[id];
+                return (
+                  <button
+                    key={id}
+                    className={`chain-row${isHot ? " hot" : ""}${isActive ? " on" : ""}`}
+                    onClick={() => onPick(n)}
+                    title={`${n.file}!${n.sheet}${w ? " ｜ " + w.reasons.join(" · ") : ""}`}
+                  >
+                    <span className="cr-name">{single ? shortName(n.sheet) : shortName(n.sheet)}</span>
+                    {/* 参考信息一律中性色，不用蓝 —— 蓝只留给"要你动"。
+                        如实说明：refs 是"引用它的公式处数"，不是"几张表"
+                        （曾经标成"被引用 114"而被误读为 114 张表）。 */}
+                    {w && w.inDegree > 0 && (
+                      <span className="cr-count" title={`${w.inDegree} 张表引用了它，共 ${grp.refs[id]} 处公式`}>
+                        {w.inDegree} 表引用
+                      </span>
+                    )}
+                    {w && w.master && <span className="cr-tag">主数据</span>}
+                    {w && w.attention >= 0.5 && (
+                      <span className="cr-weight" title={`注意力 ${w.attention.toFixed(2)}（${w.reasons.join(" · ")}）`}>
+                        {Math.round(w.attention * 100)}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+              {!single && !open && (
+                <button className="chain-more" onClick={() => setExpanded((e) => ({ ...e, [sr.key]: true }))}
+                  title={sr.items.map((x) => x.sheet).join("、")}>
+                  同系列另有 {hidden} 张，展开看看
+                </button>
+              )}
+              {!single && open && (
+                <button className="chain-more" onClick={() => setExpanded((e) => ({ ...e, [sr.key]: false }))}>
+                  收起
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/** 系列显示名：去掉期数后的主干（如「2026年9月租金 （日） 」→「租金（日）」）。 */
+function seriesLabel(sheet: string): string {
+  return sheet
+    .replace(/\d+/g, "")
+    .replace(/\s+/g, "")
+    .replace(/^[年月日]+/, "")
+    .replace(/^[（(]?[日月末初]+[）)]?/, "")
+    || sheet;
 }
 
 /* ---------- 节点汇总（用户要的"点模块展示大概汇总数据"） ---------- */

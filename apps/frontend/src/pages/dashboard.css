@@ -75,35 +75,59 @@
   display: flex; flex-direction: column; min-height: 0; overflow: auto;
 }
 .dash-h { font-size: 13px; font-weight: var(--fw-h); color: var(--text-1); margin: 0 0 4px; }
-.dash-sub { font-size: 11.5px; color: var(--text-3); margin: 0 0 20px; line-height: 1.5; }
-.dash-muted { font-size: 11.5px; color: var(--text-3); }
+.dash-sub { font-size: 11.5px; color: var(--text-2); margin: 0 0 16px; line-height: 1.5; }
+.dash-muted { font-size: 11.5px; color: var(--text-2); }
 .dash-foot { margin-top: auto; padding-top: 16px; }
 
-/* 垂直链（不用力导向蛛网——那最丑也最难懂） */
-.chain { display: flex; flex-direction: column; align-items: flex-start; }
-.chain-row { display: flex; flex-direction: column; align-items: flex-start; }
-.chain-node {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-md);
-  background: var(--surface); color: var(--text-2); cursor: pointer;
-  font-size: 12.5px; font-weight: var(--fw-med); font-family: var(--font);
-  max-width: 240px; text-align: left;
-  transition: border-color .15s var(--ease-out), color .15s var(--ease-out), background .15s var(--ease-out);
+/* ---------- 联动链 ----------
+   这里以前是「一行一个白色圆角框 + 蓝色圆点徽标」：一列 8 个框、8 个蓝点，
+   每项都在喊，且蓝点违反了本项目自己的规则（**蓝只留给"要你动"**）。
+   现在改成"一条列表"：层级靠字重/缩进/淡灰小字，不靠卡片和彩色徽标。 */
+.chain-groups { display: flex; flex-direction: column; gap: 18px; }
+.chain-group { display: flex; flex-direction: column; gap: 6px; }
+.cg-file {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text-2); margin-bottom: 2px;
 }
-.chain-node:hover { border-color: var(--line-strong); color: var(--text-1); }
-.chain-node.on { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
-.chain-node.hot { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
-.chain-node .cn-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chain-node .cn-count {
-  flex: none; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
-  background: var(--brand); color: #fff; font-size: 10.5px; font-weight: var(--fw-h);
-  display: grid; place-items: center; font-variant-numeric: tabular-nums;
+.cg-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cg-file svg { color: var(--text-3); }
+
+.chain-list { list-style: none; margin: 0; padding: 0 0 0 6px; display: flex; flex-direction: column; }
+.chain-list li { display: flex; flex-direction: column; }
+
+/* 一项 = 一行文字，不是卡片 */
+.chain-row {
+  display: flex; align-items: baseline; gap: 8px; width: 100%;
+  padding: 5px 8px; border: none; background: none; cursor: pointer;
+  border-radius: var(--radius-xs); text-align: left; font-family: var(--font);
+  font-size: 12.5px; color: var(--text-1);
+  border-left: 2px solid transparent;
+  transition: background .15s var(--ease-out), border-color .15s var(--ease-out);
 }
-.chain-link {
-  width: 2px; height: 18px; margin-left: 18px;
-  background: var(--line); transition: background .15s var(--ease-out);
+.chain-row:hover { background: var(--surface-2); }
+/* 选中/被牵动：**唯一用蓝的地方**（细左条，不是整块底色） */
+.chain-row.on { border-left-color: var(--brand); color: var(--brand); background: var(--surface-2); }
+.chain-row.hot { border-left-color: var(--live); }
+.cr-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 参考信息：中性淡灰，不用彩色徽标 */
+.cr-count { flex: none; font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.cr-tag {
+  flex: none; font-size: 10px; color: var(--text-2);
+  background: var(--surface-2); padding: 0 5px; border-radius: var(--radius-xs);
 }
-.chain-link.hot { background: var(--brand); }
+.cr-weight {
+  flex: none; font-size: 10.5px; color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 同系列折叠：默认只露一张，其余收起来 —— 24 张表里 20 张是月度同系列 */
+.chain-more {
+  align-self: flex-start; margin: 1px 0 2px 8px;
+  border: none; background: none; cursor: pointer; padding: 2px 4px;
+  font-size: 11px; color: var(--text-3); font-family: var(--font);
+  border-radius: var(--radius-xs);
+}
+.chain-more:hover { color: var(--brand); background: var(--surface-2); }
 
 /* 按文件分组的联动摘要 */
 .chain-groups { display: flex; flex-direction: column; gap: 14px; }
@@ -117,13 +141,14 @@
 
 /* ---------- 节点详情 ---------- */
 .node-detail {
-  flex: none; padding: 14px 24px; border-bottom: 1px solid var(--line);
+  flex: none; padding: 12px 20px; border-bottom: 1px solid var(--line);
   display: flex; flex-direction: column; gap: 8px;
 }
 .nd-h { display: flex; align-items: baseline; gap: 10px; }
 .nd-h b { font-size: 13.5px; font-weight: var(--fw-h); color: var(--text-1); }
 .nd-h span { font-size: 11px; color: var(--text-3); }
 .nd-links { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.nd-links .nd-lab + .nd-chip { margin-right: 8px; }
 .nd-lab { font-size: 11px; color: var(--text-3); min-width: 48px; }
 .nd-chip {
   font-size: 11.5px; padding: 2px 8px; border-radius: var(--radius-xs);
@@ -255,8 +280,8 @@
 .scan-cells { margin-left: auto; font-size: 11px; color: var(--text-3); }
 .scan-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .scan-item {
-  display: flex; align-items: baseline; gap: 10px; padding: 7px 10px;
-  border-radius: var(--radius-sm); font-size: 12px;
+  display: flex; align-items: baseline; gap: 10px; padding: 5px 8px;
+  border-radius: var(--radius-xs); font-size: 12px;
 }
 .scan-item:hover { background: var(--surface-2); }
 .scan-item .si-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; margin-top: 5px; }
@@ -302,7 +327,7 @@
   padding: 0 5px; border-radius: 999px; line-height: 16px;
 }
 /* 权重来源说明（如"还没积累使用数据，只按结构排序"） */
-.dash-weight-note { font-size: 11px; color: var(--text-3); margin: 10px 0 0; line-height: 1.5; }
+.dash-weight-note { font-size: 11px; color: var(--text-2); margin: 10px 0 0; line-height: 1.5; }
 
 /* 顶栏自检徽标：改完常驻，直到下次改动 */
 .dash-self {
@@ -397,3 +422,23 @@
   border-top: 1px solid var(--line); flex: none;
 }
 .fp-hint { flex: 1; font-size: 11.5px; color: var(--text-3); }
+
+/* ---------- 体检结果分组 ---------- */
+.scan-groups { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.scan-grp { display: flex; flex-direction: column; }
+.sg-head {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 7px 8px; border: none; background: none; cursor: pointer;
+  border-radius: var(--radius-sm); text-align: left; font-family: var(--font);
+  font-size: 12.5px; color: var(--text-1);
+  transition: background .15s var(--ease-out);
+}
+.sg-head:hover { background: var(--surface-2); }
+.sg-arrow { flex: none; width: 12px; color: var(--text-3); font-size: 10px; }
+.sg-label { flex: 1; }
+.sg-n { flex: none; font-size: 11.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+/* 账对不上是"要你判断"的 —— 给它唯一的蓝左条（其余保持中性） */
+.scan-grp.warn > .sg-head { border-left: 2px solid var(--warn); }
+.scan-grp.error > .sg-head { border-left: 2px solid var(--danger); }
+.scan-grp > .scan-list { padding-left: 12px; margin-top: 2px; }
+.scan-more { padding: 4px 10px; font-size: 11.5px; }

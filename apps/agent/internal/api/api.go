@@ -14,11 +14,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/xuri/excelize/v2"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/config"
 	"github.com/ark-local-ai/ark/apps/agent/internal/graph"
@@ -460,7 +463,17 @@ func (s *Server) runScan() (*scan.Report, error) {
 	start := time.Now()
 	merged := &scan.Report{File: layout.Root}
 	for _, t := range tables {
-		rep, err := scan.Run(t, scan.Options{})
+		// 打开跨月核对：**账对不上比 #REF! 更值得人看**，但需要知道哪些 sheet 是
+		// 按月的、以及"上期欠款/本月欠款"这类列名。这里按名字自动探测；
+		// 探测不到就自动跳过那项（不会因此报错）。
+		opt := scan.Options{
+			CrossMonthCheck: true,
+			MonthSheets:     detectMonthSheets(t),
+			PrevField:       []string{"上期欠款"},
+			CurField:        []string{"本月欠款"},
+			AnchorNames:     []string{"物业位置", "铺位", "商铺位", "铺位号"},
+		}
+		rep, err := scan.Run(t, opt)
 		if err != nil {
 			merged.Issues = append(merged.Issues, scan.Issue{
 				Kind: "scan_error", Severity: scan.SevWarn,
@@ -542,4 +555,44 @@ func (s *Server) pickTable(name string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("找不到表 %q", name)
+}
+
+// detectMonthSheets 找出形如「2026年9月租金（日）」的月度表，**按月份先后排序**。
+// 跨月核对依赖这个顺序（相邻月才可比），所以不能返回 map 或乱序。
+func detectMonthSheets(path string) []string {
+	f, err := excelize.OpenFile(path)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	type ms struct {
+		name string
+		y, m int
+	}
+	var found []ms
+	re := regexp.MustCompile(`(\d{4})\s*年\s*(\d{1,2})\s*月`)
+	for _, sh := range f.GetSheetList() {
+		g := re.FindStringSubmatch(sh)
+		if g == nil {
+			continue
+		}
+		y, _ := strconv.Atoi(g[1])
+		m, _ := strconv.Atoi(g[2])
+		if m < 1 || m > 12 {
+			continue
+		}
+		found = append(found, ms{sh, y, m})
+	}
+	// 按年月排序（跨月核对要求相邻）
+	sort.Slice(found, func(i, j int) bool {
+		if found[i].y != found[j].y {
+			return found[i].y < found[j].y
+		}
+		return found[i].m < found[j].m
+	})
+	out := make([]string, 0, len(found))
+	for _, x := range found {
+		out = append(out, x.name)
+	}
+	return out
 }
