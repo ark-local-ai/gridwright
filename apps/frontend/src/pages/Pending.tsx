@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import "./confirm.css";
 import { agentApi } from "../api-agent";
-import type { Proposal, ApplyResult, ImpactResult, SafetyReport, SelfCheckReport } from "../api-agent";
+import type { Proposal, ApplyResult, ImpactResult, SafetyReport, SelfCheckReport, GenerateResult } from "../api-agent";
 import { IconCheck, IconSpark, IconSend, IconNote, IconLink, IconShield, IconRefresh } from "../components/icons";
 
 /* 待确认（A）+ 会话（B）（见 docs/agent-architecture/19-界面设计.md 阶段 3-4）
@@ -279,6 +279,21 @@ export function ChatPane({ onPlanReady }: { onPlanReady: (p: Proposal) => void }
     }
   };
 
+  // 生成：把这句话交给后端产出草稿（落在工作区 生成/，绝不改原表）
+  const [gen, setGen] = useState<GenerateResult | null>(null);
+  const [genBusy, setGenBusy] = useState(false);
+  const makeDraft = async (instruction: string) => {
+    setGenBusy(true);
+    setErr("");
+    try {
+      setGen(await agentApi.generate(instruction));
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setGenBusy(false);
+    }
+  };
+
   // 澄清问询：点选项 = 直接把它当用户回答发出去
   const answer = (opt: string) => { setInput(opt); void send(); };
 
@@ -318,6 +333,13 @@ export function ChatPane({ onPlanReady }: { onPlanReady: (p: Proposal) => void }
                     </button>
                   </div>
                 )}
+                {/* 生成类：产出新文件到 生成/，不碰原表 */}
+                <div className="mp-opts">
+                  <button className="btn ghost sm" disabled={genBusy}
+                    onClick={() => void makeDraft(m.proposal!.detail || m.proposal!.title)}>
+                    {genBusy ? "正在生成…" : "出一份草稿"}
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -336,6 +358,31 @@ export function ChatPane({ onPlanReady }: { onPlanReady: (p: Proposal) => void }
           <IconSend size={13} />
         </button>
       </div>
+      {gen && (
+        <div className="gen-card">
+          <div className="gc-h">
+            <b>{gen.title || "已生成"}</b>
+            <span className="gc-kind">草稿</span>
+          </div>
+          <div className="gc-meta">
+            {gen.rows > 0 && <span>{gen.rows} 行</span>}
+            {gen.columns?.length > 0 && <span>列：{gen.columns.join(" / ")}</span>}
+          </div>
+          {gen.sum && Object.keys(gen.sum).length > 0 && (
+            <div className="gc-sum">
+              {Object.entries(gen.sum).map(([k, v]) => (
+                <span key={k} className="gc-sum-i"><em>{k}</em>{v.toLocaleString()}</span>
+              ))}
+            </div>
+          )}
+          {gen.content && <pre className="gc-content">{gen.content.slice(0, 600)}</pre>}
+          <div className="gc-file">
+            <code>{gen.file}</code>
+            <span className="gc-note">{gen.notes?.[0] ?? "生成不改动原表"}</span>
+          </div>
+        </div>
+      )}
+
       <p className="chat-foot">
         <IconNote size={12} /> 它只建议，不会自己改表；要改的会进「待确认」等你点头。
       </p>

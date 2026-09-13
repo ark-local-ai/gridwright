@@ -156,3 +156,32 @@
 .ps-msg { color: var(--text-2); }
 .ps-list li.issue .ps-sheet { color: var(--danger); }
 .ps-clarify { font-size: 11.5px; color: var(--warn); margin: 0; }
+
+/* 生成结果卡（草稿，落在 生成/，不改原表） */
+.gen-card {
+  margin-top: var(--sp-3); border: 1px solid var(--line);
+  border-left: 2px solid var(--ok); border-radius: var(--r-panel);
+  background: var(--surface); padding: var(--sp-3);
+  display: flex; flex-direction: column; gap: var(--sp-2);
+}
+.gc-h { display: flex; align-items: baseline; gap: var(--sp-2); }
+.gc-h b { font-size: var(--fs-sm); font-weight: var(--fw-h); color: var(--ink); }
+.gc-kind {
+  font-size: var(--fs-2xs); color: var(--ok); background: var(--ok-bg);
+  padding: 0 var(--sp-1); border-radius: var(--r-ctl);
+}
+.gc-meta { display: flex; gap: var(--sp-3); font-size: var(--fs-2xs); color: var(--text-2); }
+.gc-sum { display: flex; gap: var(--sp-3); flex-wrap: wrap; }
+.gc-sum-i {
+  font-family: var(--mono); font-size: var(--fs-xs); color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.gc-sum-i em { font-style: normal; color: var(--text-3); margin-right: var(--sp-1); font-family: var(--font); font-size: var(--fs-2xs); }
+.gc-content {
+  margin: 0; max-height: 180px; overflow: auto; font-size: var(--fs-xs);
+  color: var(--text-2); line-height: 1.6; white-space: pre-wrap;
+  background: var(--surface-2); border-radius: var(--r-ctl); padding: var(--sp-2);
+}
+.gc-file { display: flex; align-items: baseline; gap: var(--sp-2); }
+.gc-file code { font-family: var(--mono); font-size: var(--fs-2xs); color: var(--brand); }
+.gc-note { font-size: var(--fs-2xs); color: var(--text-3); }
