@@ -38,6 +38,14 @@ func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		list := st.List()
+		type jobView struct {
+			jobs.Job
+			When string `json:"when"`
+		}
+		view := make([]jobView, 0, len(list))
+		for _, j := range list {
+			view = append(view, jobView{Job: j, When: jobs.Describe(j.Schedule)})
+		}
 		if wantsText(r) {
 			var b strings.Builder
 			if len(list) == 0 {
@@ -54,7 +62,7 @@ func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 			writeText(w, b.String())
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"jobs": list})
+		writeJSON(w, http.StatusOK, map[string]any{"jobs": view})
 	case http.MethodPost:
 		var req struct {
 			Name     string `json:"name"`

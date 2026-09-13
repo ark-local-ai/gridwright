@@ -28,6 +28,15 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function del<T>(path: string): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, { method: "DELETE" });
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({}));
+    throw new Error((b as { error?: string }).error ?? `${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 async function put<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: "PUT",
@@ -278,6 +287,32 @@ export interface TermDto {
   hits?: number;
 }
 
+export interface JobDto {
+  id: string;
+  name: string;
+  schedule: string;
+  /** 人话描述（后端给的，如"每天 17:30"） */
+  when: string;
+  kind: string;
+  enabled: boolean;
+  source?: string;
+  created: string;
+  lastRun?: string;
+  lastOk: boolean;
+  lastNote?: string;
+  nextRun?: string;
+}
+
+export interface JobRunDto {
+  jobId: string;
+  name: string;
+  started: string;
+  ok: boolean;
+  summary: string;
+  errors: number;
+  warns: number;
+}
+
 export interface RollbackItem {
   id: number;
   ts: string;
@@ -343,6 +378,15 @@ export const agentApi = {
   rollback: (ids: number[], table?: string) =>
     post<{ ok: boolean; rolled: number; skipped: number; details: string[]; note?: string }>(
       "/api/v1/rollback", { ids, table }),
+  // 自动化任务
+  jobs: () => get<{ jobs: JobDto[] }>("/api/v1/jobs"),
+  createJob: (p: { name: string; schedule: string; kind?: string; enabled?: boolean; source?: string }) =>
+    post<{ ok: boolean; job: JobDto }>("/api/v1/jobs", p),
+  updateJob: (id: string, body: { name?: string; schedule?: string; enabled?: boolean }) =>
+    put<{ ok: boolean; job: JobDto }>("/api/v1/jobs", { id, ...body }),
+  deleteJob: (id: string) => del<{ ok: boolean }>(`/api/v1/jobs?id=${encodeURIComponent(id)}`),
+  runJobNow: (id: string) => post<{ ok: boolean; run: JobRunDto }>("/api/v1/jobs/run", { id }),
+  jobRuns: () => get<{ runs: JobRunDto[] }>("/api/v1/jobs/runs"),
   // 生成：给规格或一句需求
   generate: (instruction?: string, spec?: unknown, dryRun?: boolean) =>
     post<GenerateResult>("/api/v1/generate", { instruction, spec, dryRun }),

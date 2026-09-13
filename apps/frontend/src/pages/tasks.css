@@ -1,0 +1,87 @@
+/* 自动化任务（见 docs/agent-architecture/29-UI升级与剩余功能.md） */
+
+.tk-overlay {
+  position: fixed; inset: 0; z-index: 140; background: rgba(16, 20, 26, .42);
+  display: grid; place-items: center; padding: var(--sp-6);
+}
+.tk-panel {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-overlay); box-shadow: var(--el-3);
+  width: min(720px, 100%); max-height: 84vh;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.tk-head {
+  display: flex; align-items: baseline; gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--line); flex: none;
+}
+.tk-head > svg { color: var(--brand); align-self: center; }
+.tk-head b { font-size: var(--fs-h); font-weight: var(--fw-title); letter-spacing: var(--ls-tight); color: var(--ink); }
+.tk-sub { font-size: var(--fs-2xs); color: var(--text-3); }
+.tk-x { margin-left: auto; border: none; background: none; cursor: pointer; padding: var(--sp-1); border-radius: var(--r-ctl); color: var(--text-3); }
+.tk-x:hover { background: var(--surface-2); color: var(--text-1); }
+
+.tk-tabs {
+  display: flex; align-items: center; gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-5); border-bottom: 1px solid var(--line);
+  background: var(--surface-2); flex: none;
+}
+.tk-tabs button {
+  border: none; background: none; cursor: pointer; font-family: var(--font);
+  font-size: var(--fs-xs); color: var(--text-2); padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-ctl); display: inline-flex; align-items: center; gap: var(--sp-1);
+}
+.tk-tabs button.on { background: var(--surface); color: var(--ink); font-weight: var(--fw-h); box-shadow: var(--el-1); }
+.tk-tabs em { font-style: normal; font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.tk-refresh { margin-left: auto; }
+.tk-msg { margin: 0; padding: var(--sp-2) var(--sp-5); font-size: var(--fs-2xs); color: var(--brand); background: var(--brand-soft); }
+
+.tk-new {
+  display: flex; gap: var(--sp-2); padding: var(--sp-4) var(--sp-5) var(--sp-2);
+}
+.tk-new input {
+  flex: 1; min-width: 0; height: var(--h-md); padding: 0 var(--sp-3);
+  border: 1px solid var(--line); border-radius: var(--r-ctl);
+  background: var(--surface); color: var(--text-1); font-family: var(--font); font-size: var(--fs-xs);
+}
+.tk-new input:focus { outline: none; border-color: var(--brand); box-shadow: var(--focus-ring); }
+.tk-when { flex: 0 0 130px !important; }
+.tk-hint {
+  margin: 0; padding: 0 var(--sp-5); font-size: var(--fs-2xs); color: var(--text-3); line-height: 1.6;
+}
+.tk-hint b { color: var(--text-2); font-weight: var(--fw-med); }
+
+.tk-list, .tk-runs { list-style: none; margin: var(--sp-3) 0 0; padding: 0 var(--sp-3) var(--sp-3); overflow: auto; flex: 1; }
+.tk-job {
+  display: grid; grid-template-columns: 1fr auto; gap: var(--sp-1) var(--sp-3);
+  padding: var(--sp-3); border: 1px solid var(--line); border-radius: var(--r-panel);
+  margin-bottom: var(--sp-2); background: var(--surface);
+}
+.tk-job.on { border-left: 2px solid var(--ok); }
+.tk-job-main { display: flex; align-items: baseline; gap: var(--sp-2); }
+.tk-job-main b { font-size: var(--fs-body); font-weight: var(--fw-h); color: var(--ink); }
+.tk-sched {
+  font-size: var(--fs-2xs); color: var(--text-2);
+  background: var(--surface-2); padding: 0 var(--sp-1); border-radius: var(--r-ctl);
+}
+.tk-job-meta { grid-column: 1; display: flex; gap: var(--sp-3); font-size: var(--fs-2xs); }
+.tk-next { color: var(--brand); font-variant-numeric: tabular-nums; }
+.tk-paused { color: var(--text-3); }
+.tk-ok { color: var(--ok); display: inline-flex; align-items: center; gap: 4px; }
+.tk-bad { color: var(--warn); }
+.tk-job-ops { grid-column: 2; grid-row: 1 / span 2; display: flex; align-items: center; gap: var(--sp-2); }
+.tk-del {
+  border: none; background: none; cursor: pointer; padding: var(--sp-1);
+  border-radius: var(--r-ctl); color: var(--text-3);
+}
+.tk-del:hover { background: var(--danger-bg); color: var(--danger); }
+
+.tk-runs li {
+  display: flex; gap: var(--sp-3); align-items: baseline; padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--line); font-size: var(--fs-xs);
+}
+.tk-runs li.ok { border-left: 2px solid var(--ok); }
+.tk-runs li.bad { border-left: 2px solid var(--warn); }
+.tr-time { font-family: var(--mono); font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.tr-name { color: var(--text-1); min-width: 90px; }
+.tr-sum { color: var(--text-2); }
+.tk-empty { padding: var(--sp-6) var(--sp-4); text-align: center; color: var(--text-3); font-size: var(--fs-sm); }

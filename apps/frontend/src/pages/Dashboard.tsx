@@ -2,10 +2,11 @@ import { useEffect, useCallback, useState } from "react";
 import "./dashboard.css";
 import { agentApi, nodeId } from "../api-agent";
 import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, WorkspaceListItem, Proposal, WeightScore, ScanIssue, SafetyReport, SelfCheckReport } from "../api-agent";
-import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark } from "../components/icons";
+import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark, IconClock } from "../components/icons";
 import SheetView from "./SheetView";
 import Settings from "./Settings2";
 import LedgerPanel from "./LedgerPanel";
+import TasksPanel from "./TasksPanel";
 import { PendingList, ChatPane } from "./Pending";
 
 /* 数据管家 · 主看板（见 docs/agent-architecture/14-第一屏设计.md、17-工作区与跨文件联动.md）
@@ -30,6 +31,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   const [active, setActive] = useState<GraphNode | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [ledgerOpen, setLedgerOpen] = useState(false);
+  const [tasksOpen, setTasksOpen] = useState(false);
   const [zoomed, setZoomed] = useState(false);
   // 打开表格：{sheet, file, highlight} —— 表预览整屏覆盖（表数据要看全）
   const [opened, setOpened] = useState<{ sheet: string; file?: string; ref?: string } | null>(null);
@@ -167,6 +169,11 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
           )}
           {!isEmpty && !isFirstRun && (
             <button className="btn ghost sm" onClick={() => void refresh()}><IconRefresh size={13} />体检</button>
+          )}
+          {!isFirstRun && (
+            <button className="btn ghost sm" onClick={() => setTasksOpen(true)}>
+              <IconClock size={13} />任务
+            </button>
           )}
           <button className="btn ghost sm" onClick={() => setChatOpen((v) => !v)}>
             <IconSpark size={13} />对话
@@ -341,6 +348,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
       {ledgerOpen && (
         <LedgerPanel onClose={() => setLedgerOpen(false)} onChanged={() => void refresh()} />
       )}
+      {tasksOpen && <TasksPanel onClose={() => setTasksOpen(false)} />}
         </>
       )}
 
