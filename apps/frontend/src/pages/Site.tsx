@@ -6,7 +6,7 @@ import {
 } from "../components/icons";
 
 /* 下载发布页 */
-const RELEASES = "https://github.com/ark-local-ai/ark/releases";
+const RELEASES = "https://github.com/ark-local-ai/ark-ai/releases";
 const DL = `${RELEASES}/download/v0.1.0`;
 
 /* 发布渠道。
