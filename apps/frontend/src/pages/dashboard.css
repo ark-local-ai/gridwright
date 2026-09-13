@@ -322,7 +322,18 @@
   display: flex; align-items: center; gap: var(--sp-5);
   font-size: var(--fs-2xs); overflow-x: auto; white-space: nowrap;
 }
-.dash-ledger .dl-h { display: inline-flex; align-items: center; gap: 6px; color: var(--text-3); font-weight: var(--fw-h); flex: none; }
+.dash-ledger .dl-h {
+  display: inline-flex; align-items: center; gap: var(--sp-2); flex: none;
+  border: none; background: none; cursor: pointer; padding: 0;
+  color: var(--text-2); font-weight: var(--fw-h); font-family: var(--font);
+  font-size: var(--fs-2xs);
+}
+.dash-ledger .dl-h:hover { color: var(--brand); }
+.dl-open {
+  color: var(--text-3); font-weight: var(--fw-med);
+  border-bottom: 1px dashed var(--line-strong);
+}
+.dash-ledger .dl-h:hover .dl-open { color: var(--brand); border-color: var(--brand); }
 .dash-ledger .dl-row { color: var(--text-2); font-variant-numeric: tabular-nums; }
 .dash-ledger .dl-row em { font-style: normal; color: var(--text-3); font-family: var(--mono); }
 .dash-ledger .ok { color: var(--ok); margin-left: 6px; }

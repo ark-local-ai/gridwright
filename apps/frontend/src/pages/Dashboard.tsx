@@ -5,6 +5,7 @@ import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, She
 import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark } from "../components/icons";
 import SheetView from "./SheetView";
 import Settings from "./Settings2";
+import LedgerPanel from "./LedgerPanel";
 import { PendingList, ChatPane } from "./Pending";
 
 /* 数据管家 · 主看板（见 docs/agent-architecture/14-第一屏设计.md、17-工作区与跨文件联动.md）
@@ -28,6 +29,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [active, setActive] = useState<GraphNode | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [ledgerOpen, setLedgerOpen] = useState(false);
   const [zoomed, setZoomed] = useState(false);
   // 打开表格：{sheet, file, highlight} —— 表预览整屏覆盖（表数据要看全）
   const [opened, setOpened] = useState<{ sheet: string; file?: string; ref?: string } | null>(null);
@@ -320,7 +322,10 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
       </div>
 
       <footer className="dash-ledger">
-        <span className="dl-h"><IconNote size={13} />账目</span>
+        <button className="dl-h" onClick={() => setLedgerOpen(true)}>
+          <IconNote size={13} />账目
+          <span className="dl-open">查看 / 回滚</span>
+        </button>
         {ledger.length === 0 ? (
           <span className="dash-muted">还没有改动记录</span>
         ) : (
@@ -332,6 +337,10 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
           ))
         )}
       </footer>
+
+      {ledgerOpen && (
+        <LedgerPanel onClose={() => setLedgerOpen(false)} onChanged={() => void refresh()} />
+      )}
         </>
       )}
 

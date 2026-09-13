@@ -50,6 +50,9 @@ func TestRollbackRestoresOldValue(t *testing.T) {
 	if len(items) != 1 || !items[0].CanRollback {
 		t.Fatalf("应有一条可回滚账目，得到 %+v", items)
 	}
+	if items[0].Op != "set" {
+		t.Errorf("应透出 op=set，得到 %q", items[0].Op)
+	}
 
 	res, err := Rollback(led, dir, book, items, "m")
 	if err != nil {

@@ -278,6 +278,36 @@ export interface TermDto {
   hits?: number;
 }
 
+export interface RollbackItem {
+  id: number;
+  ts: string;
+  table: string;
+  sheet: string;
+  cell: string;
+  op: string;
+  old: string;
+  new: string;
+  reason: string;
+  status: string;
+  canRollback: boolean;
+  whyNot?: string;
+  group: string;
+}
+
+export interface GenerateResult {
+  ok: boolean;
+  kind: string;
+  title: string;
+  path: string;
+  file: string;
+  rows: number;
+  columns: string[];
+  preview?: string[][];
+  sum?: Record<string, number>;
+  content?: string;
+  notes?: string[];
+}
+
 export interface WeightScore {
   node: GraphNode;
   structural: number;
@@ -307,6 +337,15 @@ export const agentApi = {
     if (file) q.set("file", file);
     return get<SheetPreview>(`/api/v1/sheets/preview?${q.toString()}`);
   },
+  // 回滚：列出可回滚的账目（带"能不能倒"的判断）+ 执行
+  rollbackList: (limit = 200) =>
+    get<{ items: RollbackItem[] }>(`/api/v1/rollback?limit=${limit}`),
+  rollback: (ids: number[], table?: string) =>
+    post<{ ok: boolean; rolled: number; skipped: number; details: string[]; note?: string }>(
+      "/api/v1/rollback", { ids, table }),
+  // 生成：给规格或一句需求
+  generate: (instruction?: string, spec?: unknown, dryRun?: boolean) =>
+    post<GenerateResult>("/api/v1/generate", { instruction, spec, dryRun }),
   // 服务端目录浏览（浏览器拿不到绝对路径，故选文件夹由服务端做）
   fsList: (dir?: string) =>
     get<{ dir: string; parent: string; entries: { name: string; path: string }[]; drives?: string[]; tables: number }>(

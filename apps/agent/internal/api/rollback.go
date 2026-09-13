@@ -41,6 +41,9 @@ func (s *Server) handleRollbackList(w http.ResponseWriter, r *http.Request) {
 		writeText(w, b.String())
 		return
 	}
+	if items == nil {
+		items = []rollback.Item{}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 

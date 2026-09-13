@@ -31,6 +31,7 @@ type Item struct {
 	Table  string `json:"table"`
 	Sheet  string `json:"sheet"`
 	Cell   string `json:"cell"`
+	Op     string `json:"op"` // set | append | rollback
 	Old    string `json:"old"`
 	New    string `json:"new"`
 	Reason string `json:"reason"`
@@ -61,11 +62,12 @@ func List(led *ledger.Ledger, limit int) ([]Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	var out []Item
+	// 保证是数组而非 null —— 前端 .map 会因 null 直接崩（这坑踩过多次）
+	out := []Item{}
 	for i, e := range entries {
 		it := Item{
 			ID: i, Ts: e.Ts, Table: e.Table, Sheet: e.Sheet, Cell: e.Cell,
-			Old: e.Old, New: e.New, Reason: e.Reason, Status: e.Status,
+			Op: e.Op, Old: e.Old, New: e.New, Reason: e.Reason, Status: e.Status,
 			Group: e.Ts, // 同一时间戳视为一次操作
 		}
 		switch {
