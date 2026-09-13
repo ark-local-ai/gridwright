@@ -68,13 +68,17 @@ func (s *Server) brainClient() *llm.Client {
 }
 
 // WithRegistry 挂上工作区注册表（可为 nil，则不支持切换）。
-// 同时把启动时的工作区登记进去，否则初次打开时列表里看不到自己。
+//
+// 只在用户**显式配过**工作区时把它登记进去。
+// 首次运行时（没配过），工作区是个临时默认目录——绝不能把它当成"用户选过的"，
+// 否则界面会以为已经选好工作区，直接进空看板，用户永远看不到"选工作区"的引导。
 func (s *Server) WithRegistry(reg *workspace.Registry) *Server {
 	s.mu.Lock()
 	s.Reg = reg
 	layout := s.Layout
+	cfg := s.Cfg
 	s.mu.Unlock()
-	if reg != nil && layout != nil {
+	if reg != nil && layout != nil && cfg != nil && cfg.HasWorkspace() {
 		tables, _ := layout.DataFiles()
 		_, _ = reg.Touch(layout.Root, len(tables))
 	}
@@ -103,8 +107,20 @@ func (s *Server) SwitchWorkspace(dir string) error {
 	s.Layout = layout
 	s.Ledger = led
 	s.Cfg.Workspace = layout.Root
+	s.Cfg.MarkWorkspaceChosen() // 用户显式选了 → 不再是"首次运行"
+	cfg := s.Cfg
 	reg := s.Reg
 	s.mu.Unlock()
+
+	// 持久化：选了就记住，下次启动直接用（否则每次打开都要重选）
+	if err := cfg.Save(config.UserConfigPath()); err != nil {
+		// 保存失败不阻断本次使用，但要让调用方知道
+		if reg != nil {
+			tables, _ := layout.DataFiles()
+			_, _ = reg.Touch(layout.Root, len(tables))
+		}
+		return fmt.Errorf("已切换工作区，但写入配置失败（下次打开需重选）：%w", err)
+	}
 
 	if reg != nil {
 		tables, _ := layout.DataFiles()
@@ -142,6 +158,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/selfcheck", s.handleSelfCheck)
 	mux.HandleFunc("/api/v1/new-tables", s.handleNewTables)
 	mux.HandleFunc("/api/v1/generate", s.handleGenerate)
+	mux.HandleFunc("/api/v1/fs/list", s.handleFSList)
 	mux.HandleFunc("/api/v1/graph", s.handleGraph)
 	mux.HandleFunc("/api/v1/scan", s.handleScan)
 	mux.HandleFunc("/api/v1/scan/run", s.handleScanRun)
@@ -209,6 +226,9 @@ type workspaceInfo struct {
 	BrainReady bool `json:"brainReady"`
 	// 环境是否"离线可用"的说明位（前端据此弱化联网功能）
 	Offline bool `json:"offline"`
+	// 用户是否**显式**选过工作区。false = 首次运行，界面应引导去选一个，
+	// 而不是把临时默认目录当成用户的工作区。
+	WorkspaceChosen bool `json:"workspaceChosen"`
 }
 
 func (s *Server) handleWorkspace(w http.ResponseWriter, r *http.Request) {
@@ -237,12 +257,13 @@ func (s *Server) handleWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, workspaceInfo{
-		Root:       layout.Root,
-		Tables:     len(tables),
-		InboxCount: len(inbox),
-		LedgerPath: led.Path(),
-		BrainReady: cfg.BrainReady(),
-		Offline:    !cfg.BrainReady(),
+		Root:            layout.Root,
+		Tables:          len(tables),
+		InboxCount:      len(inbox),
+		LedgerPath:      led.Path(),
+		BrainReady:      cfg.BrainReady(),
+		Offline:         !cfg.BrainReady(),
+		WorkspaceChosen: cfg.HasWorkspace(),
 	})
 }
 

@@ -48,6 +48,8 @@ export interface WorkspaceInfo {
   ledgerPath: string;
   brainReady: boolean;
   offline: boolean;
+  /** 用户是否显式选过工作区（false=首次运行，界面要引导去选） */
+  workspaceChosen: boolean;
 }
 
 export interface FileItem {
@@ -305,6 +307,10 @@ export const agentApi = {
     if (file) q.set("file", file);
     return get<SheetPreview>(`/api/v1/sheets/preview?${q.toString()}`);
   },
+  // 服务端目录浏览（浏览器拿不到绝对路径，故选文件夹由服务端做）
+  fsList: (dir?: string) =>
+    get<{ dir: string; parent: string; entries: { name: string; path: string }[]; drives?: string[]; tables: number }>(
+      `/api/v1/fs/list${dir ? `?dir=${encodeURIComponent(dir)}` : ""}`),
   // 工作区
   workspaces: () => get<{ current: string; items: WorkspaceListItem[] }>("/api/v1/workspaces"),
   openWorkspace: (dir: string) =>

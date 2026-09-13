@@ -18,6 +18,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   const [err, setErr] = useState("");
   const [wsName, setWsName] = useState("");
   const [wsPath, setWsPath] = useState("");
+  const [chosen, setChosen] = useState(true); // 是否显式选过工作区
   const [files, setFiles] = useState<WorkspaceFiles | null>(null);
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [weights, setWeights] = useState<Record<string, WeightScore>>({});
@@ -49,6 +50,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
         setWsName(seg[seg.length - 1] ?? "工作区");
         setWsPath(ws.root);
         setBrainReady(ws.brainReady);
+        setChosen(ws.workspaceChosen);
       });
       const [f, g, s, l, w] = await Promise.all([
         agentApi.files().catch(() => null),
@@ -118,7 +120,9 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   // 空地盘：工作区里还没有表。**仍要保留顶栏**——否则用户没法切换工作区/进设置，
   // 新建用户会卡在空白页没有出路。
   const tableCount = files?.tables?.length ?? 0;
-  const isEmpty = load === "ready" && tableCount === 0;
+  // 首次运行（还没选过工作区）：引导去选，**不是**告诉他"工作区是空的"
+  const isFirstRun = load === "ready" && !chosen;
+  const isEmpty = load === "ready" && chosen && tableCount === 0;
 
   const propagate = graph?.propagate?.to ?? [];
   const hot = new Set(propagate);
@@ -131,7 +135,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
           <button className="ws-switch" onClick={() => setSwitcherOpen((v) => !v)} title="切换工作区">
             <IconXls size={16} />
             <span>{wsName || "工作区"}</span>
-            <em className="dash-count">{isEmpty ? "空" : `${tableCount} 个表`}</em>
+            <em className="dash-count">{isFirstRun ? "未选工作区" : isEmpty ? "空" : `${tableCount} 个表`}</em>
             <IconChevD size={13} />
           </button>
           {!brainReady && <span className="dash-offline" title="未配置模型：看表/体检可用，改表需联网配置">离线</span>}
@@ -161,7 +165,11 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
       )}
 
       {/* 空地盘：只有这一块，但顶栏在，能换工作区 */}
-      {isEmpty ? (
+      {isFirstRun ? (
+        <div className="dash-body dash-body-empty">
+          <FirstRun root={wsPath} pickFolder={pickFolder} onDone={() => void refresh()} />
+        </div>
+      ) : isEmpty ? (
         <div className="dash-body dash-body-empty">
           <EmptyWorkspace root={wsPath} onRefresh={() => void refresh()} onNew={() => setSettingsOpen(true)} />
         </div>
@@ -410,6 +418,177 @@ function WorkspaceSwitcher({ onPick, onOpenSettings }: { onPick: () => void; onO
 }
 
 /* ---------- 空地盘 ---------- */
+
+/** 首次运行：还没选过工作区。三件事说清 + 两个入口。 */
+function FirstRun({ root, pickFolder, onDone }: {
+  root: string;
+  pickFolder?: () => Promise<string | null>;
+  onDone: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [path, setPath] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [browsing, setBrowsing] = useState(false);
+
+  const openDir = async (dir: string) => {
+    setBusy(true);
+    setErr("");
+    try {
+      await agentApi.openWorkspace(dir);
+      onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // 选文件夹：桌面壳用系统对话框；单文件版（浏览器里）用服务端列目录浏览。
+  const choose = async () => {
+    if (pickFolder) {
+      const dir = await pickFolder();
+      if (dir) await openDir(dir);
+      return;
+    }
+    setBrowsing(true);
+  };
+
+  const create = async () => {
+    if (!name.trim()) return;
+    setBusy(true);
+    setErr("");
+    try {
+      await agentApi.createWorkspace(name.trim());
+      onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="first-run">
+      <h2>先选一个工作区</h2>
+      <p className="fr-sub">
+        工作区就是一个放表的文件夹。<b>你的表一直在你自己的机器上</b>，
+        选好之后它会盯着这个文件夹干活。
+      </p>
+
+      <div className="fr-ways">
+        <div className="fr-way">
+          <b>打开已有的文件夹</b>
+          <span>表已经在某个文件夹里了，直接指过去。</span>
+          <button className="btn primary" onClick={() => void choose()} disabled={busy}>
+            选择文件夹…
+          </button>
+          <div className="fr-manual">
+            <input value={path} placeholder="或直接填路径，如 D:\台账"
+              onChange={(e) => setPath(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && path.trim()) void openDir(path.trim()); }} />
+            <button className="btn ghost sm" onClick={() => void openDir(path.trim())}
+              disabled={busy || !path.trim()}>打开</button>
+          </div>
+        </div>
+
+        <div className="fr-way">
+          <b>新建一个工作区</b>
+          <span>还没有文件夹？建一个新的，再把表放进去。</span>
+          <div className="fr-manual">
+            <input value={name} placeholder="工作区名称，如 御龙湾台账"
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") void create(); }} />
+            <button className="btn ghost sm" onClick={() => void create()}
+              disabled={busy || !name.trim()}>新建</button>
+          </div>
+        </div>
+      </div>
+
+      {err && <p className="fr-err">{err}</p>}
+      <p className="fr-hint">
+        当前临时目录（还没选）：<code>{root}</code>
+      </p>
+
+      {browsing && (
+        <FolderPicker
+          onCancel={() => setBrowsing(false)}
+          onPick={(dir) => { setBrowsing(false); void openDir(dir); }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** 服务端目录浏览：浏览器里也能"选文件夹"（列表来自本机服务）。 */
+function FolderPicker({ onPick, onCancel }: {
+  onPick: (dir: string) => void;
+  onCancel: () => void;
+}) {
+  const [dir, setDir] = useState("");
+  const [parent, setParent] = useState("");
+  const [entries, setEntries] = useState<{ name: string; path: string }[]>([]);
+  const [drives, setDrives] = useState<string[]>([]);
+  const [tables, setTables] = useState(0);
+  const [err, setErr] = useState("");
+
+  const load = async (d?: string) => {
+    setErr("");
+    try {
+      const r = await agentApi.fsList(d);
+      setDir(r.dir);
+      setParent(r.parent);
+      setEntries(r.entries ?? []);
+      setDrives(r.drives ?? []);
+      setTables(r.tables);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  };
+  useEffect(() => { void load(); }, []);
+
+  return (
+    <div className="fp-overlay" onClick={onCancel}>
+      <div className="fp-panel" onClick={(e) => e.stopPropagation()}>
+        <header className="fp-head">
+          <b>选择工作区文件夹</b>
+          <button className="btn ghost sm" onClick={onCancel}>取消</button>
+        </header>
+        <div className="fp-path">
+          <button className="btn ghost sm" onClick={() => parent && void load(parent)}
+            disabled={!parent}>↑ 上级</button>
+          <code>{dir}</code>
+          {tables > 0 && <span className="fp-tables">此目录含 {tables} 个 xlsx</span>}
+        </div>
+        {drives.length > 0 && (
+          <div className="fp-drives">
+            {drives.map((d) => (
+              <button key={d} className="pill ghost" onClick={() => void load(d)}>{d}</button>
+            ))}
+          </div>
+        )}
+        <ul className="fp-list">
+          {entries.map((e) => (
+            <li key={e.path}>
+              <button className="fp-row" onDoubleClick={() => void load(e.path)}
+                onClick={() => void load(e.path)}>
+                <IconFolder size={13} />{e.name}
+              </button>
+            </li>
+          ))}
+          {entries.length === 0 && <li className="fp-empty">这个目录下没有子文件夹</li>}
+        </ul>
+        {err && <p className="fr-err">{err}</p>}
+        <footer className="fp-foot">
+          <span className="fp-hint">进到装表的目录，然后点"就用这个文件夹"</span>
+          <button className="btn primary" onClick={() => onPick(dir)} disabled={!dir}>
+            就用这个文件夹
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
 
 function EmptyWorkspace({ root, onRefresh, onNew }: {
   root: string; onRefresh: () => void; onNew: () => void;

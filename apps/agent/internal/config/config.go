@@ -19,6 +19,9 @@ type Config struct {
 
 	LLM    LLM    `yaml:"llm"`
 	Notify Notify `yaml:"notify"`
+
+	// workspaceSet：工作区是显式配过的（不是我们填的临时默认值）
+	workspaceSet bool
 }
 
 // LLM 是"脑"的连接配置（OpenAI 兼容 API）。
@@ -65,6 +68,9 @@ func Load(path string) (*Config, error) {
 		if err := yaml.Unmarshal(b, c); err != nil {
 			return nil, fmt.Errorf("解析用户配置 %s: %w", userPath, err)
 		}
+		if c.Workspace != "" {
+			c.markWorkspaceSet()
+		}
 	}
 
 	// ② 显式指定/默认的配置文件
@@ -74,6 +80,9 @@ func Load(path string) (*Config, error) {
 		case err == nil:
 			if err := yaml.Unmarshal(b, c); err != nil {
 				return nil, fmt.Errorf("解析配置: %w", err)
+			}
+			if c.Workspace != "" {
+				c.markWorkspaceSet()
 			}
 		case os.IsNotExist(err) && path == "config.yaml":
 			// 默认路径不存在：正常（桌面版随包运行），继续
@@ -94,10 +103,14 @@ func Load(path string) (*Config, error) {
 	}
 	if v := os.Getenv("WORKSPACE"); v != "" {
 		c.Workspace = v
+		c.markWorkspaceSet()
 	}
 
+	// 工作区**不是**启动前提：没配也要能起来，让用户在界面里选/新建工作区。
+	// （原先没工作区就 log.Fatalf 退出——双击 exe 会一闪而过，用户完全不知道发生了什么。
+	//  桌面单文件版尤其如此：它没有 config.yaml，用户也不可能先去写一个。）
 	if c.Workspace == "" {
-		return nil, fmt.Errorf("未配置工作区（config.yaml 的 workspace 或 env WORKSPACE）")
+		c.Workspace = DefaultWorkspaceDir()
 	}
 	// 脑（LLM）不是启动前提：没有 key/网络时，只读能力（看表、体检、联动图、
 	// 账目、预览）必须照常可用。只有"需要判断"的动作才要求配好脑。
@@ -123,3 +136,27 @@ func sameFile(a, b string) bool {
 func (c *Config) BrainReady() bool {
 	return c.LLM.BaseURL != "" && c.LLM.APIKey != ""
 }
+
+// DefaultWorkspaceDir 是"还没选工作区"时的临时落点：
+// 放在用户目录下，先把服务起起来，让用户在界面里选或新建真正的工作区。
+// 选了之后会写进配置，下次直接用那个。
+func DefaultWorkspaceDir() string {
+	if dir := os.Getenv("GRIDWRIGHT_CONFIG_DIR"); dir != "" {
+		return filepath.Join(dir, "workspace")
+	}
+	if cfg, err := os.UserConfigDir(); err == nil && cfg != "" {
+		return filepath.Join(cfg, "gridwright", "workspace")
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".gridwright", "workspace")
+}
+
+// HasWorkspace 表示是否**显式**配过工作区（区别于临时默认目录）。
+func (c *Config) HasWorkspace() bool { return c.Workspace != "" && c.workspaceSet }
+
+// markWorkspaceSet 由 Load 在读到显式配置时调用。
+func (c *Config) markWorkspaceSet() { c.workspaceSet = true }
+
+// MarkWorkspaceChosen 供"用户在界面里选了工作区"时调用。
+// 它同时置位并让保存把工作区写进配置。
+func (c *Config) MarkWorkspaceChosen() { c.workspaceSet = true }

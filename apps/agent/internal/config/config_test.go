@@ -81,12 +81,25 @@ llm:
 	}
 }
 
-// TestMissingWorkspaceIsError 工作区是硬要求（没有它无从下手）。
-func TestMissingWorkspaceIsError(t *testing.T) {
+// TestMissingWorkspaceFallsBack 没配工作区**不该报错**——要能起服务，
+// 让用户在界面里选。原先这里要求报错，结果双击 exe 一闪而过（真实踩到）。
+func TestMissingWorkspaceFallsBack(t *testing.T) {
 	isolateConfig(t)
 	t.Setenv("WORKSPACE", "")
-	if _, err := Load("config.yaml"); err == nil {
-		t.Fatal("没有工作区应报错")
+	c, err := Load("config.yaml")
+	if err != nil {
+		t.Fatalf("没配工作区也应能启动（让用户去选），得到: %v", err)
+	}
+	if c.Workspace == "" {
+		t.Fatal("应给一个临时默认目录，服务才能起来")
+	}
+	if c.HasWorkspace() {
+		t.Error("临时默认目录不该被当作\"用户已选\"")
+	}
+	// 用户选了之后才算已选
+	c.MarkWorkspaceChosen()
+	if !c.HasWorkspace() {
+		t.Error("标记后应算已选")
 	}
 }
 
