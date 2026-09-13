@@ -151,6 +151,10 @@ func applyAppend(f *excelize.File, e plan.Edit) plan.Result {
 	return plan.Result{Status: "ok"}
 }
 
+// Coerce 把纯数字字符串转成 number，其余原样（excelize 对数字/文本更友好）。
+// 导出以便回滚同样按此规则写回（保持与写入时一致的数值/文本语义）。
+func Coerce(v any) any { return coerce(v) }
+
 // coerce 把纯数字字符串转成 number，其余原样（excelize 对数字/文本更友好）。
 func coerce(v any) any {
 	s, ok := v.(string)

@@ -2,11 +2,14 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 	"path/filepath"
 	"strings"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/agent"
+	"github.com/ark-local-ai/ark/apps/agent/internal/notify"
 	"github.com/ark-local-ai/ark/apps/agent/internal/propose"
 )
 
@@ -103,6 +106,22 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 		if rep, err := s.runSelfCheck(node, "", touched); err == nil {
 			sc = rep
 		}
+	}
+
+	// 通知：改完就推（此前只有 inbox 自动路径发通知，界面确认后改表**不发**——
+	// 主路径反而没有通知，是漏的）。
+	cfg2, _, _, _ := s.cur()
+	detail := []string{}
+	for _, x := range results {
+		if x.Status != "ok" {
+			detail = append(detail, fmt.Sprintf("%s %s: %s", x.Ref, x.Field, x.Note))
+		}
+	}
+	if perr := notify.Send(cfg2.Notify, notify.Message{
+		Table: propNodeBase(prop), Summary: prop.Summary,
+		Applied: applied, Rejected: rejected, RejectedDetail: detail,
+	}); perr != nil {
+		log.Printf("[apply] 通知未发出: %v", perr)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{

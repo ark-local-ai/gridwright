@@ -158,12 +158,22 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			"workspace":   cfg.Workspace,
 			"pollSeconds": cfg.PollSeconds,
 			"configPath":  config.UserConfigPath(),
+			// 通知渠道（密钥只回"是否已配"）
+			"notifyChannel": cfg.Notify.Channel,
+			"hasServerChan": cfg.Notify.ServerChanSKey != "",
+			"hasPushPlus":   cfg.Notify.PushPlusToken != "",
+			"webhookUrl":    cfg.Notify.WebhookURL,
 		})
 	case http.MethodPut:
 		var req struct {
 			BaseURL string `json:"baseUrl"`
 			APIKey  string `json:"apiKey"`
 			Model   string `json:"model"`
+			// 通知配置（可选；空=不改）
+			NotifyChannel  string `json:"notifyChannel"`
+			ServerChanSKey string `json:"serverchanSkey"`
+			PushPlusToken  string `json:"pushplusToken"`
+			WebhookURL     string `json:"webhookUrl"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeErr(w, http.StatusBadRequest, "请求格式错误")
@@ -178,6 +188,18 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		if req.Model != "" {
 			s.Cfg.LLM.Model = req.Model
+		}
+		if req.NotifyChannel != "" {
+			s.Cfg.Notify.Channel = req.NotifyChannel
+		}
+		if req.ServerChanSKey != "" {
+			s.Cfg.Notify.ServerChanSKey = req.ServerChanSKey
+		}
+		if req.PushPlusToken != "" {
+			s.Cfg.Notify.PushPlusToken = req.PushPlusToken
+		}
+		if req.WebhookURL != "" {
+			s.Cfg.Notify.WebhookURL = req.WebhookURL
 		}
 		cfg := s.Cfg
 		ready := cfg.BrainReady()

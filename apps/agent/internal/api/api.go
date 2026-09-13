@@ -161,6 +161,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/selfcheck", s.handleSelfCheck)
 	mux.HandleFunc("/api/v1/new-tables", s.handleNewTables)
 	mux.HandleFunc("/api/v1/generate", s.handleGenerate)
+	mux.HandleFunc("/api/v1/rollback", s.handleRollbackOrList)
 	mux.HandleFunc("/api/v1/fs/list", s.handleFSList)
 	mux.HandleFunc("/api/v1/graph", s.handleGraph)
 	mux.HandleFunc("/api/v1/scan", s.handleScan)
