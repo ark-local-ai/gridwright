@@ -7,17 +7,17 @@ import {
 
 /* 下载发布页 */
 const RELEASES = "https://github.com/ark-local-ai/ark-ai/releases";
-const DL = `${RELEASES}/download/v0.1.0`;
+const DL = `${RELEASES}/download/v0.1.1`;
 
 /* 发布渠道。
    现在只做 Windows 桌面客户端（Tauri 安装包，见 scripts/build-desktop.sh）：
    双击安装、有窗口、引擎随包，用户不需要另装东西。
    免安装的单文件版仍保留（同一个引擎 + 界面已内嵌），给"不想装"的场景用。
    ⚠️ 还没上传到 Releases（打包脚本已能产出），所以标注"暂未开放"，避免点开 404。 */
-const BUILT = true; // v0.1.0 资产已上传到 Releases（见本文件顶部说明）
+const BUILT = true; // v0.1.1 资产已上传到 Releases（见本文件顶部说明）
 type DownloadOS = { os: string; label: string; kind: string; note: string; file: string; url: string };
 const DOWNLOADS: DownloadOS[] = [
-  { os: "setup", label: "Windows 安装版", kind: "安装包", note: "双击安装 · 有窗口 · 引擎随包", file: "gridwright_0.1.0_x64-setup.exe", url: `${DL}/gridwright_0.1.0_x64-setup.exe` },
+  { os: "setup", label: "Windows 安装版", kind: "安装包", note: "双击安装 · 有窗口 · 引擎随包", file: "gridwright_0.1.1_x64-setup.exe", url: `${DL}/gridwright_0.1.1_x64-setup.exe` },
   { os: "portable", label: "免安装版", kind: "单文件", note: "不装 · 双击运行 · 浏览器打开", file: "gridwright-windows-amd64.exe", url: `${DL}/gridwright-windows-amd64.exe` },
 ];
 
