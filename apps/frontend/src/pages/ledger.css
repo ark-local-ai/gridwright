@@ -1,11 +1,11 @@
 /* 账目 + 回滚（见 docs/agent-architecture/29-UI升级与剩余功能.md） */
 
 .lg-overlay {
-  position: fixed; inset: 0; z-index: 140; background: rgba(16, 20, 26, .42);
+  position: fixed; inset: 0; z-index: 140; background: var(--scrim); backdrop-filter: var(--scrim-blur);
   display: grid; place-items: center; padding: var(--sp-6);
 }
 .lg-panel {
-  background: var(--surface); border: 1px solid var(--line);
+  background: var(--surface);
   border-radius: var(--r-overlay); box-shadow: var(--el-3);
   width: min(1040px, 100%); max-height: 86vh;
   display: flex; flex-direction: column; overflow: hidden;
@@ -54,6 +54,7 @@
 .lg-table td { padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--line); vertical-align: baseline; }
 .lg-table tr:hover td { background: var(--surface-2); }
 .lg-table tr.no td { color: var(--text-3); }
+.lg-table tbody tr:last-child td { border-bottom: none; }
 
 .lg-c-check { width: 34px; }
 .lg-c-check input { cursor: pointer; }

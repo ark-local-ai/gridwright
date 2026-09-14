@@ -2,26 +2,31 @@
    数据管家 · 主看板（见 docs/agent-architecture/14-第一屏设计.md）
    原则：一屏答一个问题；只有一个视觉重心；颜色只三条
    （钢蓝=要你动，绿=完成，黄=警告，其余全灰）。全程不滚动主区。
-   复用 index.css 的设计令牌，不新增颜色。
+
+   透亮版：**画布与面板同色**，左右两栏不再用"白块贴灰底 + 竖边框"分家，
+   改成"一整片纸白 + 一道发丝中缝 + 留白"。所以 .dash-left / .dash-right
+   的底色一律为透明/纸白，分隔只靠 1px 极淡线。
    ===================================================================== */
 
 .dash {
   display: flex; flex-direction: column;
   height: 100%; min-height: 0;
-  background: var(--bg);
+  /* 整块看板就是**一整片纸白**：顶栏/两栏/底栏不再各自一块底色，
+     层级全靠浮光与留白。这是"透亮"最直接的落点。 */
+  background: var(--surface);
 }
 
 /* ---------- 顶栏 ---------- */
 .dash-top {
   display: flex; align-items: center; gap: 20px;
   padding: 0 22px; height: 58px; flex: none;
-  background: var(--surface); box-shadow: var(--panel-hi);
+  background: var(--surface);
   border-bottom: 1px solid var(--line);
 }
 .dash-ident { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .ws-name {
   font-size: var(--fs-display); font-weight: var(--fw-title);
-  letter-spacing: var(--ls-display); color: var(--ink);
+  letter-spacing: -0.03em; color: var(--ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   max-width: 320px;
 }
@@ -89,17 +94,19 @@
 .empty-actions { display: flex; gap: 10px; }
 .dash-actions { display: flex; gap: 8px; }
 
-/* ---------- 主体：左理解 / 右行动 ---------- */
+/* ---------- 主体：左理解 / 右行动 ----------
+   两栏同底色，中缝一道发丝线。以前左栏是"白块 + 右竖边框"，
+   在灰画布上像两块灰格子拼的；现在整片纸白，中缝只是提示。 */
 .dash-body {
   flex: 1; min-height: 0; display: grid; grid-template-columns: 300px 1fr; gap: 0;
 }
 .dash-left {
   border-right: 1px solid var(--line); padding: var(--sp-5) var(--sp-6);
-  background: var(--surface); box-shadow: var(--hi);
+  background: transparent;
   display: flex; flex-direction: column; min-height: 0; overflow: auto;
 }
 .dash-h {
-  font-size: var(--fs-h); font-weight: var(--fw-title); letter-spacing: var(--ls-tight);
+  font-size: var(--fs-h); font-weight: var(--fw-title); letter-spacing: -0.02em;
   color: var(--ink); margin: 0 0 var(--sp-1);
 }
 .dash-sub { font-size: var(--fs-2xs); color: var(--text-3); margin: 0 0 var(--sp-5); line-height: 1.5; }
@@ -122,18 +129,18 @@
 .chain-list { list-style: none; margin: 0; padding: 0 0 0 6px; display: flex; flex-direction: column; }
 .chain-list li { display: flex; flex-direction: column; }
 
-/* 一项 = 一行文字，不是卡片 */
+/* 一项 = 一行文字，不是卡片。左条只在"选中/被牵动"时出现（静态时留白）。 */
 .chain-row {
   display: flex; align-items: baseline; gap: 8px; width: 100%;
-  padding: 5px 8px; border: none; background: none; cursor: pointer;
-  border-radius: var(--radius-xs); text-align: left; font-family: var(--font);
+  padding: 6px 8px; border: none; background: none; cursor: pointer;
+  border-radius: var(--r-ctl); text-align: left; font-family: var(--font);
   font-size: 12.5px; color: var(--text-1);
   border-left: 2px solid transparent;
   transition: background .15s var(--ease-out), border-color .15s var(--ease-out);
 }
 .chain-row:hover { background: var(--surface-2); }
 /* 选中/被牵动：**唯一用蓝的地方**（细左条，不是整块底色） */
-.chain-row.on { border-left-color: var(--brand); color: var(--brand); background: var(--surface-2); }
+.chain-row.on { border-left-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
 .chain-row.hot { border-left-color: var(--live); }
 .cr-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 参考信息：中性淡灰，不用彩色徽标 */
@@ -184,11 +191,15 @@
 .nd-chip.dep { background: var(--surface-2); color: var(--text-2); border-color: var(--line); }
 .nd-open { margin-left: auto; }
 
-/* 节点汇总（点模块展示的大概汇总数据） */
+/* 节点汇总（点模块展示的大概汇总数据）
+   透亮调：不再描边框成"小灰盒"，改成"一段读数区"——靠左侧一点的
+   品牌色细条 + 极淡底，读起来像仪器上的一块铭牌。 */
 .nd-stats {
   display: flex; flex-direction: column; gap: 6px;
-  padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-md);
-  background: var(--surface); font-size: 12px;
+  padding: 11px 14px; border: none; border-radius: var(--r-panel);
+  background: var(--surface-2);
+  box-shadow: inset 2px 0 0 var(--brand-line);
+  font-size: 12px;
 }
 .nd-stats.muted { color: var(--text-3); }
 .nd-stat-row { display: flex; gap: 10px; align-items: baseline; }
@@ -211,12 +222,12 @@
 
 /* ---------- 联动大图 ---------- */
 .gv-overlay {
-  position: fixed; inset: 0; z-index: 100; background: rgba(20, 24, 30, 0.45);
+  position: fixed; inset: 0; z-index: 100; background: var(--scrim); backdrop-filter: var(--scrim-blur);
   display: grid; place-items: center; padding: 32px;
 }
 .gv-panel {
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md); width: min(1080px, 100%); max-height: 88vh;
+  background: var(--surface); border: none; border-radius: var(--r-overlay);
+  box-shadow: var(--el-3); width: min(1080px, 100%); max-height: 88vh;
   display: flex; flex-direction: column; overflow: hidden;
 }
 .gv-head {
@@ -227,8 +238,8 @@
 .gv-head button { margin-left: auto; }
 .gv-body { overflow: auto; padding: 20px; display: flex; flex-direction: column; gap: 18px; }
 
-.gv-file { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 12px 14px; background: var(--surface-2); }
-.gv-file.muted { background: transparent; border-style: dashed; }
+.gv-file { border-radius: var(--r-panel); padding: 14px 16px; background: var(--surface-2); }
+.gv-file.muted { background: transparent; border: 1px dashed var(--line-strong); }
 .gv-file.muted .gv-node { color: var(--text-3); }
 .gv-section-h {
   font-size: 12px; font-weight: var(--fw-h); color: var(--text-1);
@@ -242,13 +253,14 @@
 .gv-nodes { display: flex; flex-wrap: wrap; gap: 8px; }
 .gv-node {
   display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px;
-  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface);
+  border: 1px solid transparent; border-radius: var(--r-ctl); background: var(--surface);
   color: var(--text-2); font-size: 12px; font-family: var(--font); cursor: pointer;
-  max-width: 260px; transition: border-color .15s var(--ease-out), color .15s var(--ease-out);
+  box-shadow: var(--el-1);
+  max-width: 260px; transition: box-shadow .15s var(--ease-out), color .15s var(--ease-out);
 }
-.gv-node:hover { border-color: var(--line-strong); color: var(--text-1); }
-.gv-node.on { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
-.gv-node.hot { box-shadow: 0 0 0 3px var(--brand-soft); border-color: var(--brand); }
+.gv-node:hover { box-shadow: var(--el-2); color: var(--text-1); }
+.gv-node.on { color: var(--brand); background: var(--brand-soft); box-shadow: inset 0 0 0 1px var(--brand-line); }
+.gv-node.hot { box-shadow: 0 0 0 3px var(--brand-soft); }
 .gv-node .gv-count {
   min-width: 17px; height: 17px; padding: 0 5px; border-radius: 999px;
   background: var(--brand); color: #fff; font-size: 10px; font-weight: var(--fw-h);
@@ -268,7 +280,7 @@
 .gv-edge .gv-kind { margin-left: auto; font-size: 11px; color: var(--text-3); }
 
 /* ---------- 右：待确认 / 体检 ---------- */
-.dash-right { display: flex; flex-direction: column; min-height: 0; overflow: hidden; background: var(--bg); }
+.dash-right { display: flex; flex-direction: column; min-height: 0; overflow: hidden; background: transparent; }
 .dash-tabs { display: flex; gap: 4px; padding: 14px 24px 0; flex: none; }
 .dash-tabs button {
   border: 1px solid transparent; background: transparent; color: var(--text-2);
@@ -314,10 +326,10 @@
 .scan-item .si-ref { font-family: var(--mono); color: var(--brand); font-size: 11.5px; flex: none; }
 .scan-item .si-msg { color: var(--text-2); }
 
-/* ---------- 底：账目 ---------- */
+/* ---------- 底：账目 ----------
+   透亮调：底栏不再是一块"白板加顶边"，改成一条极轻的纸色条 + 发丝线。 */
 .dash-ledger {
-  flex: none; border-top: 1px solid var(--line); background: var(--surface);
-  box-shadow: var(--hi);
+  flex: none; border-top: 1px solid var(--line); background: var(--surface-2);
   padding: 0 var(--sp-6); height: 38px;
   display: flex; align-items: center; gap: var(--sp-5);
   font-size: var(--fs-2xs); overflow-x: auto; white-space: nowrap;
@@ -417,7 +429,7 @@
 
 /* ---------- 文件夹选择（服务端列目录，浏览器也能用） ---------- */
 .fp-overlay {
-  position: fixed; inset: 0; z-index: 130; background: rgba(20,24,30,.45);
+  position: fixed; inset: 0; z-index: 130; background: var(--scrim); backdrop-filter: var(--scrim-blur);
   display: grid; place-items: center; padding: 28px;
 }
 .fp-panel {
@@ -479,23 +491,24 @@
 .scan-grp > .scan-list { padding-left: 12px; margin-top: 2px; }
 .scan-more { padding: 4px 10px; font-size: 11.5px; }
 
-/* ===== 右栏两块堆叠（「需要你处理」最强，体检次之） ===== */
-.act-block, .scan-block {
-  border: 1px solid var(--line); border-radius: var(--radius-lg);
-  background: var(--surface); box-shadow: var(--shadow-1);
-  padding: 14px 16px; margin-bottom: 14px;
-}
-/* 有待办时，这块是"要你动"的地方 —— 给它更实的层级与唯一的蓝边 */
+/* ===== 右栏两块堆叠（「需要你处理」最强，体检次之） =====
+   透亮调：默认那块几乎"没有容器"——只有标题和一个极大的留白；
+   需要你处理时才真正"浮起来"（钢蓝左条 + 更实的柔光）。
+   以前两块都是等重的白盒子，"要你动"和"参考"看起来一样重。 */
+.act-block, .scan-block { margin-bottom: var(--sp-6); }
+/* 有待办时，这块是"要你动"的地方 —— 浮起 + 唯一的蓝左条。
+   （空态不设最小高度：单行提示不该占出一块空白。） */
 .act-block.has-work {
-  border-color: var(--brand-line); box-shadow: var(--shadow-2);
-  border-left: 3px solid var(--brand);
+  background: var(--surface); border-radius: var(--r-panel);
+  box-shadow: var(--el-2), inset 3px 0 0 var(--brand);
+  padding: var(--sp-4) var(--sp-5);
 }
-.scan-block { box-shadow: none; background: transparent; border-color: var(--line); }
+.scan-block { background: transparent; }
 
-.blk-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.blk-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: var(--sp-3); }
 .blk-head h4 {
   margin: 0; font-size: var(--fs-h); font-weight: var(--fw-title);
-  letter-spacing: var(--ls-tight); color: var(--ink);
+  letter-spacing: -0.02em; color: var(--ink);
 }
 .blk-n { font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .blk-n.act { color: var(--brand); font-weight: var(--fw-h); }

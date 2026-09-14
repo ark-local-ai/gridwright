@@ -29,9 +29,9 @@
 
 /* 管道阶段条：输入 → 处理 → 校验 → 交付 */
 .pipe-stages {
-  display: flex; align-items: center; padding: 14px 18px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  display: flex; align-items: center; padding: 16px 20px;
+  background: var(--surface); border-radius: var(--r-panel);
+  box-shadow: var(--el-1);
 }
 .ps { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-3); font-weight: var(--fw-med); flex: none; }
 .ps .ps-n {
@@ -53,7 +53,7 @@
 }
 @keyframes ps-flow { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 
-.tcard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 18px 20px; }
+.tcard { background: var(--surface); border-radius: var(--r-panel); box-shadow: var(--el-1); padding: 20px 22px; }
 .tcard .t-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 12px; }
 .tcard .t-h b { font-size: 15px; font-weight: var(--fw-h); letter-spacing: -0.2px; }
 .t-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
@@ -76,16 +76,16 @@
 .step .sub { font-size: 11.5px; color: var(--text-3); margin-left: auto; flex: none; }
 .step.cur .sub { color: var(--live); }
 
-.file { display: flex; align-items: center; gap: 13px; padding: 13px; border: 1px solid var(--line); border-radius: var(--radius-md); margin-top: 5px; }
+.file { display: flex; align-items: center; gap: 13px; padding: 14px 16px; border-radius: var(--r-panel); background: var(--surface); box-shadow: var(--el-1); margin-top: var(--sp-2); }
 .file .fn { font-size: 13.5px; font-weight: var(--fw-h); }
 .file .fm { font-size: 12px; color: var(--text-3); }
 .file .btn { margin-left: auto; }
 /* 交付物：突出，交付即感知 */
-.deliver { border: 1.5px solid var(--brand-line); background: var(--brand-soft); }
+.deliver { background: var(--brand-soft); box-shadow: var(--el-1), inset 3px 0 0 var(--brand); }
 
 /* rail */
 .rail { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 0; }
-.rbox { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px 18px; }
+.rbox { background: var(--surface); border-radius: var(--r-panel); box-shadow: var(--el-1); padding: 18px 20px; }
 .rbox h3 { font-size: 12.5px; font-weight: var(--fw-h); letter-spacing: 0.02em; margin-bottom: 4px; }
 .rbox .rsub { font-size: 11.5px; color: var(--text-3); margin-bottom: 12px; }
 .ck { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--text-2); padding: 5px 0; }
@@ -112,7 +112,7 @@
 
 /* ===== 技能与连接器 ===== */
 .skills-wrap { display: grid; grid-template-columns: 380px 1fr; gap: 18px; max-width: 1180px; align-items: start; }
-.skill-list-sec { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+.skill-list-sec { background: var(--surface); border-radius: var(--r-panel); box-shadow: var(--el-1); overflow: hidden; }
 .skill-list-sec .sec-h { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--line); }
 .skill-list-sec .sec-h b { font-size: 14px; font-weight: var(--fw-h); }
 .skill-row { display: flex; align-items: center; gap: 12px; padding: 13px 18px; cursor: pointer; border: none; background: transparent; width: 100%; text-align: left; }
@@ -121,12 +121,12 @@
 .skill-row.sel { background: var(--brand-soft); }
 .skill-row .s-name { font-size: 13.5px; font-weight: var(--fw-h); }
 .skill-row .s-desc { font-size: 12px; color: var(--text-2); }
-.code-pane { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; }
+.code-pane { background: var(--surface); border-radius: var(--r-panel); box-shadow: var(--el-1); overflow: hidden; }
 .code-pane .cp-h { display: flex; align-items: center; justify-content: space-between; padding: 13px 18px; border-bottom: 1px solid var(--line); }
 .code-pane .cp-h b { font-size: 13.5px; font-family: var(--mono); font-weight: var(--fw-h); }
 .code-area { background: var(--surface-2); font-family: var(--mono); font-size: 12.5px; line-height: 1.7; padding: 16px 18px; white-space: pre-wrap; color: var(--text-2); min-height: 320px; }
 .code-area.code-edit { display: block; width: 100%; border: 0; outline: none; resize: vertical; }
-.inp { width: 100%; box-sizing: border-box; padding: 9px 12px; font-size: 13.5px; color: var(--text-1); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); outline: none; }
+.inp { width: 100%; box-sizing: border-box; padding: 9px 12px; font-size: 13.5px; color: var(--text-1); background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-ctl); outline: none; }
 .inp:focus { border-color: var(--brand); }
 .conn-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px dashed var(--line); font-size: 13.5px; }
 .conn-row:last-child { border-bottom: none; }
@@ -141,20 +141,20 @@
 .tab:not(.on):hover { background: var(--surface-2); }
 
 /* ===== 自动化（权重表格） ===== */
-.job-table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); }
-.job-table th { text-align: left; font-size: 11.5px; color: var(--text-2); font-weight: var(--fw-h); letter-spacing: 0.02em; padding: 12px 16px; border-bottom: 1px solid var(--line-strong); background: var(--surface-2); }
-.job-table td { padding: 13px 16px; font-size: 13.5px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.job-table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--surface); border-radius: var(--r-panel); overflow: hidden; box-shadow: var(--el-1); }
+.job-table th { text-align: left; font-size: var(--fs-2xs); color: var(--text-2); font-weight: var(--fw-h); letter-spacing: 0.04em; padding: 12px 18px; border-bottom: 1px solid var(--line-strong); background: var(--surface-2); }
+.job-table td { padding: 14px 18px; font-size: 13.5px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .job-table tr:last-child td { border-bottom: none; }
 .job-name { font-weight: var(--fw-h); }
 .job-act { color: var(--text-2); font-size: 13px; }
 
 /* ===== 设置 ===== */
 .settings-wrap { display: grid; grid-template-columns: 210px 1fr; gap: 22px; max-width: 1100px; }
-.settings-nav { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 8px; align-self: start; }
+.settings-nav { background: var(--surface-2); border-radius: var(--r-panel); padding: 8px; align-self: start; }
 .s-nav-item { display: flex; align-items: center; gap: 9px; padding: 8px 11px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; color: var(--text-2); }
 .s-nav-item:hover { background: var(--surface-2); }
 .s-nav-item.on { background: var(--brand-soft); color: var(--brand); font-weight: var(--fw-h); }
-.channel { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.channel { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: var(--r-panel); background: var(--surface); box-shadow: var(--el-1); }
 .channel + .channel { margin-top: 12px; }
 .channel .c-name { font-weight: var(--fw-h); }
 .channel .c-url { font-size: 12px; color: var(--text-3); font-family: var(--mono); font-variant-numeric: tabular-nums; }
@@ -163,7 +163,7 @@
 
 /* ===== 数据（工作空间 · 一等公民） ===== */
 .workspace-wrap { display: grid; grid-template-columns: 280px 1fr; gap: 18px; max-width: 1200px; }
-.space-list { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow-sm); }
+.space-list { background: var(--surface); border-radius: var(--r-panel); padding: 16px; box-shadow: var(--el-1); }
 .space-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 11px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13.5px; gap: 10px; }
 .space-item:hover { background: var(--surface-2); }
 .space-item.on { background: var(--brand-soft); color: var(--brand); font-weight: var(--fw-h); box-shadow: inset 2.5px 0 0 var(--brand); padding-left: 8px; }
@@ -177,8 +177,8 @@
 .kind-summary { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
 .kind-pill {
   display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
-  border: 1px solid var(--line); border-radius: var(--radius-xs); background: var(--surface);
-  font-size: 12px; color: var(--text-2); font-weight: var(--fw-med);
+  border-radius: var(--r-full); background: var(--surface);
+  font-size: 12px; color: var(--text-2); font-weight: var(--fw-med); box-shadow: var(--el-1);
 }
 .kind-pill .kd { width: 8px; height: 8px; border-radius: 2px; flex: none; }
 .kind-pill b { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--text-1); font-weight: var(--fw-h); }
@@ -196,7 +196,7 @@
 .msg.ai { justify-content: flex-start; }
 .msg-bub { max-width: 78%; padding: 11px 15px; border-radius: 12px; font-size: 14px; line-height: 1.6; }
 .msg.user .msg-bub { background: var(--brand); color: #fff; border-bottom-right-radius: 4px; }
-.msg.ai .msg-bub { background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 4px; box-shadow: var(--shadow-sm); }
+.msg.ai .msg-bub { background: var(--surface); border-bottom-left-radius: 4px; box-shadow: var(--el-1); }
 .chat-page { display: flex; flex-direction: column; }
 .chat-page .chat-list { flex: 1; overflow: auto; }
 

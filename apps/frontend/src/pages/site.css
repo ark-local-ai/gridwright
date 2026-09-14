@@ -10,7 +10,7 @@
 
 .site-nav {
   position: sticky; top: 0; z-index: 50; height: 60px; display: flex; align-items: center;
-  justify-content: space-between; padding: 0 44px; background: rgba(243, 244, 246, 0.85);
+  justify-content: space-between; padding: 0 44px; background: rgba(251, 252, 253, 0.82);
   backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
 }
 .site-nav .left { display: flex; align-items: center; gap: 34px; }

@@ -8,6 +8,26 @@ import { IconXls } from "../components/icons";
    这是"进入表格的入口"：看真实数据、点坐标跳体检条目。
    诚实边界：excelize 不求值，公式格显示的是上次保存的值。 */
 
+/** 判断某一列是不是"数字列"——账页式渲染的关键：
+    数字列右对齐 + 等宽，位数一眼对齐；文本列左对齐。
+    抽样该列数据行，超过六成能解析成数字就认。 */
+function numericCols(rows: string[][], cols: number): boolean[] {
+  const out: boolean[] = [];
+  for (let c = 0; c < cols; c++) {
+    let num = 0, seen = 0;
+    for (const row of rows) {
+      const v = (row[c] ?? "").trim();
+      if (!v) continue;
+      seen++;
+      // 容忍千分位、货币符号、百分号、括号负数
+      if (/^[¥$€]?\s*-?[\d,]+(\.\d+)?\s*%?$/.test(v) || /^\([\d,.]+\)$/.test(v)) num++;
+      if (seen >= 40) break;
+    }
+    out[c] = seen >= 3 && num / seen >= 0.6;
+  }
+  return out;
+}
+
 export default function SheetView({ file, sheet, highlight, onBack }: {
   file?: string;
   sheet: string;
@@ -31,6 +51,8 @@ export default function SheetView({ file, sheet, highlight, onBack }: {
   // 高亮的坐标（体检条目点进来的）
   const hlCol = highlight?.ref ? refCol(highlight.ref) : -1;
   const hlRow = highlight?.ref ? refRow(highlight.ref) : -1;
+  // 数字列判定（账页式对齐）
+  const numCols = pv ? numericCols(pv.sample, pv.header.length) : [];
 
   return (
     <div className="sheet-view">
@@ -81,7 +103,9 @@ export default function SheetView({ file, sheet, highlight, onBack }: {
               <tr>
                 <th className="sv-rn">#</th>
                 {pv.header.map((h, i) => (
-                  <th key={i} className={hlCol === i + 1 ? "sv-hl" : ""}>{h || `列${i + 1}`}</th>
+                  <th key={i} className={`${hlCol === i + 1 ? "sv-hl" : ""}${numCols[i] ? " sv-num" : ""}`.trim() || undefined}>
+                    {h || `列${i + 1}`}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -94,8 +118,9 @@ export default function SheetView({ file, sheet, highlight, onBack }: {
                     {pv.header.map((_, ci) => {
                       const v = row[ci] ?? "";
                       const isHl = hlRow === rowNum && hlCol === ci + 1;
+                      const cls = [numCols[ci] ? "sv-num" : "", isHl ? "sv-cell-hl" : ""].filter(Boolean).join(" ");
                       return (
-                        <td key={ci} className={isHl ? "sv-cell-hl" : ""} title={v}>
+                        <td key={ci} className={cls || undefined} title={v}>
                           {v}
                         </td>
                       );

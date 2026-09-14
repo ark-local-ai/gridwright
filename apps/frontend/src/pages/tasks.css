@@ -1,11 +1,11 @@
 /* 自动化任务（见 docs/agent-architecture/29-UI升级与剩余功能.md） */
 
 .tk-overlay {
-  position: fixed; inset: 0; z-index: 140; background: rgba(16, 20, 26, .42);
+  position: fixed; inset: 0; z-index: 140; background: var(--scrim); backdrop-filter: var(--scrim-blur);
   display: grid; place-items: center; padding: var(--sp-6);
 }
 .tk-panel {
-  background: var(--surface); border: 1px solid var(--line);
+  background: var(--surface);
   border-radius: var(--r-overlay); box-shadow: var(--el-3);
   width: min(720px, 100%); max-height: 84vh;
   display: flex; flex-direction: column; overflow: hidden;
@@ -40,7 +40,7 @@
 }
 .tk-new input {
   flex: 1; min-width: 0; height: var(--h-md); padding: 0 var(--sp-3);
-  border: 1px solid var(--line); border-radius: var(--r-ctl);
+  border: 1px solid var(--line-strong); border-radius: var(--r-ctl);
   background: var(--surface); color: var(--text-1); font-family: var(--font); font-size: var(--fs-xs);
 }
 .tk-new input:focus { outline: none; border-color: var(--brand); box-shadow: var(--focus-ring); }
@@ -53,10 +53,10 @@
 .tk-list, .tk-runs { list-style: none; margin: var(--sp-3) 0 0; padding: 0 var(--sp-3) var(--sp-3); overflow: auto; flex: 1; }
 .tk-job {
   display: grid; grid-template-columns: 1fr auto; gap: var(--sp-1) var(--sp-3);
-  padding: var(--sp-3); border: 1px solid var(--line); border-radius: var(--r-panel);
-  margin-bottom: var(--sp-2); background: var(--surface);
+  padding: var(--sp-3) var(--sp-4); border-radius: var(--r-panel);
+  margin-bottom: var(--sp-2); background: var(--surface); box-shadow: var(--el-1);
 }
-.tk-job.on { border-left: 2px solid var(--ok); }
+.tk-job.on { box-shadow: var(--el-1), inset 3px 0 0 var(--ok); }
 .tk-job-main { display: flex; align-items: baseline; gap: var(--sp-2); }
 .tk-job-main b { font-size: var(--fs-body); font-weight: var(--fw-h); color: var(--ink); }
 .tk-sched {

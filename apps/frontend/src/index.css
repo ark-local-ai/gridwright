@@ -1,50 +1,54 @@
 /* =====================================================================
    gridwright 设计令牌与基准
-   冷调 · 权重 · 交付优先：冷灰纸底 + 石墨近黑 + 单一低饱和墨蓝强调。
-   权重来自强字重 + 锐利 1.5px 线条 + 小圆角 + 等宽数字，而非深色底。
-   颜色只用于「可点击 / 选中 / 运行中」，其余一律中性。
+   透亮 · 权重 · 交付优先：一整片冷纸白 + 石墨近黑 + 单一低饱和钢蓝强调。
+
+   这一版的核心改动不是"换颜色"，是**换分层方式**：
+   以前是「灰画布衬托白方块」——白块靠边框和灰底才立得住，一屏十几个方块，
+   每个都在争，整体就"土"。
+   现在是「一整片纸白 + 光」——画布与面板同色，层级由柔光/发丝线/留白产生。
+   于是没有边框也不散，加边框也极淡。这就是"透亮"的来源。
    ===================================================================== */
 
 :root {
-  /* ---------- 中性色（冷灰纸 · 精密仪器感） ---------- */
-  --bg: #f3f4f6;            /* 画布底：冷灰纸 */
-  --surface: #ffffff;       /* 卡片 / 面板白 */
-  --surface-2: #eef0f3;     /* 次级面板 / 悬停底 */
-  --surface-3: #e6e9ee;     /* 更深一档 / 按下态 */
-  --line: #dce1e8;          /* 分隔线 / 描边（冷） */
-  --line-strong: #c6cdd6;   /* 更强的描边 */
-  --text-1: #16181d;        /* 主文字：石墨近黑 */
-  --text-2: #565e6b;        /* 次要文字 */
-  --text-3: #8b94a1;        /* 弱化 / 占位 */
+  /* ---------- 中性色（纸白 · 透亮） ---------- */
+  --bg: #fbfcfd;            /* 画布底：近白冷纸（不再是灰） */
+  --surface: #ffffff;       /* 面板白（与画布同族，靠光分层） */
+  --surface-2: #f5f7fa;     /* 次级面 / 悬停底（极淡冷蓝） */
+  --surface-3: #eceff4;     /* 更深一档 / 按下态 */
+  --line: #e9edf2;          /* 发丝分隔线（极淡，只做提示） */
+  --line-strong: #d3dae4;   /* 需要明确边界时（输入框/可点边） */
+  --text-1: #141821;        /* 主文字：石墨近黑 */
+  --text-2: #5a6472;        /* 次要文字 */
+  --text-3: #8d96a5;        /* 弱化 / 占位 */
 
-  --wm: #d5dae2;            /* 水印线条色（冷） */
+  --wm: #dfe5ed;            /* 水印线条色 */
 
-  /* ---------- 品牌：墨蓝（低饱和钢蓝 · 非亮蓝） ---------- */
-  --brand: #3d5a80;
-  --brand-strong: #2f4a6e;
-  --brand-soft: #eef2f7;    /* 墨蓝浅底（选中 / 悬停） */
-  --brand-line: #cdd8e6;    /* 墨蓝描边 */
-  --brand-gradient: linear-gradient(135deg, #3d5a80 0%, #4a6b96 100%);
+  /* ---------- 品牌：钢蓝（低饱和 · 冷而清） ---------- */
+  --brand: #2f5d8a;
+  --brand-strong: #264d74;
+  --brand-soft: #eef4fa;    /* 钢蓝浅底（选中 / 悬停） */
+  --brand-line: #d2e0ee;    /* 钢蓝描边 */
+  --brand-gradient: linear-gradient(135deg, #2f5d8a 0%, #40739f 100%);
 
-  /* ---------- 运行中 / 流动（一撮更亮的冷蓝，只给"活的"状态） ---------- */
-  --live: #2f74d0;
-  --live-soft: #e8f0fb;
+  /* ---------- 运行中 / 流动（比品牌蓝亮一档，只给"活的"状态） ---------- */
+  --live: #2f78c0;
+  --live-soft: #eaf2fb;
 
   /* ---------- 语义色（仅表状态，极小面积） ---------- */
-  --ok: #2e8b67;
-  --ok-bg: #e6f2ed;
-  --warn: #c07a1f;
-  --warn-bg: #f7efe2;
-  --danger: #c4453f;
-  --danger-bg: #f9ebea;
+  --ok: #21805f;
+  --ok-bg: #e9f5f0;
+  --warn: #a86a12;
+  --warn-bg: #fbf2e2;
+  --danger: #b73f39;
+  --danger-bg: #fceeed;
 
-  /* ---------- 文件类型徽标（交付向：数据绿 / 文档墨蓝 / 演示陶土） ---------- */
-  --ft-ppt: #b0632f;
-  --ft-xls: #2e8b67;
-  --ft-doc: #3d5a80;
+  /* ---------- 文件类型徽标（交付向：数据绿 / 文档钢蓝 / 演示陶土） ---------- */
+  --ft-ppt: #a55a2b;
+  --ft-xls: #21805f;
+  --ft-doc: #2f5d8a;
   --ft-png: #64748b;
-  --ft-html: #0e8a97;
-  --ft-pdf: #c0392b;
+  --ft-html: #0d7f8b;
+  --ft-pdf: #b73f39;
 
   /* ---------- 字重阶（权重来源之一） ---------- */
   --fw-med: 500;     /* 按钮 / 标签 */
@@ -71,26 +75,24 @@
   --lh-tight: 1.2;
   --lh-body: 1.55;
 
-  /* ---------- 尺寸（小圆角 = 更锐、更权重） ---------- */
+  /* ---------- 尺寸 ---------- */
   --sb-w: 236px;
   --top-h: 48px;
-  --canvas-r: 10px;     /* 画布圆角 */
-  --radius-lg: 8px;
-  --radius-md: 6px;
-  --radius-sm: 5px;
-  --radius-xs: 4px;
+  --canvas-r: 14px;     /* 画布圆角 */
+  --radius-lg: 10px;
+  --radius-md: 8px;
+  --radius-sm: 6px;
+  --radius-xs: 5px;
 
-  /* ---------- 阴影：分两级，表达真实层级 ----------
-     一级 = 贴着画布的常规面板；二级 = 浮起来的（弹层/当前焦点）。
-     以前只有一种阴影，所有东西看着一样重，所以"平"。 */
-  --shadow-sm: 0 1px 2px rgba(20, 24, 30, 0.05);
-  --shadow-md: 0 2px 6px rgba(20, 24, 30, 0.05), 0 10px 30px rgba(20, 24, 30, 0.08);
-  --shadow-1: 0 1px 1px rgba(16, 20, 26, 0.04), 0 1px 3px rgba(16, 20, 26, 0.06);
-  --shadow-2: 0 1px 2px rgba(16, 20, 26, 0.05), 0 8px 24px -6px rgba(16, 20, 26, 0.12);
+  /* ---------- 阴影（旧命名，指向同一套层级语言） ---------- */
+  --shadow-sm: 0 1px 2px rgba(20, 30, 45, 0.04), 0 4px 12px -4px rgba(20, 30, 45, 0.06);
+  --shadow-md: 0 1px 2px rgba(20, 30, 45, 0.05), 0 12px 32px -8px rgba(20, 30, 45, 0.12);
+  --shadow-1: var(--el-1);
+  --shadow-2: var(--el-2);
   /* 面板顶部 1px 高光：让白面有"厚度"，不靠加边框 */
-  --panel-hi: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --panel-hi: inset 0 1px 0 rgba(255, 255, 255, 0.9);
   /* 比主文字更沉一档，给大标题 */
-  --ink: #0e1116;
+  --ink: #0e1219;
   --focus-ring: 0 0 0 3px var(--brand-soft);
 
   /* =====================================================================
@@ -109,19 +111,28 @@
   --sp-6: 24px;
   --sp-8: 32px;
 
-  /* 圆角：只留 3 档 + 全圆。小=控件，中=面板，大=浮层 */
-  --r-ctl: 4px;     /* 控件：按钮/输入/标签 */
-  --r-panel: 8px;   /* 面板：卡片/分区 */
-  --r-overlay: 12px;/* 浮层：弹窗/抽屉 */
+  /* 圆角：只留 3 档 + 全圆。小=控件，中=面板，大=浮层
+     透亮调里圆角可以稍大——直角配极淡线会显"硬"，8/12 更松弛。 */
+  --r-ctl: 6px;     /* 控件：按钮/输入/标签 */
+  --r-panel: 10px;  /* 面板：卡片/分区 */
+  --r-overlay: 14px;/* 浮层：弹窗/抽屉 */
   --r-full: 999px;
 
-  /* 层级：3 级，各有明确语义（以前只有一种阴影，所以"平"） */
-  --el-0: none;                                             /* 平铺在画布上 */
-  --el-1: 0 1px 1px rgba(16,20,26,.04), 0 1px 3px rgba(16,20,26,.06);   /* 常规面板 */
-  --el-2: 0 1px 2px rgba(16,20,26,.05), 0 8px 24px -6px rgba(16,20,26,.12); /* 浮起/焦点 */
-  --el-3: 0 2px 4px rgba(16,20,26,.06), 0 20px 48px -12px rgba(16,20,26,.18); /* 弹层/抽屉 */
+  /* 层级：3 级。**光是唯一的层级语言**（画布与面板同色，所以只能靠光）。
+     阴影调低透明度、放大扩散——"浮起"而非"贴上去一块灰"。 */
+  --el-0: none;
+  --el-1: 0 1px 2px rgba(20,30,45,.04), 0 4px 12px -4px rgba(20,30,45,.06);
+  --el-2: 0 1px 2px rgba(20,30,45,.05), 0 12px 32px -8px rgba(20,30,45,.12);
+  --el-3: 0 2px 6px rgba(20,30,45,.06), 0 28px 64px -16px rgba(20,30,45,.20);
   /* 白面顶高光：让面板有"厚度"，不用加边框 */
-  --hi: inset 0 1px 0 rgba(255,255,255,.85);
+  --hi: inset 0 1px 0 rgba(255,255,255,.9);
+  /* 发丝描边：透亮调里，边界只作提示，不作分隔 */
+  --hair: 1px solid var(--line);
+
+  /* 浮层遮罩：透亮调里遮罩要"轻"——重黑遮罩会把整页压回去变暗，
+     与"透亮"自相矛盾。用低透明 + 模糊，前景浮起来即可。 */
+  --scrim: rgba(24, 34, 48, .28);
+  --scrim-blur: blur(2px);
 
   /* 控件高度：小控件统一 26，常规 32，大 38 —— 一排控件必须等高 */
   --h-sm: 26px;
@@ -158,9 +169,9 @@ button { font-family: inherit; cursor: pointer; }
 /* 可见键盘焦点 */
 :focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 4px; }
 
-::-webkit-scrollbar { width: 9px; height: 9px; }
-::-webkit-scrollbar-thumb { background: #c9d0da; border-radius: 6px; border: 2px solid transparent; background-clip: content-box; }
-::-webkit-scrollbar-thumb:hover { background: #aeb8c6; background-clip: content-box; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #cdd5df; border-radius: 6px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: #b3bec9; background-clip: content-box; }
 ::-webkit-scrollbar-track { background: transparent; }
 
 /* 运行中：冷蓝呼吸 */
@@ -188,16 +199,16 @@ button { font-family: inherit; cursor: pointer; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .btn.primary {
   background: var(--brand); color: #fff;
-  box-shadow: 0 1px 2px rgba(16,20,26,.18), var(--hi);
+  box-shadow: 0 1px 2px rgba(20,30,45,.14), var(--hi);
 }
 .btn.primary:hover:not(:disabled) { background: var(--brand-strong); }
 .btn.ghost {
   background: var(--surface); border-color: var(--line); color: var(--text-1);
-  box-shadow: 0 1px 1px rgba(16,20,26,.03);
+  box-shadow: 0 1px 2px rgba(20,30,45,.04);
 }
-.btn.ghost:hover:not(:disabled) { background: var(--surface-2); border-color: var(--line-strong); }
+.btn.ghost:hover:not(:disabled) { background: var(--surface); border-color: var(--line-strong); box-shadow: 0 2px 6px rgba(20,30,45,.07); }
 .btn.soft { background: var(--brand-soft); color: var(--brand); }
-.btn.soft:hover:not(:disabled) { background: #e3eaf3; }
+.btn.soft:hover:not(:disabled) { background: #e4eef8; }
 .btn.danger { background: var(--surface); border-color: var(--line); color: var(--danger); }
 .btn.danger:hover:not(:disabled) { background: var(--danger-bg); border-color: transparent; }
 /* 三档高度：sm 与输入框等高，md 常规，lg 主行动 */
@@ -224,13 +235,19 @@ button { font-family: inherit; cursor: pointer; }
 .pill.ghost { background: var(--surface); border-color: var(--line); }
 .pill.ghost:hover { background: var(--surface-2); }
 
-/* 卡片：面板圆角 + 一级层级（扁平优先，需要浮起再加 .raised） */
+/* 卡片：**靠光浮起，不靠边框框住**。
+   透亮调的关键：画布与卡片同色，如果每张卡都描一圈边，一屏若干块就都是"灰格子"。
+   所以默认只给柔光 + 顶高光；需要明确分区时才用 .bordered。 */
 .card {
-  background: var(--surface); border: 1px solid var(--line);
+  background: var(--surface);
+  border: 1px solid transparent;
   border-radius: var(--r-panel); box-shadow: var(--el-1);
+  transition: box-shadow .18s var(--ease-out), border-color .18s var(--ease-out);
 }
-.card.flat { box-shadow: none; }
+.card.flat { box-shadow: none; border-color: var(--line); }
 .card.raised { box-shadow: var(--el-2); }
+/* 需要边界的分区/表格容器（发丝线，极淡） */
+.card.bordered { border-color: var(--line); box-shadow: var(--el-1); }
 
 /* 状态徽标 */
 .badge {
@@ -263,11 +280,11 @@ button { font-family: inherit; cursor: pointer; }
 
 /* 文本输入台 —— 全站统一的"下达任务"入口 */
 .inputbar {
-  width: 100%; background: var(--surface); border: 1.5px solid var(--line);
-  border-radius: var(--radius-lg); box-shadow: var(--shadow-md); padding: 12px 14px;
+  width: 100%; background: var(--surface); border: 1px solid var(--line-strong);
+  border-radius: var(--r-panel); box-shadow: var(--el-2); padding: 12px 14px;
   transition: border-color 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out);
 }
-.inputbar:focus-within { border-color: var(--brand-line); box-shadow: 0 0 0 3px var(--brand-soft), var(--shadow-md); }
+.inputbar:focus-within { border-color: var(--brand-line); box-shadow: 0 0 0 3px var(--brand-soft), var(--el-2); }
 .inputbar textarea {
   width: 100%; border: none; outline: none; resize: none; font-size: 13.5px;
   font-family: inherit; color: var(--text-1); background: transparent; line-height: var(--lh-body);

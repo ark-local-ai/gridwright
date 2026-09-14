@@ -1,60 +1,104 @@
-/* 表预览（见 docs/agent-architecture/19-界面设计.md 阶段 1） */
+/* =====================================================================
+   表预览 —— 从"Excel 网格直搬"改成「账页」
 
-.sheet-view { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg); }
+   为什么改：以前是 exc 式的每格描 1px 边线（横竖都有），一屏上百个格子
+   彼此等重，看着就是"一张没设计过的表格"，而且数字左对齐、混在文本里
+   读不出金额位数。
+   账页的做法（财务报表/账簿通行）：**只有横线、没有竖线**，表头与行之间
+   一条稍重的线，行间是发丝线，数字列右对齐 + 等宽（位数一眼对齐）。
+   这样它读起来是"一份账"，不是"一个控件"。
+   ===================================================================== */
+
+.sheet-view { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--surface); }
 
 .sv-top {
-  display: flex; align-items: center; gap: 14px; padding: 12px 22px;
-  border-bottom: 1px solid var(--line); flex: none;
+  display: flex; align-items: center; gap: 14px; padding: 14px 26px;
+  border-bottom: 1px solid var(--line); flex: none; background: var(--surface);
 }
-.sv-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.sv-title b { font-size: 14px; font-weight: var(--fw-h); color: var(--text-1); white-space: nowrap; }
-.sv-title span { font-size: 11.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; }
+.sv-title { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.sv-title svg { color: var(--ok); }
+.sv-title b {
+  font-size: var(--fs-h); font-weight: var(--fw-title); letter-spacing: -0.02em;
+  color: var(--ink); white-space: nowrap;
+}
+.sv-title span { font-size: var(--fs-2xs); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; }
 .sv-meta {
-  margin-left: auto; font-size: 11.5px; color: var(--text-3);
+  margin-left: auto; font-size: var(--fs-2xs); color: var(--text-2);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .sv-note {
-  flex: none; margin: 0; padding: 8px 22px; font-size: 11.5px; color: var(--warn);
-  background: var(--surface-2); border-bottom: 1px solid var(--line);
+  flex: none; margin: 0; padding: 9px 26px; font-size: var(--fs-2xs); color: var(--warn);
+  background: var(--warn-bg); border-bottom: 1px solid var(--line);
 }
-.sv-msg { padding: 40px; text-align: center; color: var(--text-2); font-size: 13px; }
+.sv-msg { padding: 48px; text-align: center; color: var(--text-2); font-size: var(--fs-sm); }
 
-.sv-scroll { flex: 1; min-height: 0; overflow: auto; padding: 16px 22px 28px; }
+.sv-scroll { flex: 1; min-height: 0; overflow: auto; padding: 22px 26px 40px; }
 
-/* 概览：表顶部那行汇总（本月收租率/应收/实收…） */
-.sv-sums { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+/* ---------- 概览读数：表顶部的汇总行 ----------
+   这是整页唯一"数字被强调"的地方，做成一行分栏的读数牌，
+   而不是一条挡住视线的横幅。 */
+.sv-sums {
+  display: flex; flex-wrap: wrap; gap: 0; margin-bottom: var(--sp-6);
+  background: var(--surface); border-radius: var(--r-panel); box-shadow: var(--el-1);
+  overflow: hidden;
+}
 .sv-sum {
-  display: flex; align-items: baseline; gap: 14px; padding: 11px 14px;
-  border: 1px solid var(--line); border-left: 3px solid var(--brand);
-  border-radius: var(--radius-md); background: var(--surface);
+  display: flex; flex-direction: column; gap: 5px; padding: 14px 20px;
+  flex: 1 1 auto; min-width: 128px;
 }
-.sv-sum-lab { font-size: 12px; color: var(--text-3); flex: none; }
-.sv-sum-vals { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.sv-sum + .sv-sum { box-shadow: inset 1px 0 0 var(--line); }
+.sv-sum-lab {
+  font-size: var(--fs-2xs); color: var(--text-3);
+  letter-spacing: var(--ls-label); font-weight: var(--fw-h);
+}
+.sv-sum-vals { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: baseline; }
 .sv-sum-v {
-  font-family: var(--mono); font-size: 12.5px; color: var(--text-1);
-  font-variant-numeric: tabular-nums;
+  font-family: var(--mono); font-size: 16px; color: var(--ink);
+  font-weight: var(--fw-title); font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
-/* 数据表：账本式——数字等宽、位数对齐 */
-.sv-table { border-collapse: collapse; font-size: 12px; width: max-content; min-width: 100%; }
+/* ---------- 账页表 ---------- */
+.sv-table {
+  border-collapse: separate; border-spacing: 0;
+  font-size: 12.5px; width: max-content; min-width: 100%;
+  background: var(--surface); border-radius: var(--r-panel);
+  box-shadow: var(--el-1);
+}
+/* **只有横线，没有竖线** —— 账页的关键 */
 .sv-table th, .sv-table td {
-  border: 1px solid var(--line); padding: 6px 10px; text-align: left;
-  white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis;
+  border: none; border-bottom: 1px solid var(--line);
+  padding: 8px 14px; text-align: left;
+  white-space: nowrap; max-width: 280px; overflow: hidden; text-overflow: ellipsis;
 }
 .sv-table th {
   background: var(--surface-2); color: var(--text-2); font-weight: var(--fw-h);
-  position: sticky; top: 0; z-index: 1;
+  font-size: var(--fs-2xs); letter-spacing: 0.03em;
+  position: sticky; top: 0; z-index: 2;
+  border-bottom: 1px solid var(--line-strong);
 }
+.sv-table thead th:first-child { border-top-left-radius: var(--r-panel); }
+.sv-table thead th:last-child { border-top-right-radius: var(--r-panel); }
 .sv-table td { color: var(--text-1); font-variant-numeric: tabular-nums; }
-.sv-table tr:hover td { background: var(--surface-2); }
+/* 最后一行不要悬空的线 */
+.sv-table tr:last-child td { border-bottom: none; }
+.sv-table tbody tr:hover td { background: var(--brand-soft); }
+
+/* 数字列：右对齐 + 等宽，位数自动对齐（账页的灵魂） */
+.sv-num { text-align: right !important; font-family: var(--mono); }
+
+/* 行号：不是数据，弱化到几乎看不见，只在悬停时提示 */
 .sv-rn {
   color: var(--text-3) !important; font-family: var(--mono); font-size: 11px;
   background: var(--surface-2); text-align: right !important; position: sticky; left: 0;
+  z-index: 1; box-shadow: inset -1px 0 0 var(--line);
 }
-.sv-hl { box-shadow: inset 0 -2px 0 var(--brand); }
+
+/* 高亮：体检点进来定位的那一格/那一行 */
+.sv-hl { box-shadow: inset 0 -2px 0 var(--brand); color: var(--brand-strong); }
 .sv-row-hl td { background: var(--brand-soft) !important; }
 .sv-cell-hl {
   background: var(--brand) !important; color: #fff !important;
-  font-weight: var(--fw-h);
+  font-weight: var(--fw-h); font-family: var(--mono);
 }
-.sv-empty { text-align: center !important; color: var(--text-3) !important; padding: 24px !important; }
+.sv-empty { text-align: center !important; color: var(--text-3) !important; padding: 32px !important; }
