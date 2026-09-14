@@ -38,8 +38,8 @@
 
 /* 管道示意：需求 → 阶段 → 交付物 */
 .hero-pipe {
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md); padding: 26px; display: flex; flex-direction: column; gap: 18px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-overlay);
+  box-shadow: var(--el-2); padding: 26px; display: flex; flex-direction: column; gap: 18px;
 }
 .hp-in { border-left: 3px solid var(--line-strong); padding-left: 14px; }
 .hp-label {
@@ -52,7 +52,7 @@
 .hp-stages { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .hp-stage {
   display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 10px 4px;
-  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-ctl); background: var(--surface);
   font-size: 11.5px; color: var(--text-2);
 }
 .hp-stage .st-ic {
@@ -67,14 +67,14 @@
 .hp-out .hp-label { margin-bottom: 10px; }
 .hp-ledger {
   display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 9px 11px;
-  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: var(--r-ctl); background: var(--surface-2);
   color: var(--text-2); font-size: 11.5px;
 }
 .hp-ledger > svg { color: var(--ok); flex: none; }
 .hp-ledger code { font-family: var(--mono); font-size: 11px; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .hp-file {
   display: flex; align-items: center; gap: 12px; padding: 12px;
-  border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--surface);
 }
 .hp-file .ftext { width: 34px; height: 34px; font-size: 9.5px; }
 .hp-file b { display: block; font-size: 13.5px; font-weight: var(--fw-h); }
@@ -96,15 +96,15 @@
 .site-grid.cols-2 { grid-template-columns: 1fr 1fr; }
 .site-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
 .site-card {
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
-  padding: 24px; box-shadow: var(--shadow-sm);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-overlay);
+  padding: 24px; box-shadow: var(--el-1);
 }
 .site-alt .site-card { box-shadow: none; }
 .site-card .k { font-size: 15px; font-weight: var(--fw-h); margin-bottom: 12px; display: flex; align-items: center; gap: 9px; }
-.site-card .k .kic { width: 28px; height: 28px; border-radius: var(--radius-sm); background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; }
+.site-card .k .kic { width: 28px; height: 28px; border-radius: var(--r-ctl); background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; }
 .site-card p { font-size: 13.5px; color: var(--text-2); line-height: 1.65; }
 .site-tag {
-  display: inline-flex; padding: 5px 12px; border-radius: var(--radius-xs);
+  display: inline-flex; padding: 5px 12px; border-radius: var(--r-ctl);
   background: var(--surface-2); border: 1px solid var(--line); color: var(--text-2);
   font-size: 12.5px; font-weight: var(--fw-med); margin: 3px 6px 3px 0;
 }
@@ -116,7 +116,7 @@
 .file-demo { display: flex; flex-direction: column; gap: 10px; }
 .fd-row {
   display: flex; align-items: center; gap: 12px; padding: 11px 12px;
-  border: 1px solid var(--line); border-radius: var(--radius-md);
+  border: 1px solid var(--line); border-radius: var(--r-panel);
   transition: border-color 0.15s var(--ease-out);
 }
 .fd-row:hover { border-color: var(--brand-line); }
@@ -126,7 +126,7 @@
 /* 步骤演示（管道节） */
 .site-steps { display: flex; flex-direction: column; gap: 4px; }
 .site-step {
-  display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: var(--r-ctl);
 }
 .site-step .n {
   width: 24px; height: 24px; border-radius: 50%; flex: none; display: grid; place-items: center;
@@ -147,12 +147,12 @@
 /* 系统版本选择器（分段控件，选中=钢蓝） */
 .dl-picker {
   display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 26px;
-  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-md);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-panel);
 }
 .dl-opt {
   border: 1px solid transparent; background: transparent; color: var(--text-2);
   font-size: 13.5px; font-weight: var(--fw-med); font-family: var(--font);
-  padding: 8px 20px; border-radius: var(--radius-sm); cursor: pointer;
+  padding: 8px 20px; border-radius: var(--r-ctl); cursor: pointer;
   transition: color 0.15s var(--ease-out), background 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
 }
 .dl-opt:hover { color: var(--text-1); }

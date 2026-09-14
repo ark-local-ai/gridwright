@@ -16,7 +16,7 @@
 .set-head b { font-size: 14px; font-weight: var(--fw-h); }
 .set-x {
   margin-left: auto; border: none; background: none; cursor: pointer;
-  color: var(--text-3); padding: 4px; border-radius: var(--radius-xs);
+  color: var(--text-3); padding: 4px; border-radius: var(--r-ctl);
 }
 .set-x:hover { background: var(--surface-2); color: var(--text-1); }
 
@@ -28,7 +28,7 @@
 .set-hint-sm { font-size: 11.5px; color: var(--text-3); }
 .set-path {
   font-family: var(--mono); font-size: 11px; color: var(--text-2);
-  background: var(--surface-2); padding: 1px 5px; border-radius: var(--radius-xs);
+  background: var(--surface-2); padding: 1px 5px; border-radius: var(--r-ctl);
   border: 1px solid var(--line); word-break: break-all;
 }
 
@@ -67,7 +67,7 @@
 .set-empty { font-size: 12px; color: var(--text-3); padding: 8px 0; }
 .set-newspace {
   flex: 1; min-width: 160px; padding: 7px 10px; font-size: 12.5px;
-  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  border: 1px solid var(--line); border-radius: var(--r-ctl);
   background: var(--surface); color: var(--text-1);
 }
 .set-newspace:focus { outline: none; border-color: var(--brand); }

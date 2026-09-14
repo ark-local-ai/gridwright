@@ -4,10 +4,10 @@
   display: flex; flex-direction: column; text-align: left; padding: 16px; cursor: pointer;
   transition: border-color 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out), transform 0.12s var(--ease-out);
 }
-.scene-card:hover { border-color: var(--brand-line); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.scene-card:hover { border-color: var(--brand-line); box-shadow: var(--el-2); transform: translateY(-1px); }
 .scene-card .sc-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .scene-ava {
-  width: 38px; height: 38px; border-radius: var(--radius-md); display: grid; place-items: center;
+  width: 38px; height: 38px; border-radius: var(--r-panel); display: grid; place-items: center;
   color: #fff; font-weight: var(--fw-title); font-size: 15px; flex: none;
 }
 .sc-count { font-size: 11.5px; color: var(--text-3); font-family: var(--mono); font-variant-numeric: tabular-nums; }
@@ -59,13 +59,13 @@
 .t-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .prompt-bar {
   display: flex; align-items: flex-start; padding: 10px 12px; margin-bottom: 14px;
-  background: var(--surface-2); border-left: 3px solid var(--brand); border-radius: var(--radius-xs);
+  background: var(--surface-2); border-left: 3px solid var(--brand); border-radius: var(--r-ctl);
   font-size: 13px; color: var(--text-2); line-height: 1.55;
 }
 
 /* 步骤：冷调管道列表，运行中 = 冷蓝流动 */
 .steps { list-style: none; display: flex; flex-direction: column; gap: 2px; }
-.step { display: flex; align-items: center; gap: 12px; padding: 8px 11px; border-radius: var(--radius-sm); }
+.step { display: flex; align-items: center; gap: 12px; padding: 8px 11px; border-radius: var(--r-ctl); }
 .step.cur { background: var(--live-soft); box-shadow: inset 2.5px 0 0 var(--live); }
 .dot { width: 21px; height: 21px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 11px; font-weight: var(--fw-title); }
 .dot.done { background: var(--ok); color: #fff; }
@@ -89,7 +89,7 @@
 .rbox h3 { font-size: 12.5px; font-weight: var(--fw-h); letter-spacing: 0.02em; margin-bottom: 4px; }
 .rbox .rsub { font-size: 11.5px; color: var(--text-3); margin-bottom: 12px; }
 .ck { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--text-2); padding: 5px 0; }
-.ck .bx { width: 17px; height: 17px; border-radius: var(--radius-xs); border: 1.5px solid var(--line-strong); display: grid; place-items: center; flex: none; }
+.ck .bx { width: 17px; height: 17px; border-radius: var(--r-ctl); border: 1.5px solid var(--line-strong); display: grid; place-items: center; flex: none; }
 .ck.on .bx { background: var(--ok); border-color: var(--ok); color: #fff; }
 .ck.on { color: var(--text-1); }
 .cfg { font-size: 12.5px; color: var(--text-2); display: flex; justify-content: space-between; padding: 4px 0; gap: 10px; }
@@ -103,11 +103,11 @@
 .ex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
 .ex-card { display: flex; flex-direction: column; padding: 18px; cursor: pointer; }
 .ex-card .e-top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.ex-ava { width: 44px; height: 44px; border-radius: var(--radius-md); display: grid; place-items: center; color: #fff; font-weight: var(--fw-title); font-size: 17px; flex: none; }
+.ex-ava { width: 44px; height: 44px; border-radius: var(--r-panel); display: grid; place-items: center; color: #fff; font-weight: var(--fw-title); font-size: 17px; flex: none; }
 .ex-card .e-name { font-size: 15px; font-weight: var(--fw-h); }
 .ex-card .e-desc { color: var(--text-2); font-size: 13px; flex: 1; }
 .ex-meta { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
-.ex-create { display: grid; place-items: center; gap: 6px; border: 1.5px dashed var(--line-strong); border-radius: var(--radius-lg); padding: 24px; color: var(--text-3); cursor: pointer; background: transparent; }
+.ex-create { display: grid; place-items: center; gap: 6px; border: 1.5px dashed var(--line-strong); border-radius: var(--r-overlay); padding: 24px; color: var(--text-3); cursor: pointer; background: transparent; }
 .ex-create:hover { border-color: var(--brand-line); color: var(--brand); }
 
 /* ===== 技能与连接器 ===== */
@@ -151,7 +151,7 @@
 /* ===== 设置 ===== */
 .settings-wrap { display: grid; grid-template-columns: 210px 1fr; gap: 22px; max-width: 1100px; }
 .settings-nav { background: var(--surface-2); border-radius: var(--r-panel); padding: 8px; align-self: start; }
-.s-nav-item { display: flex; align-items: center; gap: 9px; padding: 8px 11px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; color: var(--text-2); }
+.s-nav-item { display: flex; align-items: center; gap: 9px; padding: 8px 11px; border-radius: var(--r-ctl); cursor: pointer; font-size: 13px; color: var(--text-2); }
 .s-nav-item:hover { background: var(--surface-2); }
 .s-nav-item.on { background: var(--brand-soft); color: var(--brand); font-weight: var(--fw-h); }
 .channel { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: var(--r-panel); background: var(--surface); box-shadow: var(--el-1); }
@@ -164,7 +164,7 @@
 /* ===== 数据（工作空间 · 一等公民） ===== */
 .workspace-wrap { display: grid; grid-template-columns: 280px 1fr; gap: 18px; max-width: 1200px; }
 .space-list { background: var(--surface); border-radius: var(--r-panel); padding: 16px; box-shadow: var(--el-1); }
-.space-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 11px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13.5px; gap: 10px; }
+.space-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 11px; border-radius: var(--r-ctl); cursor: pointer; font-size: 13.5px; gap: 10px; }
 .space-item:hover { background: var(--surface-2); }
 .space-item.on { background: var(--brand-soft); color: var(--brand); font-weight: var(--fw-h); box-shadow: inset 2.5px 0 0 var(--brand); padding-left: 8px; }
 .space-item .cnt { color: var(--text-3); font-size: 12px; font-family: var(--mono); font-variant-numeric: tabular-nums; flex: none; }
@@ -185,7 +185,7 @@
 
 .files-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
 .file-card { padding: 15px; cursor: pointer; }
-.file-card:hover { border-color: var(--brand-line); box-shadow: var(--shadow-md); }
+.file-card:hover { border-color: var(--brand-line); box-shadow: var(--el-2); }
 .file-card .fname { font-size: 13.5px; font-weight: var(--fw-h); margin-top: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-card .fmeta { font-size: 11.5px; color: var(--text-3); margin-top: 3px; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .file-card .fops { display: flex; gap: 8px; margin-top: 12px; }
@@ -205,7 +205,7 @@
 .space-new { padding: 4px 2px; display: flex; flex-direction: column; gap: 6px; }
 .space-new input {
   width: 100%; padding: 7px 9px; font-size: 13px; border: 1px solid var(--line);
-  border-radius: var(--radius-sm); background: var(--surface); color: var(--text-1); outline: none;
+  border-radius: var(--r-ctl); background: var(--surface); color: var(--text-1); outline: none;
 }
 .space-new input:focus { border-color: var(--brand); }
 .space-new-ops { display: flex; gap: 6px; justify-content: flex-end; }

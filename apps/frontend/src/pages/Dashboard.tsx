@@ -253,15 +253,23 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
         <section className="dash-right">
           {active && graph && (
             <div className="node-detail">
-              <div className="nd-h">
-                <b>{active.sheet}</b>
-                <span>{active.file || "外部文件"}</span>
-                <button
-                  className="btn primary sm nd-open"
-                  onClick={() => setOpened({ sheet: active.sheet, file: active.file })}
-                >
-                  打开表格
-                </button>
+              {/* 选中的表 = 这一屏的主角，做成"仪器铭牌"：
+                  大标题给名字，右侧一个主行动，下面一行等宽读数。
+                  以前是"一段平文本 + 一个小按钮"，主角感全无。 */}
+              <div className="nd-plate">
+                <div className="nd-plate-h">
+                  <h2 className="nd-name">{active.sheet}</h2>
+                  <button
+                    className="btn primary sm nd-open"
+                    onClick={() => setOpened({ sheet: active.sheet, file: active.file })}
+                  >
+                    打开表格
+                  </button>
+                </div>
+                <p className="nd-file">
+                  <IconXls size={12} />
+                  {active.file || "外部文件"}
+                </p>
               </div>
               <NodeStats node={active} />
               {/* 关联只在其一时才显示对应那行；两边都空就整块不要——
@@ -579,28 +587,44 @@ function NodeStats({ node }: { node: GraphNode }) {
   const sums = pv.summaries ?? [];
   const header = pv.header ?? [];
   const overview = sums.find((s) => s.label && s.values.length > 2) ?? sums[0];
+  const ovValues = (overview?.values ?? []).filter((v) => v !== overview?.label);
   return (
     <div className="nd-stats">
-      <div className="nd-stat-row">
-        <span className="ns-k">规模</span>
-        <span className="ns-v">{pv.rows} 行 · {pv.cols} 列 · {pv.formulas} 公式</span>
+      {/* 规模：三个等宽读数横排——仪器铭牌的语汇（小标注 + 大数字） */}
+      <div className="nd-metrics">
+        <Metric label="行" value={pv.rows.toLocaleString()} />
+        <Metric label="列" value={String(pv.cols)} />
+        <Metric label="公式" value={pv.formulas.toLocaleString()} />
       </div>
-      <div className="nd-stat-row">
-        <span className="ns-k">列</span>
-        <span className="ns-v ns-cols">{header.filter(Boolean).slice(0, 6).join(" / ")}{header.length > 6 ? " …" : ""}</span>
-      </div>
-      {overview && (overview.values ?? []).length > 0 && (
-        <div className="nd-stat-row">
-          <span className="ns-k">概览</span>
-          <span className="ns-v ns-sum">
-            {(overview.values ?? []).filter((v) => v !== overview.label).slice(0, 8).map((v, i) => (
+      {header.filter(Boolean).length > 0 && (
+        <p className="nd-cols">
+          <span className="nd-k">列</span>
+          {header.filter(Boolean).slice(0, 6).join(" / ")}
+          {header.filter(Boolean).length > 6 ? " …" : ""}
+        </p>
+      )}
+      {ovValues.length > 0 && (
+        <div className="nd-sum">
+          <span className="nd-k">{overview?.label || "概览"}</span>
+          <div className="ns-sum">
+            {ovValues.slice(0, 8).map((v, i) => (
               <span key={i} className="ns-chip">{v}</span>
             ))}
-          </span>
+          </div>
         </div>
       )}
       {pv.note && <div className="nd-note">{pv.note}</div>}
     </div>
+  );
+}
+
+/** 一个仪器读数：小标注在上，等宽大数字在下。 */
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="nd-metric">
+      <span className="nd-m-label">{label}</span>
+      <span className="nd-m-value">{value}</span>
+    </span>
   );
 }
 

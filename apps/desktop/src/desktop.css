@@ -50,7 +50,7 @@
   background: transparent;
   color: var(--text-2);
   padding: 3px 8px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-ctl);
   cursor: pointer;
   transition: background 0.12s var(--ease-out);
 }
@@ -95,8 +95,8 @@
   transform: translate(-50%, -50%);
   width: min(360px, calc(100vw - 40px));
   padding: 22px 24px;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  border-radius: var(--r-overlay);
+  box-shadow: var(--el-2);
   z-index: 201;
   display: flex;
   flex-direction: column;
@@ -143,7 +143,7 @@
 .be-rec-panel code {
   background: var(--surface-2);
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-ctl);
   padding: 1px 6px;
   font-size: 0.9em;
   color: var(--text-1);
