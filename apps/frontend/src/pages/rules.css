@@ -205,15 +205,12 @@
 }
 .rl-dry-item:hover { background: var(--surface-2); }
 .rl-dry-item.skip { background: var(--warn-bg); }
+/* 首列显示"表!格"坐标（试跑已真定位，坐标能直接对上表） */
 .rl-dry-line {
-  flex: none; width: 56px; font-family: var(--mono); font-size: var(--fs-2xs);
-  color: var(--text-3); font-variant-numeric: tabular-nums;
+  flex: none; min-width: 92px; font-family: var(--mono); font-size: var(--fs-2xs);
+  color: var(--brand); font-variant-numeric: tabular-nums;
 }
 .rl-dry-why { flex: 1; min-width: 0; color: var(--text-2); }
-.rl-dry-field {
-  flex: none; font-size: var(--fs-2xs); color: var(--text-3);
-  background: var(--surface-2); padding: 0 var(--sp-2); border-radius: var(--r-ctl);
-}
 .rl-dry-new {
   flex: none; font-family: var(--mono); font-size: var(--fs-xs);
   color: var(--ink); font-weight: var(--fw-med); font-variant-numeric: tabular-nums;

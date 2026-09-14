@@ -242,6 +242,101 @@ func TestRulesDryRunNoData(t *testing.T) {
 	}
 }
 
+// 试跑**命中**时：要列出会改什么，并且**一个字节都不许写**。
+// 这条是 dry-run 的全部意义所在——改表前能先看清楚。
+func TestRulesDryRunReportsHitsWithoutWriting(t *testing.T) {
+	s, rulesPath := rulesServer(t)
+	_, layout, _, _ := s.cur()
+
+	// 规则：把 inbox 的 实收金额 按 物业位置 累加进 测试表 的 本月实收
+	rf := memory.RulesFile{Rules: []memory.Rule{{
+		Name: "记实收",
+		When: &memory.RuleWhen{HasColumns: []string{"物业位置", "实收金额"}},
+		Then: &memory.RuleThen{
+			TargetFile: "测试表", Sheet: "Sheet1",
+			Key:   map[string]string{"物业位置": "物业位置"},
+			Field: map[string]string{"本月实收": "实收金额"},
+			Op:    "add",
+		},
+	}}}
+	if err := rf.Save(rulesPath); err != nil {
+		t.Fatal(err)
+	}
+	inboxCSV := filepath.Join(layout.Inbox, "实收.csv")
+	if err := os.WriteFile(inboxCSV, []byte("物业位置,实收金额\nA03,100\n没有这个铺位,50\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// 记下试跑前的文件指纹——试跑后必须一模一样
+	before, err := os.ReadFile(filepath.Join(layout.Root, "测试表.xlsx"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/rules/dry-run", nil))
+	if rec.Code != 200 {
+		t.Fatalf("状态 %d：%s", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		File  string `json:"file"`
+		Hits  []string
+		Items []struct {
+			Rule  string
+			Sheet string
+			Ref   string
+			New   string
+			Line  int
+			Why   string
+		} `json:"items"`
+		Skips []struct {
+			Why  string
+			Line int
+		} `json:"skips"`
+		Wrote bool `json:"wrote"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.Wrote {
+		t.Fatal("试跑绝不能写文件")
+	}
+	if len(resp.Hits) != 1 || resp.Hits[0] != "记实收" {
+		t.Fatalf("该报出命中的规则：%+v", resp.Hits)
+	}
+	if len(resp.Items) != 1 {
+		t.Fatalf("该报出 1 处会改的地方（定不到行的那条要落到 skips）：%+v", resp.Items)
+	}
+	it := resp.Items[0]
+	if it.Sheet != "Sheet1" || it.Ref == "" {
+		t.Fatalf("该说清改哪张表、哪个格：%+v", it)
+	}
+	// 累加值要对：表里原本 19354.02，加 100 → 19454.02
+	if !strings.Contains(it.New, "19454.02") {
+		t.Fatalf("该显示累加后的新值：%+v", it)
+	}
+	// 定不到行的那条要出现在 skips 里（试跑也要暴露"会漏"），而不是被吞成一条假成功
+	if len(resp.Skips) != 1 || !strings.Contains(resp.Skips[0].Why, "第 2 行") {
+		t.Fatalf("定不到的行该报出来：%+v", resp.Skips)
+	}
+
+	// **核心断言**：试跑后表文件字节不变
+	after, err := os.ReadFile(filepath.Join(layout.Root, "测试表.xlsx"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(before) != string(after) {
+		t.Fatal("试跑改动了表文件——这违背了「只计算、不写文件」的承诺")
+	}
+	// inbox 里的数据也不该被移走（试跑不消费数据）
+	if _, err := os.Stat(inboxCSV); err != nil {
+		t.Fatalf("试跑不该动 inbox 里的文件：%v", err)
+	}
+	// 不该产生账目（账目文件本身有表头行，所以查"有没有数据行"而不是"文件空不空"）
+	if b, _ := os.ReadFile(layout.Ledger); len(strings.Split(strings.TrimSpace(string(b)), "\n")) > 1 {
+		t.Fatalf("试跑不该记账，但账目有数据行：%s", string(b))
+	}
+}
+
 // ---------- 声明连线（link） ----------
 
 func TestDeclaredLinkMergesIntoGraph(t *testing.T) {

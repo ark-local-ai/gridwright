@@ -267,9 +267,10 @@ export default function RulesPanel({ onClose }: { onClose: () => void }) {
                     <ul className="rl-dry-list">
                       {dry.items!.map((it, i) => (
                         <li key={i} className="rl-dry-item">
-                          <span className="rl-dry-line">第 {it.line} 行</span>
+                          {/* 显示**坐标**（表!格）而不是行号：试跑已经真定位过，
+                              坐标是能直接对上表的东西，行号只是来源。 */}
+                          <span className="rl-dry-line">{[it.sheet, it.ref].filter(Boolean).join("!")}</span>
                           <span className="rl-dry-why">{it.why}</span>
-                          <span className="rl-dry-field">{it.field}</span>
                           <span className="rl-dry-new">{it.new}</span>
                         </li>
                       ))}
@@ -287,7 +288,7 @@ export default function RulesPanel({ onClose }: { onClose: () => void }) {
                     <ul className="rl-dry-list">
                       {dry.skips!.map((s: RuleDryItem, i: number) => (
                         <li key={i} className="rl-dry-item skip">
-                          <span className="rl-dry-line">第 {s.line} 行</span>
+                          {/* 跳过说明里已含"第 N 行"（后端拼的），这里只展示原因 */}
                           <span className="rl-dry-why">{s.why}</span>
                         </li>
                       ))}

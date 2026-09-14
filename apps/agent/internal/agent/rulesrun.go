@@ -13,6 +13,25 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/rules"
 )
 
+// DryRun 是"规则试跑"的公开入口：**只计算，不写文件、不记账、不消费 inbox**。
+//
+// 它复用 runRulesOn（与真实执行同一条定位逻辑），所以试跑看到什么，真跑就改什么
+// ——包括"这行定不到位"也要如实报出来。若试跑另写一套简化逻辑，它会报出一堆
+// "看起来能改、其实定不到行"的假结果，那比不给试跑更坏。
+func (a *Agent) DryRun(inboxFile string, rf memory.RulesFile) (*plan.Plan, []string) {
+	// 先算"哪些规则命中"（给人看的一句话），再走真实定位拿到逐条结果。
+	var hits []string
+	if d, err := rules.Load(inboxFile); err == nil {
+		for _, r := range rf.PlanRules() {
+			if rules.Match(r, d) {
+				hits = append(hits, r.Name)
+			}
+		}
+	}
+	p, _ := a.runRulesOn(inboxFile, rf)
+	return p, hits
+}
+
 // runRulesOn 是 inbox 自动链路里的"规则短路"：把命中的规则展开成**带坐标的**
 // plan.Edit（inbox 路径用的是坐标，不是语义句）。
 //

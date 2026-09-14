@@ -2,11 +2,13 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/ark-local-ai/ark/apps/agent/internal/agent"
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory"
 	"github.com/ark-local-ai/ark/apps/agent/internal/rules"
 )
@@ -242,22 +244,21 @@ func (s *Server) handleRulesDryRun(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "读不了 "+filepath.Base(pick)+"："+err.Error())
 		return
 	}
-	resp := dryRunResp{File: filepath.Base(pick)}
-	for _, rule := range ok {
-		if !rules.Match(rule, data) {
-			continue
-		}
-		resp.Hits = append(resp.Hits, rule.Name)
-		intents, skips := rules.Expand(rule, data)
-		for _, sk := range skips {
-			resp.Skips = append(resp.Skips, dryItem{Rule: sk.Rule, Line: sk.Line, Why: sk.Reason})
-		}
-		for _, in := range intents {
+	// 走**真实执行同一条定位逻辑**（agent.DryRun），而不是只展开语义。
+	// 只展开的话，"铺位号在表里不存在"也会被列成"会改"——试跑就骗了人。
+	cfg, _, led, _ := s.cur()
+	ag := agent.New(cfg, layout, led, s.brainClient())
+	plan, hits := ag.DryRun(pick, rf)
+
+	resp := dryRunResp{File: filepath.Base(pick), Hits: hits}
+	if plan != nil {
+		for _, e := range plan.Edits {
 			resp.Items = append(resp.Items, dryItem{
-				Rule: in.Rule, Sheet: in.Sheet, Field: in.Field,
-				New:  in.Value + map[bool]string{true: "（累加）", false: ""}[in.Op == "add"],
-				Line: in.Line, Why: describeIntent(in),
+				Sheet: e.Sheet, Ref: e.Cell, New: fmt.Sprint(e.Value), Why: e.Reason,
 			})
+		}
+		for _, s := range plan.SkipReasons {
+			resp.Skips = append(resp.Skips, dryItem{Why: s})
 		}
 	}
 	if len(resp.Hits) == 0 {
@@ -266,17 +267,9 @@ func (s *Server) handleRulesDryRun(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-func describeIntent(in rules.Intent) string {
-	var keys []string
-	for k, v := range in.Key {
-		keys = append(keys, k+"="+v)
-	}
-	s := "改 " + in.Sheet + " 里 " + strings.Join(keys, "、")
-	if in.Month != "" {
-		s += "，" + in.Month
-	}
-	return s + " 的 " + in.Field
-}
+// 说明：试跑已改为走真实定位（agent.DryRun），不再只展开语义——
+// 只展开会把"表里找不到这个铺位"也列成"会改"，那是骗人，所以删掉了
+// 旧的 describeIntent（语义预览）。
 
 // rulesPutReq 是保存规则的请求体。
 //
