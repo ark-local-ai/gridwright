@@ -97,7 +97,7 @@ func Locked(path string) bool {
 	return err == nil
 }
 
-// MoveToDone 把处理完的 inbox 文件移入 inbox/done（重名自动加序号）。
+// MoveToDone 把处理完的文件移入 inbox/done（重名自动加序号）。
 func (l *Layout) MoveToDone(src string) error {
 	base := filepath.Base(src)
 	dst := filepath.Join(l.Done, base)
@@ -107,5 +107,12 @@ func (l *Layout) MoveToDone(src string) error {
 		}
 		dst = filepath.Join(l.Done, fmt.Sprintf("%d-%s", i, base))
 	}
-	return os.Rename(src, dst)
+	if err := os.Rename(src, dst); err != nil {
+		if os.IsNotExist(err) {
+			// 已经被移走（并发下的正常情况）：不是错误，别刷噪音日志。
+			return nil
+		}
+		return err
+	}
+	return nil
 }

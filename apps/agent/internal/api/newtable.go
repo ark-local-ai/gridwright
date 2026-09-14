@@ -31,6 +31,8 @@ func (s *Server) handleNewTables(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// 有新数据流经的表不算孤岛——人声明的关联也要算进来。
+	s.mergeDeclared(g)
 	got := newtable.Detect(newtable.Input{Graph: g, Files: files})
 
 	if wantsText(r) {

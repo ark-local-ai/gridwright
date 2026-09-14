@@ -52,6 +52,9 @@ type Proposal struct {
 	Finger  string `json:"finger"`  // 目标表指纹（Apply 前校验，防盲改）
 	Summary string `json:"summary"` // 一句话说明
 	Items   []Item `json:"items"`
+	// Source 这份清单是怎么来的："rule:<规则名>"（规则短路）或空（问模型）。
+	// 界面据此显示"这条是规则办的"——用户要能分清是规则还是模型在动他的表。
+	Source string `json:"source,omitempty"`
 	// 被挡下的条目（命中 forbid / 定位失败等），要让人看见，不静默
 	Blocked []Blocked `json:"blocked,omitempty"`
 	Created time.Time `json:"created"`

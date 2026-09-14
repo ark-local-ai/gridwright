@@ -7,6 +7,7 @@ import SheetView from "./SheetView";
 import Settings from "./Settings2";
 import LedgerPanel from "./LedgerPanel";
 import TasksPanel from "./TasksPanel";
+import RulesPanel from "./RulesPanel";
 import { PendingList, ChatPane } from "./Pending";
 
 /* 数据管家 · 主看板（见 docs/agent-architecture/14-第一屏设计.md、17-工作区与跨文件联动.md）
@@ -32,6 +33,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   const [chatOpen, setChatOpen] = useState(false);
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [zoomed, setZoomed] = useState(false);
   // 打开表格：{sheet, file, highlight} —— 表预览整屏覆盖（表数据要看全）
   const [opened, setOpened] = useState<{ sheet: string; file?: string; ref?: string } | null>(null);
@@ -173,6 +175,11 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
           {!isFirstRun && (
             <button className="btn ghost sm" onClick={() => setTasksOpen(true)}>
               <IconClock size={13} />任务
+            </button>
+          )}
+          {!isFirstRun && (
+            <button className="btn ghost sm" onClick={() => setRulesOpen(true)}>
+              <IconNote size={13} />规则
             </button>
           )}
           <button className="btn ghost sm" onClick={() => setChatOpen((v) => !v)}>
@@ -349,6 +356,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
         <LedgerPanel onClose={() => setLedgerOpen(false)} onChanged={() => void refresh()} />
       )}
       {tasksOpen && <TasksPanel onClose={() => setTasksOpen(false)} />}
+      {rulesOpen && <RulesPanel onClose={() => setRulesOpen(false)} />}
         </>
       )}
 

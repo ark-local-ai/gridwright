@@ -1,0 +1,220 @@
+/* =====================================================================
+   规则引擎面板（见 docs/agent-architecture/30-规则引擎.md）
+   风格：精简数据仪表盘风（Data-dense Clean）——浅底、紧凑对齐、状态色只表状态。
+
+   这一屏只有一个视觉焦点：**哪条规则真的会替你办事**。
+   所以「自动执行」用唯一实心色标，「仅提示」保持中性；其余信息一律安静，
+   不跟这个对比抢注意力。（统一性 × 对比：统一在 token，对比在这一处。）
+   全部值走 index.css 的 token，无裸值。
+   ===================================================================== */
+
+.rl-overlay {
+  position: fixed; inset: 0; z-index: 140; background: var(--scrim);
+  backdrop-filter: var(--scrim-blur);
+  display: grid; place-items: center; padding: var(--sp-6);
+}
+.rl-panel {
+  background: var(--surface); border-radius: var(--r-overlay); box-shadow: var(--el-3);
+  width: min(760px, 100%); max-height: 86vh;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+
+/* ---------- 头部：标题 + 全屏最重要的两个读数 ---------- */
+.rl-head {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--line); flex: none;
+}
+.rl-head-ic {
+  width: 30px; height: 30px; flex: none; display: grid; place-items: center;
+  border-radius: var(--r-ctl); background: var(--brand-soft); color: var(--brand);
+}
+.rl-head-t { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.rl-head-t b {
+  font-size: var(--fs-h); font-weight: var(--fw-title);
+  letter-spacing: -0.02em; color: var(--ink);
+}
+.rl-sub { font-size: var(--fs-2xs); color: var(--text-3); }
+
+.rl-readout { margin-left: auto; display: flex; align-items: center; gap: var(--sp-3); flex: none; }
+.rl-ro {
+  display: inline-flex; align-items: baseline; gap: 5px;
+  font-size: var(--fs-2xs); color: var(--text-3);
+}
+.rl-ro em {
+  font-style: normal; font-family: var(--mono); font-size: var(--fs-h);
+  font-weight: var(--fw-title); font-variant-numeric: tabular-nums;
+  color: var(--text-1); letter-spacing: -0.02em;
+}
+/* 「自动执行」条数：唯一实心强调（它是这一屏的答案） */
+.rl-ro.live em { color: var(--ok); }
+.rl-ro.warn em { color: var(--warn); }
+
+.rl-x {
+  border: none; background: none; cursor: pointer; padding: var(--sp-1);
+  border-radius: var(--r-ctl); color: var(--text-3); flex: none;
+  transition: background .15s var(--ease-out), color .15s var(--ease-out);
+}
+.rl-x:hover { background: var(--surface-2); color: var(--text-1); }
+
+/* ---------- tabs ---------- */
+.rl-tabs {
+  display: flex; align-items: center; gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-5); border-bottom: 1px solid var(--line);
+  background: var(--surface-2); flex: none;
+}
+.rl-tabs button {
+  border: none; background: none; cursor: pointer; font-family: var(--font);
+  font-size: var(--fs-xs); color: var(--text-2); padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-ctl); display: inline-flex; align-items: center; gap: var(--sp-1);
+  transition: background .15s var(--ease-out), color .15s var(--ease-out);
+}
+.rl-tabs button:hover { color: var(--text-1); }
+.rl-tabs button.on { background: var(--surface); color: var(--ink); font-weight: var(--fw-h); box-shadow: var(--el-1); }
+.rl-tabs em { font-style: normal; font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.rl-refresh { margin-left: auto; }
+
+/* ---------- 消息条 ---------- */
+.rl-msg {
+  display: flex; align-items: center; gap: var(--sp-2); margin: 0;
+  padding: var(--sp-2) var(--sp-5); font-size: var(--fs-2xs); flex: none;
+}
+.rl-msg.ok { color: var(--ok); background: var(--ok-bg); }
+.rl-msg.bad { color: var(--danger); background: var(--danger-bg); }
+.rl-msg svg { flex: none; }
+
+/* ---------- body ---------- */
+.rl-body { overflow: auto; flex: 1; min-height: 180px; padding: var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-5); }
+
+.rl-block { display: flex; flex-direction: column; gap: var(--sp-3); }
+.rl-block-h { display: flex; align-items: baseline; gap: var(--sp-2); }
+.rl-block-h h4 {
+  margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-h);
+  letter-spacing: var(--ls-label); color: var(--text-3); text-transform: uppercase;
+}
+.rl-n { font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; }
+.rl-n.ok { color: var(--ok); font-weight: var(--fw-h); }
+.rl-n.warn { color: var(--warn); font-weight: var(--fw-h); }
+
+/* ---------- 规则卡 ---------- */
+.rl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+
+.rl-rule {
+  border-radius: var(--r-panel); padding: var(--sp-3) var(--sp-4);
+  background: var(--surface); box-shadow: var(--el-1);
+  display: flex; flex-direction: column; gap: var(--sp-1);
+}
+/* 会自动执行：唯一的实心左条（这一屏的重音） */
+.rl-rule.on { box-shadow: var(--el-1), inset 3px 0 0 var(--ok); }
+/* 声明关联：钢蓝左条（它是"设置"而非"在跑"，用品牌色区别于完成绿） */
+.rl-rule.link { box-shadow: var(--el-1), inset 3px 0 0 var(--brand-line); }
+/* 护栏：中性左条，最安静 */
+.rl-rule.guard { box-shadow: var(--el-1), inset 3px 0 0 var(--line-strong); }
+/* 仅提示：安静，虚线边只表示"这是个未完成的东西" */
+.rl-rule.off { background: var(--surface-2); box-shadow: none; }
+
+.rl-rule-h { display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; }
+.rl-rule-h b { font-size: var(--fs-body); font-weight: var(--fw-h); color: var(--ink); }
+
+.rl-tag {
+  font-size: var(--fs-2xs); font-weight: var(--fw-h);
+  padding: 1px var(--sp-2); border-radius: var(--r-full);
+}
+.rl-tag.on { background: var(--ok-bg); color: var(--ok); }
+.rl-tag.off { background: var(--surface-3); color: var(--text-3); }
+/* 声明关联/护栏：中性偏蓝、中性偏灰——它们是"设置"，不抢"自动执行"的重音 */
+.rl-tag.link { background: var(--brand-soft); color: var(--brand); }
+.rl-tag.guard { background: var(--surface-3); color: var(--text-2); }
+
+.rl-target {
+  margin-left: auto; font-family: var(--mono); font-size: var(--fs-2xs);
+  color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 46%;
+}
+
+.rl-sum { margin: 0; font-size: var(--fs-xs); color: var(--text-2); line-height: 1.6; }
+.rl-why { margin: 0; font-size: var(--fs-xs); color: var(--warn); line-height: 1.6; }
+.rl-forbid {
+  margin: 0; font-size: var(--fs-2xs); color: var(--text-3);
+}
+.rl-forbid::before { content: "🛡 "; }
+
+.rl-empty {
+  padding: var(--sp-6) var(--sp-4); text-align: center; color: var(--text-3);
+  font-size: var(--fs-xs); line-height: 1.7; background: var(--surface-2);
+  border-radius: var(--r-panel);
+}
+.rl-empty code, .rl-hint code, .rl-foot code {
+  font-family: var(--mono); font-size: 0.92em; color: var(--brand);
+  background: var(--brand-soft); padding: 0 var(--sp-1); border-radius: var(--r-ctl);
+}
+
+/* 空态引导：一处克制的质感（图标 + 标题 + 说明 + 动作） */
+.rl-intro {
+  display: flex; flex-direction: column; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-6) var(--sp-5); text-align: center;
+  background: var(--surface-2); border-radius: var(--r-panel);
+}
+.rl-intro > svg { color: var(--brand); }
+.rl-intro h4 { margin: 0; font-size: var(--fs-body); font-weight: var(--fw-h); color: var(--ink); }
+.rl-intro p {
+  margin: 0 0 var(--sp-1); font-size: var(--fs-xs); color: var(--text-2);
+  line-height: 1.7; max-width: 44ch;
+}
+.rl-intro b { color: var(--text-1); }
+
+.rl-foot { margin: 0; font-size: var(--fs-2xs); color: var(--text-3); }
+
+/* ---------- 编辑 ---------- */
+.rl-edit { gap: var(--sp-3); }
+.rl-hint { margin: 0; font-size: var(--fs-xs); color: var(--text-2); line-height: 1.7; }
+.rl-hint b { color: var(--text-1); font-weight: var(--fw-med); }
+
+.rl-code {
+  width: 100%; min-height: 300px; resize: vertical;
+  font-family: var(--mono); font-size: var(--fs-xs); line-height: 1.7;
+  color: var(--text-1); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: var(--r-panel);
+  padding: var(--sp-4); outline: none;
+  transition: border-color .15s var(--ease-out), box-shadow .15s var(--ease-out);
+}
+.rl-code:focus { border-color: var(--brand-line); box-shadow: var(--focus-ring); }
+.rl-edit-ops { display: flex; gap: var(--sp-2); }
+
+/* ---------- 试跑 ---------- */
+.rl-dry-head { display: flex; align-items: baseline; gap: var(--sp-3); }
+.rl-dry-head b { font-size: var(--fs-body); font-weight: var(--fw-h); color: var(--ink); }
+.rl-dry-file { font-family: var(--mono); font-size: var(--fs-2xs); color: var(--text-2); }
+/* 「不写文件」是这一屏要让人放心的关键，给它安全绿 */
+.rl-dry-safe {
+  margin-left: auto; font-size: var(--fs-2xs); color: var(--ok);
+  background: var(--ok-bg); padding: 1px var(--sp-2); border-radius: var(--r-full);
+}
+.rl-dry-hits { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.rl-dry-lab { font-size: var(--fs-2xs); color: var(--text-3); }
+.rl-chip {
+  font-size: var(--fs-2xs); color: var(--brand); background: var(--brand-soft);
+  padding: 1px var(--sp-2); border-radius: var(--r-full); font-weight: var(--fw-med);
+}
+
+.rl-dry-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.rl-dry-item {
+  display: flex; align-items: baseline; gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl);
+  font-size: var(--fs-xs); background: var(--surface);
+}
+.rl-dry-item:hover { background: var(--surface-2); }
+.rl-dry-item.skip { background: var(--warn-bg); }
+.rl-dry-line {
+  flex: none; width: 56px; font-family: var(--mono); font-size: var(--fs-2xs);
+  color: var(--text-3); font-variant-numeric: tabular-nums;
+}
+.rl-dry-why { flex: 1; min-width: 0; color: var(--text-2); }
+.rl-dry-field {
+  flex: none; font-size: var(--fs-2xs); color: var(--text-3);
+  background: var(--surface-2); padding: 0 var(--sp-2); border-radius: var(--r-ctl);
+}
+.rl-dry-new {
+  flex: none; font-family: var(--mono); font-size: var(--fs-xs);
+  color: var(--ink); font-weight: var(--fw-med); font-variant-numeric: tabular-nums;
+}

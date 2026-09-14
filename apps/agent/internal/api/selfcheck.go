@@ -46,6 +46,8 @@ func (s *Server) runSelfCheck(nodeID, kind string, touched []string) (*selfcheck
 	if err != nil {
 		return nil, err
 	}
+	// 自检要按人声明的关联去查"该同步的表动了吗"。
+	s.mergeDeclared(g)
 	mem, _ := s.memStore()
 	return selfcheck.Run(selfcheck.Input{
 		Root:    layout.Root,

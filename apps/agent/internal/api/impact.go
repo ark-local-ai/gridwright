@@ -44,6 +44,8 @@ func (s *Server) handleImpact(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// 人声明的关联也要参与影响面推断——否则"公式看不出的搬运"永远漏下游。
+	s.mergeDeclared(g)
 	mem, _ := s.memStore()
 	res := impact.Infer(impact.Input{
 		Graph: g, From: parseNode(req.Node), Kind: req.Kind, Memory: mem,

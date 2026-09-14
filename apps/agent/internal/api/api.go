@@ -27,6 +27,7 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/graph"
 	"github.com/ark-local-ai/ark/apps/agent/internal/ledger"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
+	"github.com/ark-local-ai/ark/apps/agent/internal/memory"
 	"github.com/ark-local-ai/ark/apps/agent/internal/propose"
 	"github.com/ark-local-ai/ark/apps/agent/internal/scan"
 	"github.com/ark-local-ai/ark/apps/agent/internal/webui"
@@ -162,6 +163,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/new-tables", s.handleNewTables)
 	mux.HandleFunc("/api/v1/generate", s.handleGenerate)
 	mux.HandleFunc("/api/v1/rollback", s.handleRollbackOrList)
+	mux.HandleFunc("/api/v1/rules", s.handleRulesOrPut)
+	mux.HandleFunc("/api/v1/rules/dry-run", s.handleRulesDryRun)
+	mux.HandleFunc("/api/v1/rules/validate", s.handleRulesValidate)
 	mux.HandleFunc("/api/v1/jobs", s.handleJobs)
 	mux.HandleFunc("/api/v1/jobs/run", s.handleJobRun)
 	mux.HandleFunc("/api/v1/jobs/runs", s.handleJobRuns)
@@ -375,7 +379,11 @@ func (s *Server) handleGraph(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// scanGraph 扫工作区里全部 xlsx。
+// scanGraph 扫工作区里全部 xlsx，并把 rules.yaml 里人工声明的关联**合并进来**。
+//
+// 为什么要合并：跨表人工搬运（把 A 表的合计抄进 B 表）在公式上看不出来，
+// 只看公式的图就会漏掉这条关系，影响面推断也随之漏掉下游表。
+// 人写一句 link，这里补上——声明边按 high 置信度对待（是人拍板的）。
 func (s *Server) scanGraph() (*graph.Graph, error) {
 	_, layout, _, _ := s.cur()
 	tables, err := layout.DataFiles()
@@ -385,7 +393,29 @@ func (s *Server) scanGraph() (*graph.Graph, error) {
 	if len(tables) == 0 {
 		return nil, fmt.Errorf("工作区没有 .xlsx 表（%s）", layout.Root)
 	}
-	return graph.ScanWorkspace(layout.Root, tables, graph.Options{})
+	g, err := graph.ScanWorkspace(layout.Root, tables, graph.Options{})
+	if err != nil {
+		return nil, err
+	}
+	s.mergeDeclared(g)
+	return g, nil
+}
+
+// mergeDeclared 把 rules.yaml 里的 link 合进图（没有规则文件就原样返回）。
+func (s *Server) mergeDeclared(g *graph.Graph) {
+	if g == nil {
+		return
+	}
+	_, layout, _, _ := s.cur()
+	rf, _, _, _, err := memory.Load(layout.Rules, layout.State)
+	if err != nil {
+		return // 规则文件坏了不该连累只读功能
+	}
+	var pairs [][2]string
+	for _, dl := range rf.DeclaredLinks() {
+		pairs = append(pairs, [2]string{dl.From, dl.To})
+	}
+	g.AddDeclaredPairs(pairs)
 }
 
 // parseNode 解析 "文件!工作表" 或裸 "工作表"。

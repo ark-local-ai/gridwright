@@ -45,8 +45,17 @@ type semanticEdit struct {
 }
 
 // Plan 组装 prompt → 问脑 → 语义指令翻成具体格 → 产出待确认清单（**不落盘**）。
-// 需要配好模型；没配会返回明确错误（只读功能不受影响）。
+//
+// 先试**规则短路**：rules.yaml 里 when/then 齐全的规则命中这批输入时，
+// 直接由规则产出清单，**不问模型**（省 token、可复现、可审计）。
+// 没有规则命中才走模型（见 docs/agent-architecture/30-规则引擎.md）。
+//
+// 需要配好模型；但**规则命中时不需要**——这正是短路的收益：断网也能按规矩办事。
 func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) (*propose.Proposal, error) {
+	// 规则短路优先：命中即返回，不调模型。
+	if prop, err := a.planFromRules(instruction, opts); err == nil && prop != nil {
+		return prop, nil
+	}
 	if a.Brain == nil || !a.Brain.Ready() {
 		return nil, fmt.Errorf("还没配置模型（脑）：请在设置里填 base_url 与 api_key，之后才能让它判断该改哪些格")
 	}

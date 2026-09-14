@@ -387,6 +387,16 @@ export const agentApi = {
   deleteJob: (id: string) => del<{ ok: boolean }>(`/api/v1/jobs?id=${encodeURIComponent(id)}`),
   runJobNow: (id: string) => post<{ ok: boolean; run: JobRunDto }>("/api/v1/jobs/run", { id }),
   jobRuns: () => get<{ runs: JobRunDto[] }>("/api/v1/jobs/runs"),
+  // 规则引擎（见 docs/agent-architecture/30-规则引擎.md）
+  rules: () => get<RulesResp>("/api/v1/rules"),
+  saveRules: (p: { rules?: RuleDto[]; raw?: string }) =>
+    post<{ saved: boolean; total: number; executable: number; problems?: RuleProblem[]; path: string }>(
+      "/api/v1/rules", p),
+  validateRules: (p: { rules?: RuleDto[]; raw?: string }) =>
+    post<{ ok: boolean; error?: string; total?: number; executable?: number; problems?: RuleProblem[]; dup?: string }>(
+      "/api/v1/rules/validate", p),
+  dryRunRules: (file?: string) =>
+    post<RulesDryRun>(`/api/v1/rules/dry-run${file ? `?file=${encodeURIComponent(file)}` : ""}`, {}),
   // 生成：给规格或一句需求
   generate: (instruction?: string, spec?: unknown, dryRun?: boolean) =>
     post<GenerateResult>("/api/v1/generate", { instruction, spec, dryRun }),
@@ -466,4 +476,84 @@ export interface ConvoDto {
   messages: ConvoMsgDto[];
   created: string;
   updated: string;
+}
+
+/* ---------- 规则引擎 ---------- */
+
+/** 一条规则的可执行条件（when）——与导入同义，都会命中才算。 */
+export interface RuleWhenDto {
+  file?: string;
+  format?: string;
+  has_columns?: string[];
+}
+
+/** 一条规则的动作（then）。取值只从 inbox 按列名取，不做算术。 */
+export interface RuleThenDto {
+  sheet?: string;
+  target_file?: string;
+  key?: Record<string, string>;
+  field?: Record<string, string>;
+  month_from?: string;
+  op?: string;
+}
+
+/** 人工声明的表间关联（补公式够不到的关系）。 */
+export interface RuleLinkDto {
+  from: string;
+  to: string;
+  note?: string;
+}
+
+export interface RuleDto {
+  name: string;
+  trigger?: string;
+  action?: string;
+  forbid?: string[];
+  when?: RuleWhenDto;
+  then?: RuleThenDto;
+  link?: RuleLinkDto;
+}
+
+/** 规则 + 引擎对它"能不能跑"的判定（runnable=false 时 reason 说明原因）。 */
+export interface RuleViewDto extends RuleDto {
+  /** 类别：edge=改表 / link=声明关联 / forbid=护栏 / hint=纯提示。 */
+  kind?: "edge" | "link" | "forbid" | "hint";
+  runnable: boolean;
+  reason?: string;
+  target?: string;
+  summary?: string;
+}
+
+export interface RuleProblem {
+  name: string;
+  reason: string;
+}
+
+export interface RulesResp {
+  rules: RuleViewDto[];
+  path: string;
+  raw: string;
+  executable: number;
+  total: number;
+}
+
+export interface RuleDryItem {
+  rule?: string;
+  sheet?: string;
+  ref?: string;
+  field?: string;
+  old?: string;
+  new?: string;
+  line?: number;
+  why?: string;
+}
+
+export interface RulesDryRun {
+  file?: string;
+  target?: string;
+  hits?: string[];
+  items?: RuleDryItem[];
+  skips?: RuleDryItem[];
+  note?: string;
+  wrote: boolean;
 }

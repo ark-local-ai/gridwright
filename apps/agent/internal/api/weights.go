@@ -33,6 +33,8 @@ func (s *Server) handleWeights(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// 权重也吃人声明的关联：结构信号里应包含"人明确说过的关系"。
+	s.mergeDeclared(g)
 
 	// 公式格数（结构信号之一）
 	formulas := map[string]int{}

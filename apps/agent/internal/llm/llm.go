@@ -41,11 +41,19 @@ func New(c config.LLM) *Client {
 }
 
 // Model 返回当前模型名（记账用）。
-func (c *Client) Model() string { return c.model }
+// nil 接收者返回 "rule"：**规则短路时根本没有模型**，账目里该如实写"这格是规则改的"，
+// 而不是崩掉、也不是假装有个模型。
+func (c *Client) Model() string {
+	if c == nil {
+		return "rule"
+	}
+	return c.model
+}
 
 // Ready 表示"脑"是否配好（有 baseURL + apiKey）。未配好时只读能力照常，
 // 但需要判断的动作应明确报错，而不是发出一个必然 401 的请求。
-func (c *Client) Ready() bool { return c.baseURL != "" && c.apiKey != "" }
+// nil 接收者视为"没配"——规则短路路径会走到这里，必须安全。
+func (c *Client) Ready() bool { return c != nil && c.baseURL != "" && c.apiKey != "" }
 
 // Plan 把 prompt 发给脑，解析结构化输出。
 func (c *Client) Plan(ctx context.Context, prompt string) (*plan.Plan, error) {

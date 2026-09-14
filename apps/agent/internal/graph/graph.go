@@ -342,6 +342,31 @@ func sharedAnchors(a, b []string) []string {
 	return out
 }
 
+// AddDeclaredPairs 用纯文本对声明关系：p = {下游表, 上游表}。
+// 语义与 Edge 一致（改了第二个会牵动第一个），只是省得调用方自己拼 Node。
+// 给规则链路用——rules.yaml 里人写的 link 走这里合进图。
+func (g *Graph) AddDeclaredPairs(pairs [][2]string) {
+	links := make([]Edge, 0, len(pairs))
+	for _, p := range pairs {
+		down, up := strings.TrimSpace(p[0]), strings.TrimSpace(p[1])
+		if down == "" || up == "" {
+			continue
+		}
+		links = append(links, Edge{From: g.parseNode(down), To: g.parseNode(up), Count: 1})
+	}
+	if len(links) > 0 {
+		g.AddDeclared(links)
+	}
+}
+
+// parseNode 解析 "文件!工作表" 或裸 "工作表"。
+func (g *Graph) parseNode(s string) Node {
+	if i := strings.LastIndex(s, "!"); i >= 0 {
+		return Node{File: s[:i], Sheet: s[i+1:]}
+	}
+	return Node{Sheet: s}
+}
+
 // AddDeclared 合并人工声明的高置信边（rules.yaml 里的 link）。
 // 节点可用 "文件!sheet" 或裸 "sheet" 指定；裸名会在工作区内解析到唯一匹配的文件。
 func (g *Graph) AddDeclared(links []Edge) {
