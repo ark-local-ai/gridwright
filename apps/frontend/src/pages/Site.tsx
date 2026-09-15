@@ -10,7 +10,7 @@ import { APP_VERSION } from "../lib/version";
    版本号**不再手写**：下载链的 tag 与安装包文件名都由 APP_VERSION 拼出来，
    所以发版只需改 apps/desktop/package.json 一处。
    之前这里写死 v0.1.1，而应用已经到 0.1.2——链接就悄悄指到了旧包。 */
-const RELEASES = "https://github.com/ark-local-ai/ark-ai/releases";
+const RELEASES = "https://github.com/ark-local-ai/gridwright/releases";
 const TAG = `v${APP_VERSION}`;
 const DL = `${RELEASES}/download/${TAG}`;
 const SETUP_FILE = `gridwright_${APP_VERSION}_x64-setup.exe`;

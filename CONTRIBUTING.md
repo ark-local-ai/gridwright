@@ -6,7 +6,7 @@
 
 ```bash
 # 克隆
-git clone https://github.com/ark-local-ai/ark-ai.git
+git clone https://github.com/ark-local-ai/gridwright.git
 cd ark-ai
 
 # 前端

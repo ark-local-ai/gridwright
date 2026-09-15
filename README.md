@@ -7,8 +7,8 @@
 跑在自己机器上的 Excel 台账管家 —— 新数据一进 inbox，它按你定的规矩自动改表；
 每一格改动都留账目、能回滚、改完通知你。**数据不出本机。**
 
-[![Release](https://img.shields.io/github/v/release/ark-local-ai/ark-ai?color=2f5d8a&label=release)](https://github.com/ark-local-ai/ark-ai/releases/latest)
-[![License](https://img.shields.io/github/license/ark-local-ai/ark-ai?color=2f5d8a)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/ark-local-ai/gridwright?color=2f5d8a&label=release)](https://github.com/ark-local-ai/gridwright/releases/latest)
+[![License](https://img.shields.io/github/license/ark-local-ai/gridwright?color=2f5d8a)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows-2f5d8a)](#下载)
 [![Go](https://img.shields.io/badge/Go-1.21+-2f5d8a?logo=go&logoColor=white)](apps/agent)
 [![React](https://img.shields.io/badge/React-19-2f5d8a?logo=react&logoColor=white)](apps/frontend)
@@ -70,7 +70,7 @@ b50         9 处   差 562.3万     ← 反复出问题的铺位排在前面
 
 ## 下载
 
-前往 [**Releases**](https://github.com/ark-local-ai/ark-ai/releases/latest) 下载：
+前往 [**Releases**](https://github.com/ark-local-ai/gridwright/releases/latest) 下载：
 
 | 版本 | 说明 | 适用 |
 |---|---|---|
