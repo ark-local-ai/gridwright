@@ -62,5 +62,7 @@
   !else
     Delete "$SMPROGRAMS\卸载 gridwright.lnk"
   !endif
-  DeleteRegValue HKCU "${MANUPRODUCTKEY}" ""
+  ; 删整个键：DeleteRegValue 用空串删"默认值"不生效（实测），
+  ; 而 DeleteRegKey 是可靠的。这个键只存安装路径与界面语言。
+  DeleteRegKey HKCU "${MANUPRODUCTKEY}"
 !macroend
