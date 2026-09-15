@@ -4,20 +4,24 @@ import {
   GridwrightLogo, IconCheck, IconFolder,
   IconLink, IconNote, IconRefresh, IconShield, IconTable, IconXls,
 } from "../components/icons";
+import { APP_VERSION } from "../lib/version";
 
-/* 下载发布页 */
+/* 下载发布页。
+   版本号**不再手写**：下载链的 tag 与安装包文件名都由 APP_VERSION 拼出来，
+   所以发版只需改 apps/desktop/package.json 一处。
+   之前这里写死 v0.1.1，而应用已经到 0.1.2——链接就悄悄指到了旧包。 */
 const RELEASES = "https://github.com/ark-local-ai/ark-ai/releases";
-const DL = `${RELEASES}/download/v0.1.1`;
+const TAG = `v${APP_VERSION}`;
+const DL = `${RELEASES}/download/${TAG}`;
+const SETUP_FILE = `gridwright_${APP_VERSION}_x64-setup.exe`;
 
 /* 发布渠道。
    现在只做 Windows 桌面客户端（Tauri 安装包，见 scripts/build-desktop.sh）：
    双击安装、有窗口、引擎随包，用户不需要另装东西。
-   免安装的单文件版仍保留（同一个引擎 + 界面已内嵌），给"不想装"的场景用。
-   ⚠️ 还没上传到 Releases（打包脚本已能产出），所以标注"暂未开放"，避免点开 404。 */
-const BUILT = true; // v0.1.1 资产已上传到 Releases（见本文件顶部说明）
+   免安装的单文件版仍保留（同一个引擎 + 界面已内嵌），给"不想装"的场景用。 */
 type DownloadOS = { os: string; label: string; kind: string; note: string; file: string; url: string };
 const DOWNLOADS: DownloadOS[] = [
-  { os: "setup", label: "Windows 安装版", kind: "安装包", note: "双击安装 · 有窗口 · 引擎随包", file: "gridwright_0.1.1_x64-setup.exe", url: `${DL}/gridwright_0.1.1_x64-setup.exe` },
+  { os: "setup", label: "Windows 安装版", kind: "安装包", note: "双击安装 · 有窗口 · 引擎随包", file: SETUP_FILE, url: `${DL}/${SETUP_FILE}` },
   { os: "portable", label: "免安装版", kind: "单文件", note: "不装 · 双击运行 · 浏览器打开", file: "gridwright-windows-amd64.exe", url: `${DL}/gridwright-windows-amd64.exe` },
 ];
 
@@ -194,19 +198,14 @@ export default function Site() {
             </button>
           ))}
         </div>
-        {BUILT ? (
-          <a className="btn primary lg dl-btn" href={sel.url} target="_blank" rel="noreferrer">
-            下载 {sel.kind} · {sel.file}
-          </a>
-        ) : (
-          <a className="btn ghost lg dl-btn" href={RELEASES} target="_blank" rel="noreferrer"
-            title="打包脚本已能产出，还没上传到 Releases">
-            下载暂未开放 · 去 Releases 看进度
-          </a>
-        )}
+        {/* 下载按钮直接用真实资产的 URL。之前这里包了一层 BUILT 开关
+            （未上传时显示"暂未开放"），现在资产随版本一起发，开关本身
+            又成了一个发版时会忘记改的地方，索性去掉。 */}
+        <a className="btn primary lg dl-btn" href={sel.url} target="_blank" rel="noreferrer">
+          下载 {sel.kind} · {sel.file}
+        </a>
         <p className="dl-meta">
           {sel.note} · 免安装 · 数据不出本机
-          {!BUILT && " · 安装包正在准备"}
           {" · "}<a href={RELEASES} target="_blank" rel="noreferrer">查看全部版本</a>
         </p>
       </section>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getCurrentWindow, type Window } from '@tauri-apps/api/window'
 import { GridwrightLogo } from '../../frontend/src/components/icons'
+import { APP_VERSION } from '../../frontend/src/lib/version'
 
 // 仅在 Tauri 宿主内可用 getCurrentWindow；纯浏览器预览（无 Tauri IPC）时返回 null，
 // 使同一套前端也能在浏览器里预览工作台（窗口控制自动 no-op，Tauri 内行为不变）。
@@ -84,7 +85,7 @@ export default function TitleBar() {
           <div className="tb-about card" role="dialog" aria-label="关于 gridwright">
             <div className="tb-about-head">
               <GridwrightLogo h={28} thin />
-              <span>v0.1.0</span>
+              <span>v{APP_VERSION}</span>
             </div>
             <p>跑在办公机上的数据管家 —— 新数据一进 inbox，按你定的规矩自动改表，每一格改动都留账目、能回滚、改完就通知你。</p>
             <p className="tb-about-meta">gridwright 承载你的工作与数据，安全独立、自主可控、成果归你。</p>

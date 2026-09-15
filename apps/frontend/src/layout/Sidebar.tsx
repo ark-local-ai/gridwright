@@ -6,6 +6,7 @@ import {
   IconShare, IconRename, IconDots, IconSpark, IconTable, IconTrash, IconUsers,
   GridwrightLogo, IconCollapse,
 } from "../components/icons";
+import { APP_VERSION } from "../lib/version";
 import { recentTasks as mockRecentTasks } from "../data/mock";
 import { listTasks, deleteTask, retryTask, listSpaces, createSpace, setActiveSpace, deleteSpace, getAuthStatus, type SpaceDto, type AuthUser } from "../api";
 import AuthModal from "../components/AuthModal";
@@ -149,7 +150,7 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
               <div className="brandrow">
                 <GridwrightLogo h={19} />
               </div>
-              <span className="brand-ver">数据管家 · v0.1.0</span>
+              <span className="brand-ver">数据管家 · v{APP_VERSION}</span>
             </div>
             <button
               className="sb-collapse"
@@ -295,7 +296,7 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
                   <button className="sb-menu-item" onClick={() => { setMenuOpen(false); nav("/app/settings"); }}>
                     <IconGear size={14} /> 设置
                   </button>
-                  <div className="sb-menu-meta">Gridwright v0.1.0 · 本地运行 · 数据不出本机</div>
+                  <div className="sb-menu-meta">Gridwright v{APP_VERSION} · 本地运行 · 数据不出本机</div>
                 </div>
               </>
             )}
