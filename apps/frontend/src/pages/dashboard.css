@@ -120,15 +120,17 @@
 .dash-body {
   flex: 1; min-height: 0; display: grid; grid-template-columns: 340px 1fr; gap: 0;
 }
+/* 侧栏材质：macOS 侧栏与内容区**不同材质**（微冷灰、带一点透明），
+   这样"我在侧栏里"和"我在看内容"是不同的地方。
+   之前是 transparent（与画布同色），两栏糊成一片，反而失去了分区感。 */
 .dash-left {
-  border-right: 1px solid var(--line); padding: var(--sp-5) var(--sp-6);
-  background: transparent;
+  padding: var(--sp-5) var(--sp-4) var(--sp-5) var(--sp-4);
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--line);
   display: flex; flex-direction: column; min-height: 0; overflow: auto;
 }
-.dash-h {
-  font-size: var(--fs-h); font-weight: var(--fw-title); letter-spacing: -0.02em;
-  color: var(--ink); margin: 0;
-}
+/* 侧栏里的小标题：macOS 的分节标题——小、灰、不抢 */
+.dash-h { font-size: var(--fs-2xs); font-weight: var(--fw-h); letter-spacing: var(--ls-label); color: var(--text-3); margin: 0; text-transform: none; }
 /* 左栏小标题 + 一句话说明：说明紧贴标题（同一组），与列表之间留出呼吸 */
 .dash-sub {
   font-size: var(--fs-2xs); color: var(--text-3);
@@ -774,12 +776,11 @@
 .att-item { display: flex; flex-direction: column; }
 .att-row {
   display: flex; align-items: center; gap: var(--sp-2); width: 100%;
-  padding: 7px var(--sp-2); border: none; background: none; cursor: pointer;
-  border-radius: var(--r-ctl); text-align: left; font-family: var(--font);
-  border-left: 2px solid transparent;
+  padding: 7px var(--sp-3); border: none; background: none; cursor: pointer;
+  border-radius: var(--r-pill, 8px); text-align: left; font-family: var(--font);
   transition: background var(--d-fast) var(--ease-out);
 }
-.att-row:hover { background: var(--surface-2); }
+.att-row:hover { background: var(--sidebar-sel); }
 /* 铺位名 = 主信息，用等宽（它是财务嘴里的"那个铺位"） */
 .att-name {
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
