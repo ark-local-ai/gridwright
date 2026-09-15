@@ -37,13 +37,30 @@
   --live: #2f78c0;
   --live-soft: #eaf2fb;
 
-  /* ---------- 语义色（仅表状态，极小面积） ---------- */
-  --ok: #21805f;
+  /* ---------- 语义色 ----------
+     参考 Radix Colors 的真实色阶取值（amber/jade/red 的 9~11 阶），
+     它们是为 UI 调过的：在浅底上做文字/描边都过 AA。
+     以前全站近乎无彩，读起来"单调"——颜色在这里**承载信息**：
+     收租率高低、欠租多少，靠色相就能分类，不必逐个读数字。 */
+  --ok: #21805f;        /* 玉绿（Radix jade 11 调暗） */
   --ok-bg: #e9f5f0;
-  --warn: #9a5f0d;
+  --ok-line: #a8d9c7;
+  --warn: #9a5f0d;      /* 琥珀（Radix amber 11） */
   --warn-bg: #fbf2e2;
-  --danger: #b73f39;
+  --warn-line: #ecd39a;
+  --danger: #b73f39;    /* 红（Radix red 11） */
   --danger-bg: #fceeed;
+  --danger-line: #f0bdb9;
+  --info: #0d74ce;      /* 蓝（Radix blue 11）——只给"信息"，不抢"要你动" */
+  --info-bg: #eaf3fd;
+
+  /* 数据可视化：一张连续的冷→暖刻度，给走势/进度条用。
+     单调的根因是"所有条一个颜色"，有了刻度才能一眼分出高低。 */
+  --viz-1: #cfe3f5;
+  --viz-2: #9dc4e6;
+  --viz-3: #6ba0d4;
+  --viz-4: #4a7cb0;
+  --viz-5: #2f5d8a;
 
   /* ---------- 文件类型徽标（交付向：数据绿 / 文档钢蓝 / 演示陶土） ---------- */
   --ft-ppt: #a55a2b;

@@ -166,6 +166,8 @@ export interface SheetShape {
   rows: number;
   cols: number;
   formulas: number;
+  /** 表自带的概览读数（如"本月收租率 8.34%"）。是表里写的，不是另算的。 */
+  kpi?: SheetSummary[];
 }
 
 export interface WorkspaceListItem {

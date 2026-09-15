@@ -5,6 +5,7 @@ import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, She
 import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark, IconClock } from "../components/icons";
 import SheetThumb from "../components/SheetThumb";
 import WeightBar from "../components/WeightBar";
+import LedgerBoard from "../components/LedgerBoard";
 import SheetView from "./SheetView";
 import { SkPanel } from "../components/Skeleton";
 import { useChanged } from "../lib/useChanged";
@@ -247,7 +248,11 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
       <div className="dash-body">
         {/* 左：联动摘要（按文件分组） */}
         <section className="dash-left rise">
-          <h3 className="dash-h">表的联动</h3>
+          {/* 账目展示台：先答"账怎么样"（收租率/应收/实收/走势），
+              再答"有哪些表"。以前只有后者，最该看的数字全躺着没人看。 */}
+          <LedgerBoard shapes={shapes} onOpen={(sheet, file) => setOpened({ sheet, file })} />
+
+          <h3 className="dash-h dash-h-links">表的联动</h3>
           <p className="dash-sub">点表看它牵动到谁</p>
 
           {graph ? (
