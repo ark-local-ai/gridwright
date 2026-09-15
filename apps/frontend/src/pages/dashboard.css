@@ -147,7 +147,7 @@
   border-radius: var(--r-ctl); text-align: left; font-family: var(--font);
   font-size: var(--fs-xs); color: var(--text-1);
   border-left: 2px solid transparent;
-  transition: background .15s var(--ease-out), border-color .15s var(--ease-out);
+  transition: background var(--d-fast) var(--ease-out), border-color var(--d-fast) var(--ease-out);
 }
 .chain-row:hover { background: var(--surface-2); }
 /* 选中/被牵动：**唯一用蓝的地方**（细左条，不是整块底色） */
@@ -286,7 +286,7 @@
   border: 1px solid transparent; border-radius: var(--r-ctl); background: var(--surface);
   color: var(--text-2); font-size: var(--fs-xs); font-family: var(--font); cursor: pointer;
   box-shadow: var(--el-1);
-  max-width: 260px; transition: box-shadow .15s var(--ease-out), color .15s var(--ease-out);
+  max-width: 260px; transition: box-shadow var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
 }
 .gv-node:hover { box-shadow: var(--el-2); color: var(--text-1); }
 .gv-node.on { color: var(--brand); background: var(--brand-soft); box-shadow: inset 0 0 0 1px var(--brand-line); }
@@ -338,7 +338,7 @@
 .scan-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .scan-item {
   display: flex; align-items: baseline; gap: var(--sp-3); padding: var(--sp-1) var(--sp-2);
-  border-radius: var(--r-ctl); font-size: var(--fs-xs); transition: background .12s var(--ease-out);
+  border-radius: var(--r-ctl); font-size: var(--fs-xs); transition: background var(--d-fast) var(--ease-out);
 }
 .scan-item:hover { background: var(--surface-2); }
 .scan-item .si-main { display: flex; gap: var(--sp-3); min-width: 0; flex-wrap: wrap; align-items: baseline; }
@@ -501,7 +501,7 @@
   padding: var(--sp-2) var(--sp-2); border: none; background: none; cursor: pointer;
   border-radius: var(--r-ctl); text-align: left; font-family: var(--font);
   font-size: var(--fs-sm); color: var(--text-1);
-  transition: background .15s var(--ease-out);
+  transition: background var(--d-fast) var(--ease-out);
 }
 .sg-head:hover { background: var(--surface-2); }
 .sg-arrow { flex: none; width: 12px; color: var(--text-3); font-size: var(--fs-2xs); }
@@ -545,7 +545,7 @@
   z-index: 60; display: flex; flex-direction: column;
   background: var(--surface); border-left: 1px solid var(--line);
   box-shadow: var(--el-2);
-  animation: drawer-in .18s var(--ease-out);
+  animation: drawer-in var(--d-base) var(--ease-out);
 }
 @keyframes drawer-in { from { transform: translateX(12px); opacity: .6; } to { transform: none; opacity: 1; } }
 .cd-head {

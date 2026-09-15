@@ -117,7 +117,7 @@
 .fd-row {
   display: flex; align-items: center; gap: 12px; padding: 11px 12px;
   border: 1px solid var(--line); border-radius: var(--r-panel);
-  transition: border-color 0.15s var(--ease-out);
+  transition: border-color var(--d-fast) var(--ease-out);
 }
 .fd-row:hover { border-color: var(--brand-line); }
 .fd-row b { font-size: 13px; font-weight: var(--fw-med); }
@@ -153,7 +153,7 @@
   border: 1px solid transparent; background: transparent; color: var(--text-2);
   font-size: 13.5px; font-weight: var(--fw-med); font-family: var(--font);
   padding: 8px 20px; border-radius: var(--r-ctl); cursor: pointer;
-  transition: color 0.15s var(--ease-out), background 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
+  transition: color var(--d-fast) var(--ease-out), background var(--d-fast) var(--ease-out), border-color var(--d-fast) var(--ease-out);
 }
 .dl-opt:hover { color: var(--text-1); }
 .dl-opt.on { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: var(--fw-h); }

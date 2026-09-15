@@ -53,7 +53,7 @@
 .rl-x {
   border: none; background: none; cursor: pointer; padding: var(--sp-1);
   border-radius: var(--r-ctl); color: var(--text-3); flex: none;
-  transition: background .15s var(--ease-out), color .15s var(--ease-out);
+  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
 }
 .rl-x:hover { background: var(--surface-2); color: var(--text-1); }
 
@@ -67,7 +67,7 @@
   border: none; background: none; cursor: pointer; font-family: var(--font);
   font-size: var(--fs-xs); color: var(--text-2); padding: var(--sp-1) var(--sp-3);
   border-radius: var(--r-ctl); display: inline-flex; align-items: center; gap: var(--sp-1);
-  transition: background .15s var(--ease-out), color .15s var(--ease-out);
+  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
 }
 .rl-tabs button:hover { color: var(--text-1); }
 .rl-tabs button.on { background: var(--surface); color: var(--ink); font-weight: var(--fw-h); box-shadow: var(--el-1); }
@@ -176,7 +176,7 @@
   color: var(--text-1); background: var(--surface-2);
   border: 1px solid var(--line); border-radius: var(--r-panel);
   padding: var(--sp-4); outline: none;
-  transition: border-color .15s var(--ease-out), box-shadow .15s var(--ease-out);
+  transition: border-color var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out);
 }
 .rl-code:focus { border-color: var(--brand-line); box-shadow: var(--focus-ring); }
 .rl-edit-ops { display: flex; gap: var(--sp-2); }

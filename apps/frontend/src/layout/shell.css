@@ -342,7 +342,7 @@
   border-radius: 999px; background: var(--surface); border: 1px solid var(--line);
   color: var(--brand); box-shadow: var(--el-1); cursor: pointer;
   transition: background var(--d-fast) var(--ease-out), border-color var(--d-fast) var(--ease-out),
-    color var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out), transform 0.1s var(--ease-out);
+    color var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out), transform var(--d-fast) var(--ease-out);
 }
 .chip-all:hover { border-color: var(--brand-line); color: var(--brand-strong); box-shadow: var(--el-2); transform: translateY(-50%) scale(1.03); }
 .chip-all:active { transform: translateY(-50%) scale(0.96); background: var(--surface-2); }
@@ -351,7 +351,7 @@
   border-radius: 999px; background: var(--surface); border: 1px solid var(--line);
   font-size: 12px; color: var(--text-2); box-shadow: var(--el-1);
   transition: background var(--d-fast) var(--ease-out), border-color var(--d-fast) var(--ease-out),
-    color var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out), transform 0.1s var(--ease-out);
+    color var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out), transform var(--d-fast) var(--ease-out);
 }
 .chip:hover { border-color: var(--brand-line); color: var(--text-1); box-shadow: var(--el-2); }
 .chip:active { transform: translateY(1px); background: var(--surface-2); }

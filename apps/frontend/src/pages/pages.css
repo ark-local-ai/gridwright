@@ -2,7 +2,7 @@
 .scene-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
 .scene-card {
   display: flex; flex-direction: column; text-align: left; padding: 16px; cursor: pointer;
-  transition: border-color 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out), transform 0.12s var(--ease-out);
+  transition: border-color var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out), transform var(--d-fast) var(--ease-out);
 }
 .scene-card:hover { border-color: var(--brand-line); box-shadow: var(--el-2); transform: translateY(-1px); }
 .scene-card .sc-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
