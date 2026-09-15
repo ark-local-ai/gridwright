@@ -45,6 +45,21 @@
 .readout.act .ro-value { color: var(--brand); }
 .readout.warn .ro-value { color: var(--warn); }
 .dash-actions { display: flex; align-items: center; gap: var(--sp-2); flex: none; }
+/* 次要入口收成小图标方块：1px 描边、34px 见方，一排像仪器的按钮组。
+   视觉权重低于"联动图/体检"（那两个留文字标签），因为它们不是日常动作。 */
+.dash-mini {
+  display: flex; align-items: center; gap: 2px; padding: 2px;
+  border: 1px solid var(--line); border-radius: var(--r-ctl);
+  background: var(--surface-2);
+}
+.mini-btn {
+  display: grid; place-items: center; width: 30px; height: 30px;
+  border: none; border-radius: var(--r-ctl); background: transparent;
+  color: var(--text-2); cursor: pointer;
+  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
+}
+.mini-btn:hover { background: var(--surface); color: var(--brand); box-shadow: var(--el-1); }
+.mini-btn:active { transform: translateY(1px); }
 
 /* 工作区切换器 */
 .ws-switch {

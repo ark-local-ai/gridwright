@@ -191,26 +191,34 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
               自检 {lastSelfCheck.findings.length} 项待看
             </span>
           )}
+          {/* 主行动（与"看这张表"同一档）：联动图 + 体检。留文字标签。 */}
           {!isEmpty && !isFirstRun && (
             <button className="btn ghost sm" onClick={() => setZoomed(true)}><IconLink size={13} />联动图</button>
           )}
           {!isEmpty && !isFirstRun && (
             <button className="btn ghost sm" onClick={() => void refresh()}><IconRefresh size={13} />体检</button>
           )}
-          {!isFirstRun && (
-            <button className="btn ghost sm" onClick={() => setTasksOpen(true)}>
-              <IconClock size={13} />任务
+          {/* 次要入口：图标 + 提示（tooltip），不占文字宽度。
+              它们不是日常动作——每天要看的是上面的数字与下面的体检，
+              任务/规则/对话/设置是"偶尔去一趟"的地方，做成小方块即可。 */}
+          <div className="dash-mini" role="group" aria-label="更多">
+            {!isFirstRun && (
+              <button className="mini-btn" onClick={() => setTasksOpen(true)} title="定时任务" aria-label="定时任务">
+                <IconClock size={15} />
+              </button>
+            )}
+            {!isFirstRun && (
+              <button className="mini-btn" onClick={() => setRulesOpen(true)} title="规则（rules.yaml）" aria-label="规则">
+                <IconNote size={15} />
+              </button>
+            )}
+            <button className="mini-btn" onClick={() => setChatOpen((v) => !v)} title="对话" aria-label="对话">
+              <IconSpark size={15} />
             </button>
-          )}
-          {!isFirstRun && (
-            <button className="btn ghost sm" onClick={() => setRulesOpen(true)}>
-              <IconNote size={13} />规则
+            <button className="mini-btn" onClick={() => setSettingsOpen(true)} title="设置" aria-label="设置">
+              <IconGear size={15} />
             </button>
-          )}
-          <button className="btn ghost sm" onClick={() => setChatOpen((v) => !v)}>
-            <IconSpark size={13} />对话
-          </button>
-          <button className="btn ghost sm" onClick={() => setSettingsOpen(true)}><IconGear size={13} />设置</button>
+          </div>
         </div>
       </header>
 
