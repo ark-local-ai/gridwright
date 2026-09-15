@@ -129,6 +129,33 @@
 .chain-groups { display: flex; flex-direction: column; gap: var(--sp-4); }
 .chain-group { display: flex; flex-direction: column; gap: var(--sp-1); }
 
+/* ===== 两个分区：枢纽 / 其余 =====
+   这是这一栏**唯一**值得分层的信号。以前 11 行等重、9 根空条，
+   读者无从下眼；分区之后，"上 2 行先看、下 9 行安静"一眼可知。 */
+.cg-sec { display: flex; flex-direction: column; gap: var(--sp-2); }
+.cg-sec + .cg-sec { margin-top: var(--sp-4); }
+.cg-sec-h {
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--fs-2xs); color: var(--text-3);
+  font-weight: var(--fw-h); letter-spacing: var(--ls-label);
+}
+/* 分区标题左侧一道短横线：像仪器面板上的分组刻线，比纯文字更像"分区" */
+.cg-sec-h::after {
+  content: ""; flex: 1; height: 1px; background: var(--line);
+}
+.cg-sec-n {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+/* 其余区更轻：整块降低存在感，把分量让给上面的枢纽 */
+.cg-sec-rest .cg-sec-h { color: var(--text-3); }
+.cg-sec-rest .cg-sec-h::after { background: var(--line); opacity: .6; }
+.cg-sec-rest .cr-name { color: var(--text-2); font-size: var(--fs-2xs); }
+.cg-sec-rest .chain-row { padding-top: 4px; padding-bottom: 4px; }
+.cg-sec-rest .sh-thumb { opacity: .5; }
+.cg-sec-rest .chain-row:hover .sh-thumb,
+.cg-sec-rest .chain-row.on .sh-thumb { opacity: 1; }
+
 /* ===== 微缩缩略图（SheetThumb）=====
    表本来就"有形状"：304×15 和 64×8 的轮廓完全不同。用形状认表比读名字快——
    "2026年9月租金"和"2026年8月租金"读起来几乎一样，但格子密度一眼可辨。 */

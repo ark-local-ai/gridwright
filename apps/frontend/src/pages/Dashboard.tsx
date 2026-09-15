@@ -527,6 +527,94 @@ function SheetGroup({ grp, weights, shapes, active, hot, onPick }: {
   }));
   series.sort((a, b) => b.items.length - a.items.length);
 
+  // 按"有没有分量"分区——这是这一栏唯一值得分层的信号。
+  // 真实台账里 24 张表有 22 张权重为 0：把它们和 2 张枢纽平铺在一起，
+  // 等于 11 行等重、9 根空条，读者无从下眼。
+  // 分成两区之后：上面 2 行是"先看这个"，下面 9 行安静躺平即可。
+  const attnOf = (sr: { items: GraphNode[] }) =>
+    sr.items.reduce((m, n) => Math.max(m, weights[nodeId(n)]?.attention ?? 0), 0);
+  const ranked = [...series].sort((a, b) => attnOf(b) - attnOf(a));
+  const hubs = ranked.filter((sr) => attnOf(sr) > 0);
+  const rest = ranked.filter((sr) => attnOf(sr) <= 0);
+  // 计数用**张**（工作表数），不是行数——「租金」是 1 行但含 14 张表，
+  // 报"2 张"会让用户以为只有两张表。如实报表的张数。
+  const sheetsIn = (list: { items: GraphNode[] }[]) =>
+    list.reduce((n, sr) => n + sr.items.length, 0);
+
+  /** 渲染一个系列。hot=true 时是"枢纽"（带条 + 信号），否则是"其余"（安静紧凑）。 */
+  const renderSeries = (sr: { key: string; label: string; items: GraphNode[] }, hotSec: boolean) => {
+    const single = sr.items.length === 1;
+    const open = expanded[sr.key] ?? false;
+    const head = sr.items[0];
+    const headActive = active && nodeId(active) === nodeId(head);
+    const headHot = hot.has(nodeId(head));
+    const members = sr.items.map((n) => weights[nodeId(n)]).filter(Boolean) as WeightScore[];
+    const best = members.reduce<WeightScore | null>(
+      (acc, w) => (!acc || w.attention > acc.attention ? w : acc), null);
+    const seriesAttn = best?.attention ?? 0;
+    return (
+      <li key={sr.key} className={`cr-series${hotSec ? " hub" : ""}`}>
+        <button
+          className={`chain-row series-head${headHot ? " hot" : ""}${single && headActive ? " on" : ""}`}
+          onClick={() => {
+            if (single) onPick(head);
+            else setExpanded((e) => ({ ...e, [sr.key]: !open }));
+          }}
+          title={single ? `${head.file}!${head.sheet}` : sr.items.map((x) => x.sheet).join("、")}
+        >
+          <SheetThumb shape={shapeOf(head)} active={single && !!headActive}
+            tone={best?.master ? "master" : undefined} />
+          <span className="cr-body">
+            <span className="cr-name">{sr.label}</span>
+            <span className="cr-sub">
+              {single ? shortName(head.sheet)
+                : `${sr.items.length} 张 · 最近 ${shortName(head.sheet)}`}
+            </span>
+          </span>
+          {/* 枢纽区才显示信号（条 + 主数据）。其余区不画空条：
+              空条不是诚实，是噪音——安静本身就是这一区的表达。 */}
+          {hotSec && (
+            <>
+              {best?.master && <span className="cr-tag">主数据</span>}
+              <WeightBar value={seriesAttn} master={best?.master}
+                title={best ? `注意力 ${seriesAttn.toFixed(2)}（${best.reasons.join(" · ")}）` : ""} />
+            </>
+          )}
+          {!single && <span className={`cr-caret${open ? " open" : ""}`}>›</span>}
+        </button>
+
+        {!single && open && (
+          <ul className="cr-sub-list">
+            {sr.items.map((n) => {
+              const id = nodeId(n);
+              const isActive = active && nodeId(active) === id;
+              const isHot = hot.has(id);
+              const wn = weights[id];
+              const sh = shapeOf(n);
+              return (
+                <li key={id}>
+                  <button
+                    className={`chain-row sub${isHot ? " hot" : ""}${isActive ? " on" : ""}`}
+                    onClick={() => onPick(n)}
+                    title={`${n.file}!${n.sheet}${wn ? " ｜ " + wn.reasons.join(" · ") : ""}`}
+                  >
+                    <span className="cr-body">
+                      <span className="cr-name">{shortName(n.sheet)}</span>
+                      {sh && <span className="cr-sub">{sh.rows} 行 · {sh.cols} 列</span>}
+                    </span>
+                    {wn && wn.attention > 0 && (
+                      <WeightBar value={wn.attention} title={`注意力 ${wn.attention.toFixed(2)}`} />
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </li>
+    );
+  };
+
   return (
     <div className="chain-group">
       <div className="cg-file">
@@ -543,96 +631,34 @@ function SheetGroup({ grp, weights, shapes, active, hot, onPick }: {
       )}
 
       {loaded && (
-        <ul className="chain-list">
-          {series.map((sr) => {
-            const single = sr.items.length === 1;
-            const open = expanded[sr.key] ?? false;
-            const head = sr.items[0];
-            const headActive = active && nodeId(active) === nodeId(head);
-            const headHot = hot.has(nodeId(head));
-            // 系列取"成员里的最大权重"：13 张月表里只要有一张被依赖，
-            // 这个系列就该显出分量；取平均会把单月的信号摊平。
-            const members = sr.items.map((n) => weights[nodeId(n)]).filter(Boolean) as WeightScore[];
-            const best = members.reduce<WeightScore | null>(
-              (acc, w) => (!acc || w.attention > acc.attention ? w : acc), null);
-            const w = weights[nodeId(head)];
-            const seriesAttn = best?.attention ?? 0;
-            return (
-              <li key={sr.key} className="cr-series">
-                <button
-                  className={`chain-row series-head${headHot ? " hot" : ""}${single && headActive ? " on" : ""}`}
-                  onClick={() => {
-                    if (single) onPick(head);
-                    else setExpanded((e) => ({ ...e, [sr.key]: !open }));
-                  }}
-                  title={single
-                    ? `${head.file}!${head.sheet}`
-                    : sr.items.map((x) => x.sheet).join("、")}
-                >
-                  <SheetThumb shape={shapeOf(head)} active={single && !!headActive}
-                    tone={best?.master ? "master" : undefined} />
-                  <span className="cr-body">
-                    <span className="cr-name">{sr.label}</span>
-                    <span className="cr-sub">
-                      {single
-                        ? shortName(head.sheet)
-                        : `${sr.items.length} 张 · 最近 ${shortName(head.sheet)}`}
-                    </span>
-                  </span>
-                  {w && w.inDegree > 0 && (
-                    <span className="cr-count" title={`${best!.inDegree} 张表引用了它，共 ${grp.refs[nodeId(head)]} 处公式`}>
-                      {best!.inDegree} 表引用
-                    </span>
-                  )}
-                  {best?.master && <span className="cr-tag">主数据</span>}
-                  <WeightBar
-                    value={seriesAttn}
-                    master={best?.master}
-                    title={best
-                      ? `注意力 ${seriesAttn.toFixed(2)}（${best.reasons.join(" · ")}）`
-                      : "还没有使用数据，也没有结构性依赖"}
-                  />
-                  {!single && <span className={`cr-caret${open ? " open" : ""}`}>›</span>}
-                </button>
+        <>
+          {/* ① 枢纽：有权重才有资格进这一区。带条、带信号——它们是"先看这个" */}
+          {hubs.length > 0 && (
+            <div className="cg-sec">
+              <div className="cg-sec-h">
+                <span>枢纽</span>
+                <span className="cg-sec-n">{sheetsIn(hubs)} 张</span>
+              </div>
+              <ul className="chain-list">
+                {hubs.map((sr) => renderSeries(sr, true))}
+              </ul>
+            </div>
+          )}
 
-                {/* 展开后的各期：每期带自己的权重条（同一个系列里权重可以差很多） */}
-                {!single && open && (
-                  <ul className="cr-sub-list">
-                    {sr.items.map((n) => {
-                      const id = nodeId(n);
-                      const isActive = active && nodeId(active) === id;
-                      const isHot = hot.has(id);
-                      const wn = weights[id];
-                      return (
-                        <li key={id}>
-                          <button
-                            className={`chain-row sub${isHot ? " hot" : ""}${isActive ? " on" : ""}`}
-                            onClick={() => onPick(n)}
-                            title={`${n.file}!${n.sheet}${wn ? " ｜ " + wn.reasons.join(" · ") : ""}`}
-                          >
-                            <SheetThumb shape={shapeOf(n)} active={!!isActive} />
-                            <span className="cr-body">
-                              <span className="cr-name">{shortName(n.sheet)}</span>
-                              {shapeOf(n) && (
-                                <span className="cr-sub">
-                                  {shapeOf(n)!.rows} 行 · {shapeOf(n)!.cols} 列
-                                </span>
-                              )}
-                            </span>
-                            <WeightBar
-                              value={wn?.attention ?? 0}
-                              title={wn ? `注意力 ${wn.attention.toFixed(2)}` : "无依赖"}
-                            />
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+          {/* ② 其余：紧凑行、**不画空条**。空条不是诚实，是 9 个噪音——
+              这一区本来就"安静"，安静本身就把上面的分量衬出来了。 */}
+          {rest.length > 0 && (
+            <div className="cg-sec cg-sec-rest">
+              <div className="cg-sec-h">
+                <span>其余</span>
+                <span className="cg-sec-n">{sheetsIn(rest)} 张</span>
+              </div>
+              <ul className="chain-list">
+                {rest.map((sr) => renderSeries(sr, false))}
+              </ul>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
