@@ -146,7 +146,32 @@
 .sh-thumb.on { box-shadow: inset 0 0 0 1px var(--brand), 0 0 0 3px var(--brand-soft); }
 .sh-thumb-empty i { background: var(--line-strong); opacity: .3; }
 
-/* ===== 左栏：系列行（缩略图 + 名称 + 副行）===== */
+/* ===== 权重条谱（WeightBar）=====
+   每行**都画底槽**：真实台账里 24 张表有 22 张权重为 0，只画有值的会让
+   整页变成"两根条 + 一片空白"，像坏了。空槽本身是信息——"这张表目前
+   没人依赖它"，是明确陈述，不是缺数据。 */
+.wb { flex: none; display: flex; align-items: center; gap: var(--sp-1); width: 76px; }
+.wb-track {
+  flex: 1; height: 5px; border-radius: var(--r-full);
+  background: var(--surface-3); overflow: hidden;
+}
+.wb-track i {
+  display: block; height: 100%; border-radius: var(--r-full);
+  background: var(--text-2);
+  transition: width var(--d-base) var(--ease-out);
+}
+.wb.master .wb-track i { background: var(--brand); }
+.wb.zero .wb-track { background: var(--surface-2); }
+/* 数值：等宽、右对齐，位数对齐（账目语汇）。零值用"—"而不是"0"：
+   "没有"和"很小"是两件事，别让 0 看起来像"有一点点"。 */
+.wb-val {
+  flex: none; width: 18px; text-align: right;
+  font-family: var(--mono); font-size: var(--fs-2xs);
+  color: var(--text-2); font-variant-numeric: tabular-nums;
+}
+.wb.zero .wb-val { color: var(--text-3); }
+.wb.master .wb-val { color: var(--brand); font-weight: var(--fw-h); }
+.chain-row.sub .wb { width: 58px; }
 .cg-n { margin-left: auto; font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
 .cg-skel { padding: var(--sp-2) 0; }
 

@@ -4,6 +4,7 @@ import { agentApi, nodeId } from "../api-agent";
 import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, SheetShape, WorkspaceListItem, Proposal, WeightScore, ScanIssue, SafetyReport, SelfCheckReport } from "../api-agent";
 import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark, IconClock } from "../components/icons";
 import SheetThumb from "../components/SheetThumb";
+import WeightBar from "../components/WeightBar";
 import SheetView from "./SheetView";
 import { SkPanel } from "../components/Skeleton";
 import { useChanged } from "../lib/useChanged";
@@ -545,12 +546,17 @@ function SheetGroup({ grp, weights, shapes, active, hot, onPick }: {
         <ul className="chain-list">
           {series.map((sr) => {
             const single = sr.items.length === 1;
-            // 单张表直接就是一行；多张表默认只露"最新一期"，避免 13 行同名
             const open = expanded[sr.key] ?? false;
             const head = sr.items[0];
             const headActive = active && nodeId(active) === nodeId(head);
             const headHot = hot.has(nodeId(head));
+            // 系列取"成员里的最大权重"：13 张月表里只要有一张被依赖，
+            // 这个系列就该显出分量；取平均会把单月的信号摊平。
+            const members = sr.items.map((n) => weights[nodeId(n)]).filter(Boolean) as WeightScore[];
+            const best = members.reduce<WeightScore | null>(
+              (acc, w) => (!acc || w.attention > acc.attention ? w : acc), null);
             const w = weights[nodeId(head)];
+            const seriesAttn = best?.attention ?? 0;
             return (
               <li key={sr.key} className="cr-series">
                 <button
@@ -559,26 +565,37 @@ function SheetGroup({ grp, weights, shapes, active, hot, onPick }: {
                     if (single) onPick(head);
                     else setExpanded((e) => ({ ...e, [sr.key]: !open }));
                   }}
-                  title={single ? head.sheet : sr.items.map((x) => x.sheet).join("、")}
+                  title={single
+                    ? `${head.file}!${head.sheet}`
+                    : sr.items.map((x) => x.sheet).join("、")}
                 >
                   <SheetThumb shape={shapeOf(head)} active={single && !!headActive}
-                    tone={w?.master ? "master" : undefined} />
+                    tone={best?.master ? "master" : undefined} />
                   <span className="cr-body">
                     <span className="cr-name">{sr.label}</span>
                     <span className="cr-sub">
-                      {single ? shortName(head.sheet) : `${sr.items.length} 张 · 最近 ${shortName(head.sheet)}`}
+                      {single
+                        ? shortName(head.sheet)
+                        : `${sr.items.length} 张 · 最近 ${shortName(head.sheet)}`}
                     </span>
                   </span>
                   {w && w.inDegree > 0 && (
-                    <span className="cr-count" title={`${w.inDegree} 张表引用了它，共 ${grp.refs[nodeId(head)]} 处公式`}>
-                      {w.inDegree} 表引用
+                    <span className="cr-count" title={`${best!.inDegree} 张表引用了它，共 ${grp.refs[nodeId(head)]} 处公式`}>
+                      {best!.inDegree} 表引用
                     </span>
                   )}
-                  {w && w.master && <span className="cr-tag">主数据</span>}
+                  {best?.master && <span className="cr-tag">主数据</span>}
+                  <WeightBar
+                    value={seriesAttn}
+                    master={best?.master}
+                    title={best
+                      ? `注意力 ${seriesAttn.toFixed(2)}（${best.reasons.join(" · ")}）`
+                      : "还没有使用数据，也没有结构性依赖"}
+                  />
                   {!single && <span className={`cr-caret${open ? " open" : ""}`}>›</span>}
                 </button>
 
-                {/* 展开后的各期：每期也带自己的缩略图（同系列形状相近，但行数会差） */}
+                {/* 展开后的各期：每期带自己的权重条（同一个系列里权重可以差很多） */}
                 {!single && open && (
                   <ul className="cr-sub-list">
                     {sr.items.map((n) => {
@@ -599,10 +616,13 @@ function SheetGroup({ grp, weights, shapes, active, hot, onPick }: {
                               {shapeOf(n) && (
                                 <span className="cr-sub">
                                   {shapeOf(n)!.rows} 行 · {shapeOf(n)!.cols} 列
-                                  {shapeOf(n)!.formulas > 0 && ` · ${shapeOf(n)!.formulas} 公式`}
                                 </span>
                               )}
                             </span>
+                            <WeightBar
+                              value={wn?.attention ?? 0}
+                              title={wn ? `注意力 ${wn.attention.toFixed(2)}` : "无依赖"}
+                            />
                           </button>
                         </li>
                       );
