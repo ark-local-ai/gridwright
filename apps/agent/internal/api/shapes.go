@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 
 	"github.com/xuri/excelize/v2"
+
+	"github.com/ark-local-ai/ark/apps/agent/internal/locate"
 )
 
 // shapes.go 提供"批量取表形状"的接口（给左栏的微缩缩略图用）。
@@ -21,6 +23,10 @@ type sheetShape struct {
 	Rows     int    `json:"rows"`     // 总行数（含表头）
 	Cols     int    `json:"cols"`     // 总列数
 	Formulas int    `json:"formulas"` // 公式格数
+	// KPI 是这张表顶部的概览读数（如"本月收租率 8.34% / 本月应收 …"）。
+	// 它是**表自己写的**汇总行，不是我们另算的——所以可信、可对上 Excel。
+	// 带上它的原因：首页该展示的是"账怎么样"，而不是"有哪些表"。
+	KPI []sheetSum `json:"kpi,omitempty"`
 }
 
 // handleSheetShapes GET /api/v1/sheets/shapes?file=
@@ -62,10 +68,31 @@ func (s *Server) handleSheetShapes(w http.ResponseWriter, r *http.Request) {
 			Rows:     len(rows),
 			Cols:     cols,
 			Formulas: countFormulas(f, name, rows),
+			KPI:      sheetKPI(name, rows),
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"file":   filepath.Base(target),
 		"shapes": shapes,
 	})
+}
+
+// sheetKPI 抽出这张表顶部的概览读数（"本月收租率 8.34% / 本月应收 …"）。
+//
+// 复用 /sheets/preview 已经在用的 detectSummaries —— **不另写一套识别**：
+// 同一个汇总行，预览页和首页必须读出同样的东西，否则两处对不上就是 bug。
+// 只取概览行（表头之前那几行），行内"合计"不属于 KPI。
+func sheetKPI(name string, rows [][]string) []sheetSum {
+	sh := &locate.Sheet{Name: name, Rows: rows}
+	hdrIdx, _ := sh.FindHeader(10)
+	all := detectSummaries(sh, hdrIdx)
+	out := make([]sheetSum, 0, len(all))
+	for _, s := range all {
+		// 行内合计的 Label 是"合计/小计/总计"，顶部概览的 Label 通常是"本月收租率"这类
+		if s.Label == "合计" || s.Label == "小计" || s.Label == "总计" {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
 }
