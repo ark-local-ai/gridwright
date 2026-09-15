@@ -29,8 +29,13 @@
   height: 100%;
 }
 
-/* ---------------- 自绘标题栏 ---------------- */
+/* ---------------- 自绘标题栏 ----------------
+   macOS 特征：**侧栏材质向上延伸进标题栏**，让侧栏是一整块到顶的面，
+   而不是"标题栏横跨全宽、侧栏从它下面才开始"。
+   做法：标题栏本身透明，另铺一条 --sidebar-w 宽的左带用侧栏材质，
+   带子右缘与下方栏缝对齐（同一条 1px 线），于是两者连成一片。 */
 .tb {
+  position: relative;
   height: var(--tb-h);
   flex: none;
   display: flex;
@@ -41,6 +46,35 @@
   border-bottom: 1px solid var(--line);
   user-select: none;
   -webkit-user-select: none;
+}
+/* 左带：侧栏材质的延续。宽度用与看板左栏同一个令牌，保证接缝不错位。
+   它只作视觉延续，不接收指针事件（免得挡住拖拽/点击）。 */
+.tb::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--sidebar-w);
+  background: var(--sidebar-bg);
+  pointer-events: none;
+}
+/* 左带右缘：与栏缝同色同粗的一条竖线，把"侧栏那一块"框出来 */
+.tb::after {
+  content: "";
+  position: absolute;
+  left: var(--sidebar-w);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line);
+  pointer-events: none;
+}
+/* 品牌标记落在左带里（侧栏那一侧），控制按钮在内容那一侧 —— 与 macOS 一致 */
+.tb-brand { position: relative; z-index: 1; }
+
+/* 窄窗时看板塌成单栏（见 dashboard.css 900px 断点），左带就不再对应任何
+   侧栏了 —— 此时撤掉，免得标题栏左边挂着一块无来由的灰。 */
+@media (max-width: 900px) {
+  .tb::before, .tb::after { display: none; }
 }
 .tb-brand {
   display: flex;

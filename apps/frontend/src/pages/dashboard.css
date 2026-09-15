@@ -118,7 +118,7 @@
    两栏同底色，中缝一道发丝线。以前左栏是"白块 + 右竖边框"，
    在灰画布上像两块灰格子拼的；现在整片纸白，中缝只是提示。 */
 .dash-body {
-  flex: 1; min-height: 0; display: grid; grid-template-columns: 340px 1fr; gap: 0;
+  flex: 1; min-height: 0; display: grid; grid-template-columns: var(--sidebar-w) 1fr; gap: 0;
 }
 /* 侧栏材质：macOS 侧栏与内容区**不同材质**（微冷灰、带一点透明），
    这样"我在侧栏里"和"我在看内容"是不同的地方。
@@ -127,7 +127,13 @@
   padding: var(--sp-5) var(--sp-4) var(--sp-5) var(--sp-4);
   background: var(--sidebar-bg);
   border-right: 1px solid var(--line);
-  display: flex; flex-direction: column; min-height: 0; overflow: auto;
+  display: flex; flex-direction: column; min-height: 0;
+  /* 滚动用"渐隐到底"而不是硬切（macOS 侧栏特征）：内容在材质下淡出，
+     而不是被一条生硬的边截断。遮罩跟着滚动容器，所以不会跟着内容跑。
+     两侧 0 不遮、只遮底部，滚动到底时自然消失（底边无更多内容时看不见）。 */
+  overflow: auto;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
 }
 /* 侧栏里的小标题：macOS 的分节标题——小、灰、不抢 */
 .dash-h { font-size: var(--fs-2xs); font-weight: var(--fw-h); letter-spacing: var(--ls-label); color: var(--text-3); margin: 0; text-transform: none; }
@@ -501,7 +507,8 @@
 
 @media (max-width: 900px) {
   .dash-body { grid-template-columns: 1fr; }
-  .dash-left { border-right: none; border-bottom: 1px solid var(--line); }
+  /* 单栏时侧栏在下半屏，底部渐隐就没意义了（会遮住内容） */
+  .dash-left { border-right: none; border-bottom: 1px solid var(--line); mask-image: none; -webkit-mask-image: none; }
 }
 /* 权重来源说明（如"还没积累使用数据，只按结构排序"） */
 .dash-weight-note { font-size: var(--fs-2xs); color: var(--text-2); margin: var(--sp-3) 0 0; line-height: 1.5; }
