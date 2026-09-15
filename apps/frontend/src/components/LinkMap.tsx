@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { GraphData, GraphNode, ScanIssue } from "../api-agent";
 import { linkHealth, families, brokenRefs } from "../lib/linkage";
+import { assignHues } from "../lib/hues";
 
 /**
  * LinkMap —— 「表的连接」用图表达，而且这张图回答一个问题：
@@ -30,6 +31,8 @@ export default function LinkMap({ graph, issues, onOpenSheet, onOpenIssue }: {
     for (const n of graph.nodes) m.set(n.sheet, n);
     return m;
   }, [graph]);
+  // 族之间要能一眼分开，所以同屏内分配互不撞色的色相
+  const famHue = useMemo(() => assignHues(fams.map((f) => f.name)), [fams]);
 
   return (
     <div className="lm">
@@ -43,34 +46,39 @@ export default function LinkMap({ graph, issues, onOpenSheet, onOpenIssue }: {
         <span className="lm-st tot">共 <b>{health.total}</b> 张</span>
       </div>
 
-      {/* 族谱：一行一族。连着的实心，断开的空心虚线。 */}
+      {/* 族谱：一行一族。连着的实心，断开的空心虚线。
+          每族一个身份色相——族名、方块、"连着 n 张"同色，扫一眼就知道是同一族。 */}
       {fams.length > 0 && (
         <div className="lm-fams">
-          {fams.map((f) => (
-            <div key={f.name} className="lm-fam">
-              <div className="lm-fam-h">
-                <span className="lm-fam-n">{f.name}</span>
-                <span className="lm-fam-c">
-                  {f.linked.length} 连着 · {f.isolated.length} 断开
-                </span>
+          {fams.map((f) => {
+            const hue = famHue.get(f.name);
+            return (
+              <div key={f.name} className="lm-fam">
+                <div className="lm-fam-h">
+                  <span className="lm-fam-n" style={{ color: hue }}>{f.name}</span>
+                  <span className="lm-fam-c">
+                    {f.linked.length} 连着 · {f.isolated.length} 断开
+                  </span>
+                </div>
+                {/* 每个成员一个小方块：实=连着、空=断开。横排，像一排开关 */}
+                <div className="lm-dots">
+                  {f.members.map((m) => {
+                    const isLinked = f.linked.includes(m);
+                    const nd = nodeOf.get(m);
+                    return (
+                      <button
+                        key={m}
+                        className={`lm-dot${isLinked ? " on" : ""}`}
+                        style={isLinked ? { background: hue } : { borderColor: hue }}
+                        title={`${m}${isLinked ? "（有跨表引用）" : "（孤立：改动不会传进来，也不会传出去）"}`}
+                        onClick={() => nd && onOpenSheet(nd)}
+                      />
+                    );
+                  })}
+                </div>
               </div>
-              {/* 每个成员一个小方块：实=连着、空=断开。横排，像一排开关 */}
-              <div className="lm-dots">
-                {f.members.map((m) => {
-                  const isLinked = f.linked.includes(m);
-                  const nd = nodeOf.get(m);
-                  return (
-                    <button
-                      key={m}
-                      className={`lm-dot${isLinked ? " on" : ""}`}
-                      title={`${m}${isLinked ? "（有跨表引用）" : "（孤立：改动不会传进来，也不会传出去）"}`}
-                      onClick={() => nd && onOpenSheet(nd)}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

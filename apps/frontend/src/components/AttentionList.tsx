@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { ScanIssue } from "../api-agent";
 import { hotspots, bySheet, shortMoney } from "../lib/issues";
+import { assignHues, gapSeverity, sevVar } from "../lib/hues";
 import { IconShield, IconChart } from "./icons";
 
 /**
@@ -31,6 +32,12 @@ export default function AttentionList({ issues, onOpen }: {
     for (const i of errs) m.set(i.kind, (m.get(i.kind) ?? 0) + 1);
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
   }, [errs]);
+  // 同屏 8 行必须两两不同色，否则"看颜色分区"不成立（见 assignHues 注释）。
+  // 只在**实际渲染的那 8 个**里分配：铺位可能多于 8 个，把没显示的分进色相池
+  // 只会挤掉可见行的颜色（8 色 11 对象必撞）。这里 8 个以内保证两两不同。
+  const shown = useMemo(() => spots.slice(0, 8), [spots]);
+  const spotHue = useMemo(() => assignHues(shown.map((s) => s.name)), [shown]);
+  const kindHue = useMemo(() => assignHues(errKinds.map(([k]) => k)), [errKinds]);
 
   if (issues.length === 0) {
     return <p className="dash-muted">本次未发现问题</p>;
@@ -45,26 +52,47 @@ export default function AttentionList({ issues, onOpen }: {
             <span>账对不上</span>
             <span className="att-n warn">{mism.length} 处 · {spots.length} 个铺位</span>
           </div>
-          {/* 哪个月集中出错：一行小字说清"那个月有问题" */}
-          {load.length > 0 && (
-            <div className="att-load">
-              {load.map((l) => (
-                <span key={l.sheet} className="att-load-i">
-                  {l.sheet.replace(/\s*（日）\s*/, "")}
-                  <b>{l.count}</b>
-                </span>
-              ))}
-            </div>
-          )}
+          {/* 哪个月集中出错：一行小字说清"那个月有问题"。
+              每片的深浅按该月问题数走——问题多的月自己会"沉下去"，不用读数字。 */}
+          {load.length > 0 && (() => {
+            const max = Math.max(...load.map((l) => l.count));
+            return (
+              <div className="att-load">
+                {load.map((l) => {
+                  const step = loadStep(l.count, max);
+                  // viz-1/2 是浅底 → 深字；viz-4/5 是深底 → 白字。写死映射以免读不出。
+                  const light = step <= 2;
+                  return (
+                    <span
+                      key={l.sheet}
+                      className="att-load-i"
+                      data-step={step}
+                      style={{
+                        background: `var(--viz-${step})`,
+                        color: light ? "var(--text-1)" : "#fff",
+                      }}
+                      title={`${l.sheet}：${l.count} 处对不上`}
+                    >
+                      {l.sheet.replace(/\s*（日）\s*/, "")}
+                      <b>{l.count}</b>
+                    </span>
+                  );
+                })}
+              </div>
+            );
+          })()}
           <ul className="att-list">
-            {spots.slice(0, 8).map((s) => {
+            {shown.map((s) => {
               const open = openName === s.name;
+              const sev = gapSeverity(s.gap);
               return (
                 <li key={s.name} className="att-item">
                   <button className="att-row" onClick={() => setOpenName(open ? null : s.name)}>
-                    {/* 图标列：macOS 侧栏每行都有图标，它给行一个"类别"的锚点。
-                        这里用颜色区分严重度——差得多的行图标是暖色。 */}
-                    <span className={`att-ic${s.gap !== undefined && s.gap >= 10000 ? " hot" : ""}`}>
+                    {/* 两条颜色语言同时上，各说各的：
+                        · 左细条 = 严重度（暖度表急迫，横向可比"谁先查"）
+                        · 图标   = 对象身份色相（b50 永远是同一个蓝/绿，认色如认人） */}
+                    <span className="att-rail" style={{ background: sevVar(sev) }} aria-hidden />
+                    <span className="att-ic" style={{ color: spotHue.get(s.name) }}>
                       <IconChart size={14} />
                     </span>
                     <span className="att-name">{s.name}</span>
@@ -72,7 +100,8 @@ export default function AttentionList({ issues, onOpen }: {
                       {s.count} 处
                     </span>
                     {s.gap !== undefined && (
-                      <span className="att-gap" title={`最大差额（原值）：${s.gap.toFixed(2)}`}>
+                      <span className="att-gap" style={{ color: sevVar(sev) }}
+                        title={`最大差额（原值）：${s.gap.toFixed(2)}`}>
                         差 {shortMoney(s.gap)}
                       </span>
                     )}
@@ -116,7 +145,10 @@ export default function AttentionList({ issues, onOpen }: {
               return (
                 <li key={kind} className="att-item">
                   <button className="att-row" onClick={() => onOpen(first)}>
-                    <span className="att-ic bad"><IconShield size={14} /></span>
+                    <span className="att-rail" style={{ background: sevVar(3) }} aria-hidden />
+                    <span className="att-ic" style={{ color: kindHue.get(kind) }}>
+                      <IconShield size={14} />
+                    </span>
                     <span className="att-name">{kindLabel(kind)}</span>
                     <span className="att-cnt">{n} 处</span>
                     <span className="cr-caret">›</span>
@@ -140,4 +172,15 @@ function kindLabel(kind: string): string {
     case "scan_error": return "该表扫描出错";
     default: return kind;
   }
+}
+
+/** 该月问题数相对峰值 → viz 刻度档（1..5）。相对刻度让"最多的月"总是最深。 */
+function loadStep(count: number, max: number): number {
+  if (max <= 1) return 5;
+  const r = count / max;
+  if (r >= 0.85) return 5;
+  if (r >= 0.6) return 4;
+  if (r >= 0.35) return 3;
+  if (r >= 0.15) return 2;
+  return 1;
 }

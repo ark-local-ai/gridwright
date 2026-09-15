@@ -762,31 +762,41 @@
 .att-n { font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
 .att-n.warn { color: var(--warn); font-weight: var(--fw-h); }
 
-/* 哪个月集中出错：一排小chip，把"那个月有问题"直接说出来 */
+/* 哪个月集中出错：一排小chip，把"那个月有问题"直接说出来。
+   每片的底色深浅由该月问题数决定（viz 刻度，在组件里算好），
+   所以"最忙的那个月"自己就最深——不必逐个读数字。 */
 .att-load { display: flex; flex-wrap: wrap; gap: 4px; }
 .att-load-i {
   display: inline-flex; align-items: baseline; gap: 4px;
-  padding: 1px 7px; border-radius: var(--r-full);
-  background: var(--warn-bg); color: var(--warn);
-  font-size: var(--fs-2xs);
+  padding: 2px 8px; border-radius: var(--r-full);
+  font-size: var(--fs-2xs); font-weight: var(--fw-med);
+  transition: transform var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out);
 }
+.att-load-i:hover { transform: translateY(-1px); box-shadow: var(--el-1); }
 .att-load-i b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
 .att-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .att-item { display: flex; flex-direction: column; }
 .att-row {
+  position: relative;
   display: flex; align-items: center; gap: var(--sp-2); width: 100%;
   padding: 7px var(--sp-3); border: none; background: none; cursor: pointer;
   border-radius: var(--r-pill, 8px); text-align: left; font-family: var(--font);
   transition: background var(--d-fast) var(--ease-out);
 }
 .att-row:hover { background: var(--sidebar-sel); }
-/* 铺位名 = 主信息，用等宽（它是财务嘴里的"那个铺位"） */
+/* 严重度细条：行首的竖向色块，暖度表示"多急"。
+   它不是装饰——8 行里哪 2 行要先看，扫这一列就够，不用读数字。
+   用绝对定位所以不占布局宽度（列表要保持对齐的等宽节奏）。 */
+.att-rail {
+  position: absolute; left: 3px; top: 8px; bottom: 8px;
+  width: 2.5px; border-radius: var(--r-full);
+  transition: top var(--d-fast) var(--ease-out), bottom var(--d-fast) var(--ease-out);
+}
+.att-row:hover .att-rail { top: 5px; bottom: 5px; }
 /* 图标列：给每行一个类别锚点（macOS 侧栏的通行做法）。
-   颜色区分严重度：差额 ≥1 万的行图标是暖色，其余中性。 */
-.att-ic { flex: none; display: grid; place-items: center; width: 18px; height: 18px; color: var(--text-3); }
-.att-ic.hot { color: var(--warn); }
-.att-ic.bad { color: var(--danger); }
+   色相在组件里按对象名定死——同一铺位在同一位置永远是同一色，认色如认人。 */
+.att-ic { flex: none; display: grid; place-items: center; width: 18px; height: 18px; }
 .att-name {
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-family: var(--mono); font-size: var(--fs-xs); font-weight: var(--fw-h); color: var(--ink);
@@ -848,14 +858,16 @@
 .lm-fam-n { font-size: var(--fs-2xs); color: var(--text-2); font-weight: var(--fw-h); }
 .lm-fam-c { font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
 .lm-dots { display: flex; flex-wrap: wrap; gap: 4px; }
-/* 实心方块 = 连着；空心虚线 = 断开。一眼扫过去就知道断了几格。 */
+/* 实心方块 = 连着；空心虚线 = 断开。一眼扫过去就知道断了几格。
+   每族的色相在组件里注入（同一族同色）——族名、方块、统计同色，
+   所以"哪几格属于这一族"不必读文字就成立。 */
 .lm-dot {
   width: 13px; height: 13px; padding: 0; cursor: pointer;
-  border-radius: 3px; border: 1.5px dashed var(--warn); background: transparent;
-  transition: transform var(--d-fast) var(--ease-out), background var(--d-fast) var(--ease-out);
+  border-radius: 3px; border: 1.5px dashed currentColor; background: transparent;
+  transition: transform var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out);
 }
-.lm-dot.on { border: none; background: var(--brand); }
-.lm-dot:hover { transform: scale(1.25); }
+.lm-dot.on { border: 1.5px solid transparent; }
+.lm-dot:hover { transform: scale(1.3); box-shadow: var(--el-1); }
 
 /* 断口清单：具体哪张表、多少处，点了跳到那一格 */
 .lm-breaks { display: flex; flex-direction: column; gap: var(--sp-2); }
