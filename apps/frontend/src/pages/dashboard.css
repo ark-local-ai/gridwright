@@ -82,6 +82,12 @@
 .ws-empty { padding: var(--sp-3); font-size: var(--fs-xs); color: var(--text-3); }
 .ws-manage { border-top: 1px solid var(--line); margin-top: 3px; padding-top: var(--sp-2); color: var(--text-2); }
 
+/* 首屏骨架：按真实版面分左右两栏，占位尺寸贴近内容（加载完不跳版） */
+.dash-boot { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px 1fr; }
+.dash-boot-side { padding: var(--sp-5) var(--sp-6); border-right: 1px solid var(--line); }
+.dash-boot-main { padding: var(--sp-5) var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-4); }
+.sk-stat { height: 116px; }
+
 /* 空工作区引导 */
 .dash-body-empty { display: block; }
 .empty-ways { display: flex; gap: var(--sp-3); flex-wrap: wrap; justify-content: center; margin: var(--sp-2) 0 var(--sp-1); }
@@ -351,7 +357,7 @@
   display: inline-flex; align-items: center; gap: var(--sp-2); flex: none;
   border: none; background: none; cursor: pointer; padding: 0;
   color: var(--text-2); font-weight: var(--fw-h); font-family: var(--font);
-  font-size: var(--fs-2xs)
+  font-size: var(--fs-2xs);
 }
 .dash-ledger .dl-h:hover { color: var(--brand); }
 .dl-open {
@@ -359,7 +365,10 @@
   border-bottom: 1px dashed var(--line-strong);
 }
 .dash-ledger .dl-h:hover .dl-open { color: var(--brand); border-color: var(--brand); }
-.dash-ledger .dl-row { color: var(--text-2); font-variant-numeric: tabular-nums; }
+.dash-ledger .dl-row { color: var(--text-2); font-variant-numeric: tabular-nums; padding: 1px var(--sp-2); border-radius: var(--r-ctl); }
+/* 最新一条：刚发生的改动该"报到"一次（轻微回弹 + 淡底色），
+   而不是安静地排在最左边等人自己发现。 */
+.dash-ledger .dl-row.fresh { animation: pop-in-spring var(--d-base) var(--ease-spring) both; background: var(--brand-soft); }
 .dash-ledger .dl-row em { font-style: normal; color: var(--text-3); font-family: var(--mono); }
 .dash-ledger .ok { color: var(--ok); margin-left: var(--sp-2); }
 .dash-ledger .rj { color: var(--warn); margin-left: var(--sp-2); }
@@ -495,7 +504,7 @@
   transition: background .15s var(--ease-out);
 }
 .sg-head:hover { background: var(--surface-2); }
-.sg-arrow { flex: none; width: 12px; color: var(--text-3); font-size: var(--fs-2xs) }
+.sg-arrow { flex: none; width: 12px; color: var(--text-3); font-size: var(--fs-2xs); }
 .sg-label { flex: 1; font-weight: var(--fw-med); }
 .sg-n {
   flex: none; font-size: var(--fs-2xs); color: var(--text-2);

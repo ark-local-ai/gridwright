@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { SkPanel } from "../components/Skeleton";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { IconCheck } from "../components/icons";
 import { ftColor, ftLabel } from "../data/mock";
@@ -68,7 +69,7 @@ export default function TaskPage() {
   if (!task) {
     return (
       <div className="page">
-        <div className="empty" style={{ height: 300 }}>加载中…</div>
+        <div className="sk-group" style={{ height: 300, padding: 24 }}><SkPanel rows={6} /></div>
       </div>
     );
   }

@@ -9,7 +9,7 @@
   width: var(--sb-w); flex: none; background: var(--surface);
   display: flex; flex-direction: column; padding: 12px 6px 10px 10px;
   overflow: visible; position: relative; z-index: 20;
-  transition: width 0.22s var(--ease-out);
+  transition: width var(--d-base) var(--ease-out);
 }
 .sb.collapsed { width: 0; padding-left: 0; padding-right: 0; }
 
@@ -26,7 +26,7 @@
 .sb-collapse {
   width: 26px; height: 26px; border-radius: var(--r-ctl); display: grid; place-items: center;
   color: var(--text-2); background: none; border: none; flex: none;
-  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
 }
 .sb-collapse:hover { background: var(--surface-2); color: var(--text-1); }
 .sb-collapse:active { background: var(--surface-3); }
@@ -45,7 +45,7 @@
 .top-tool {
   width: 28px; height: 28px; border-radius: var(--r-ctl); display: grid; place-items: center;
   color: var(--text-2); background: none; border: none; flex: none;
-  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
 }
 .top-tool:hover { background: var(--surface-2); color: var(--text-1); }
 .top-tool:active { background: var(--surface-3); }
@@ -72,14 +72,14 @@
 .sb-item {
   display: flex; align-items: center; gap: 9px; padding: 6.5px 9px; border-radius: var(--r-ctl);
   color: var(--text-2); font-size: 12.5px; text-decoration: none; position: relative;
-  transition: background 0.18s var(--ease-out), color 0.18s var(--ease-out), box-shadow 0.18s var(--ease-out), transform 0.18s var(--ease-out);
+  transition: background var(--d-base) var(--ease-out), color var(--d-base) var(--ease-out), box-shadow var(--d-base) var(--ease-out), transform var(--d-base) var(--ease-out);
 }
 .sb-item:hover { background: var(--surface-2); color: var(--text-1); box-shadow: var(--el-1); }
 .sb-item:active { background: var(--surface-3); }
 .sb-item.on { background: var(--surface-3); color: var(--text-1); box-shadow: var(--el-1); font-weight: var(--fw-h); transform: translateY(-0.5px); }
 .sb-item.on::before {
   content: ""; position: absolute; left: -10px; top: 6px; bottom: 6px; width: 3px;
-  border-radius: 3px; background: var(--brand); transition: height 0.18s var(--ease-out);
+  border-radius: 3px; background: var(--brand); transition: height var(--d-base) var(--ease-out);
 }
 .sb-item .icw { display: grid; place-items: center; color: inherit; }
 
@@ -90,13 +90,13 @@
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-overlay);
   box-shadow: var(--el-2); padding: 4px; min-width: 132px;
   opacity: 0; visibility: hidden; transform: translateX(-4px);
-  transition: opacity 0.16s var(--ease-out), transform 0.16s var(--ease-out), visibility 0.16s;
+  transition: opacity var(--d-fast) var(--ease-out), transform var(--d-fast) var(--ease-out), visibility var(--d-fast);
 }
 .sb-item-group:hover .sb-submenu { opacity: 1; visibility: visible; transform: none; }
 .sb-submenu-item {
   display: block; width: 100%; text-align: left; padding: 7px 11px; border-radius: var(--r-ctl);
   border: none; background: none; font-size: 12.5px; color: var(--text-1);
-  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
 }
 .sb-submenu-item:hover { background: var(--surface-2); color: var(--brand); }
 .sb-submenu-item:active { background: var(--surface-3); }
@@ -109,7 +109,7 @@
   position: absolute; right: -3px; top: 50%; transform: translateY(-50%);
   width: 23px; height: 23px; border-radius: 999px; display: grid; place-items: center;
   color: var(--text-2); background: var(--surface-2); border: 1px solid var(--line);
-  transition: background 0.16s var(--ease-out), color 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out);
+  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out);
 }
 .seg {
   position: relative; display: flex; background: var(--surface-2);
@@ -120,20 +120,20 @@
   content: ""; position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc(50% - 2px);
   background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
   box-shadow: var(--el-1);
-  transition: transform 0.24s var(--ease-out), background 0.24s var(--ease-out);
+  transition: transform var(--d-base) var(--ease-out), background var(--d-base) var(--ease-out);
 }
 .seg.space::before { transform: translateX(100%); }
 .seg-btn {
   flex: 1; position: relative; z-index: 1; display: inline-flex; align-items: center;
   justify-content: center; gap: 3px; padding: 3.5px 7px; font-size: 10.5px; color: var(--text-2);
   background: transparent; border: none; border-radius: 999px; white-space: nowrap;
-  transition: color 0.18s var(--ease-out);
+  transition: color var(--d-base) var(--ease-out);
 }
 .seg-btn.on { color: var(--text-1); font-weight: var(--fw-h); }
 .sb-expall {
   width: 22px; height: 22px; border-radius: var(--r-ctl); display: grid; place-items: center;
   color: var(--text-2); background: transparent; border: none; flex: none; margin-left: 4px;
-  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
 }
 .sb-expall:hover { background: var(--surface-2); color: var(--text-1); }
 .sb-expall:active { background: var(--surface-3); }
@@ -145,7 +145,7 @@
   position: fixed; left: 50%; top: 90px; transform: translateX(-50%);
   z-index: 80; width: min(560px, calc(100vw - 40px));
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-overlay);
-  box-shadow: var(--el-2); padding: 14px; animation: pop-in 0.18s var(--ease-out);
+  box-shadow: var(--el-2); padding: 14px; animation: pop-in var(--d-base) var(--ease-out);
 }
 .sb-search-input {
   display: flex; align-items: center; gap: 8px; background: var(--surface-2);
@@ -163,12 +163,12 @@
 .sb-grp {
   display: flex; align-items: center; gap: 5px; padding: 5px 7px; font-size: 11px;
   color: var(--text-3); background: none; border: none; border-radius: 7px; cursor: pointer;
-  text-align: left; transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+  text-align: left; transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
 }
 .sb-grp:hover { background: var(--surface-2); color: var(--text-2); }
 .sb-grp.head { cursor: default; color: var(--text-2); font-weight: var(--fw-h); }
 .sb-grp.head:hover { background: none; }
-.sb-grp .ic { transition: transform 0.16s var(--ease-out); }
+.sb-grp .ic { transition: transform var(--d-fast) var(--ease-out); }
 .sb-grp .ic.fold { transform: rotate(-90deg); }
 .sb-grp .lb { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 .sb-grp .cnt { font-size: 10.5px; flex: none; }
@@ -177,7 +177,7 @@
   display: flex; align-items: center; gap: 8px; width: 100%;
   padding: 6px 8px 6px 21px; border-radius: var(--r-ctl);
   background: none; border: none; cursor: pointer; text-align: left;
-  transition: background 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out);
+  transition: background var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out);
 }
 .sb-row:hover { background: var(--surface-2); box-shadow: var(--el-1); }
 .sb-row:active { background: var(--surface-3); }
@@ -189,8 +189,8 @@
   width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
   color: var(--text-1); background: transparent; border: none; flex: none;
   opacity: 0; transform: scale(0.8); cursor: pointer;
-  transition: opacity 0.15s var(--ease-out), transform 0.15s var(--ease-out),
-    background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+  transition: opacity var(--d-fast) var(--ease-out), transform var(--d-fast) var(--ease-out),
+    background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
 }
 .sb-row:hover .row-x { opacity: 1; transform: scale(1); }
 .row-x:hover { background: var(--surface-3); color: var(--text-1); }
@@ -200,14 +200,14 @@
 .grp-del {
   display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%;
   color: var(--text-1); flex: none; opacity: 0; transform: scale(0.8); cursor: pointer;
-  transition: opacity 0.15s var(--ease-out), transform 0.15s var(--ease-out),
-    background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+  transition: opacity var(--d-fast) var(--ease-out), transform var(--d-fast) var(--ease-out),
+    background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
 }
 .grp-add {
   display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%;
   color: var(--text-2); flex: none; opacity: 0; transform: scale(0.8); cursor: pointer;
-  transition: opacity 0.15s var(--ease-out), transform 0.15s var(--ease-out),
-    background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+  transition: opacity var(--d-fast) var(--ease-out), transform var(--d-fast) var(--ease-out),
+    background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
 }
 .sb-grp:hover .grp-del, .sb-grp:hover .grp-add { opacity: 1; transform: scale(1); }
 .grp-add:hover { background: var(--surface-3); color: var(--text-1); }
@@ -220,7 +220,7 @@
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
   z-index: 100; width: 220px; background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--r-overlay); box-shadow: var(--el-2); padding: 16px;
-  animation: confirm-in 0.18s var(--ease-out);
+  animation: confirm-in var(--d-base) var(--ease-out);
 }
 @keyframes confirm-in {
   from { opacity: 0; }
@@ -234,12 +234,12 @@
 .sb-ctx {
   position: fixed; z-index: 120; min-width: 168px;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-overlay);
-  box-shadow: var(--el-2); padding: 5px; animation: pop-in 0.16s var(--ease-out);
+  box-shadow: var(--el-2); padding: 5px; animation: pop-in var(--d-fast) var(--ease-out);
 }
 .sb-ctx-item {
   display: flex; width: 100%; align-items: center; gap: 8px; padding: 7px 10px;
   border-radius: var(--r-ctl); border: none; background: none; font-size: 12.5px; color: var(--text-1);
-  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
 }
 .sb-ctx-item:hover { background: var(--surface-2); }
 .sb-ctx-item:active { background: var(--surface-3); }
@@ -252,13 +252,13 @@
 .sb-user {
   display: flex; width: 100%; align-items: center; gap: 9px; padding: 6px 8px;
   border-radius: var(--r-ctl); border: none; background: none;
-  transition: background 0.16s var(--ease-out);
+  transition: background var(--d-fast) var(--ease-out);
 }
 .sb-user:hover { background: var(--surface-2); }
 .sb-user .ava {
   width: 28px; height: 28px; border-radius: 50%; background: var(--surface-3); color: var(--text-1);
   display: grid; place-items: center; font-weight: var(--fw-h); font-size: 12px; flex: none;
-  transition: background 0.16s var(--ease-out);
+  transition: background var(--d-fast) var(--ease-out);
 }
 .sb-user-t { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.2; min-width: 0; }
 .sb-user-t b { font-size: 12.5px; color: var(--text-1); white-space: nowrap; }
@@ -266,12 +266,12 @@
 .sb-menu {
   position: absolute; bottom: calc(100% + 8px); left: 4px; right: 4px; z-index: 70;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-overlay);
-  box-shadow: var(--el-2); padding: 5px; animation: pop-in 0.16s var(--ease-out);
+  box-shadow: var(--el-2); padding: 5px; animation: pop-in var(--d-fast) var(--ease-out);
 }
 .sb-menu-item {
   display: flex; width: 100%; align-items: center; gap: 8px; padding: 7.5px 10px;
   border-radius: var(--r-ctl); border: none; background: none; font-size: 12.5px; color: var(--text-1);
-  transition: background 0.15s var(--ease-out);
+  transition: background var(--d-fast) var(--ease-out);
 }
 .sb-menu-item:hover { background: var(--surface-2); }
 .sb-menu-item:active { background: var(--surface-3); }
@@ -301,7 +301,7 @@
 .pn-tab {
   display: inline-flex; align-items: center; gap: 6px; padding: 7px 15px; border-radius: 999px;
   font-size: 13px; color: var(--text-2); background: transparent; border: 1px solid transparent;
-  transition: background 0.16s var(--ease-out), color 0.16s var(--ease-out), border-color 0.16s var(--ease-out);
+  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out), border-color var(--d-fast) var(--ease-out);
 }
 .pn-tab:hover { background: var(--surface-2); color: var(--text-1); }
 .pn-tab:active { background: var(--surface-3); }
@@ -341,8 +341,8 @@
   display: grid; place-items: center; width: 32px; height: 32px;
   border-radius: 999px; background: var(--surface); border: 1px solid var(--line);
   color: var(--brand); box-shadow: var(--el-1); cursor: pointer;
-  transition: background 0.16s var(--ease-out), border-color 0.16s var(--ease-out),
-    color 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out), transform 0.1s var(--ease-out);
+  transition: background var(--d-fast) var(--ease-out), border-color var(--d-fast) var(--ease-out),
+    color var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out), transform 0.1s var(--ease-out);
 }
 .chip-all:hover { border-color: var(--brand-line); color: var(--brand-strong); box-shadow: var(--el-2); transform: translateY(-50%) scale(1.03); }
 .chip-all:active { transform: translateY(-50%) scale(0.96); background: var(--surface-2); }
@@ -350,8 +350,8 @@
   display: inline-flex; align-items: center; gap: 6px; padding: 5.5px 12px;
   border-radius: 999px; background: var(--surface); border: 1px solid var(--line);
   font-size: 12px; color: var(--text-2); box-shadow: var(--el-1);
-  transition: background 0.16s var(--ease-out), border-color 0.16s var(--ease-out),
-    color 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out), transform 0.1s var(--ease-out);
+  transition: background var(--d-fast) var(--ease-out), border-color var(--d-fast) var(--ease-out),
+    color var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out), transform 0.1s var(--ease-out);
 }
 .chip:hover { border-color: var(--brand-line); color: var(--text-1); box-shadow: var(--el-2); }
 .chip:active { transform: translateY(1px); background: var(--surface-2); }
@@ -359,7 +359,7 @@
 
 /* 场景胶囊下拉（WorkBuddy 式：场景 → 参考提示词 → 输入台标签） */
 .chip-wrap { position: relative; display: inline-flex; }
-.chip .ic { transition: transform 0.16s var(--ease-out); }
+.chip .ic { transition: transform var(--d-fast) var(--ease-out); }
 .chip.on { background: var(--brand-soft); border-color: var(--brand-line); color: var(--brand-strong); }
 .chip.on .ic { transform: rotate(180deg); }
 .chip .ic.rot { transform: rotate(-90deg); }
@@ -368,13 +368,13 @@
   min-width: 300px; max-width: 340px; text-align: left;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel);
   box-shadow: var(--el-2); padding: 6px; z-index: 41;
-  animation: pop-in 0.16s var(--ease-out) both;
+  animation: pop-in var(--d-fast) var(--ease-out) both;
 }
 .chip-menu-h { font-size: 11px; color: var(--text-3); padding: 6px 8px 4px; }
 .chip-menu-item {
   display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left;
   padding: 8px 9px; border: none; background: transparent; border-radius: var(--r-ctl);
-  transition: background 0.14s var(--ease-out);
+  transition: background 0var(--d-fast) var(--ease-out);
 }
 .chip-menu-item:hover { background: var(--surface-2); }
 .chip-menu-item .cm-note { font-size: 11px; font-weight: var(--fw-h); color: var(--brand); }
@@ -394,7 +394,7 @@
 .tag-x {
   display: grid; place-items: center; width: 15px; height: 15px; border: none;
   border-radius: 4px; background: transparent; color: inherit; cursor: pointer;
-  transition: background 0.14s var(--ease-out);
+  transition: background 0var(--d-fast) var(--ease-out);
 }
 .tag-x:hover { background: var(--brand-line); }
 
@@ -404,7 +404,7 @@
 .foot-chip {
   display: inline-flex; align-items: center; gap: 6px; padding: 4.5px 8px; font-size: 11.5px;
   color: var(--text-2); background: none; border: none; border-radius: 7px;
-  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
 }
 .foot-chip:hover { background: var(--surface-2); color: var(--text-1); }
 .foot-chip:active { background: var(--surface-3); }

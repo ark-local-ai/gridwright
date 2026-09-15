@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SkPanel } from "../components/Skeleton";
 import "./ledger.css";
 import { agentApi } from "../api-agent";
 import type { RollbackItem } from "../api-agent";
@@ -100,7 +101,7 @@ export default function LedgerPanel({ onClose, onChanged }: {
         {msg && <p className="lg-msg"><IconCheck size={12} />{msg}</p>}
 
         <div className="lg-body">
-          {load && <p className="lg-empty">读取中…</p>}
+          {load && <div className="lg-sk"><SkPanel rows={6} /></div>}
           {!load && items.length === 0 && (
             <p className="lg-empty">
               还没有改动记录。让它改一次表，这里就会留下每一格的旧值。

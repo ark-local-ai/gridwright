@@ -4,6 +4,8 @@ import { agentApi, nodeId } from "../api-agent";
 import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, WorkspaceListItem, Proposal, WeightScore, ScanIssue, SafetyReport, SelfCheckReport } from "../api-agent";
 import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark, IconClock } from "../components/icons";
 import SheetView from "./SheetView";
+import { SkPanel } from "../components/Skeleton";
+import { useChanged } from "../lib/useChanged";
 import Settings from "./Settings2";
 import LedgerPanel from "./LedgerPanel";
 import TasksPanel from "./TasksPanel";
@@ -96,7 +98,19 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   }, []);
 
   if (load === "loading" && !graph) {
-    return <div className="dash"><div className="dash-empty"><p>正在读取工作区…</p></div></div>;
+    // 首屏加载：给骨架而不是"正在读取工作区…"——骨架一眼就懂，且不跳版
+    return (
+      <div className="dash">
+        <div className="dash-boot">
+          <div className="dash-boot-side"><SkPanel rows={7} /></div>
+          <div className="dash-boot-main">
+            <SkPanel rows={2} />
+            <div className="sk-block sk-stat" />
+            <SkPanel rows={5} />
+          </div>
+        </div>
+      </div>
+    );
   }
   if (load === "error") {
     return (
@@ -222,7 +236,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
 
       <div className="dash-body">
         {/* 左：联动摘要（按文件分组） */}
-        <section className="dash-left">
+        <section className="dash-left rise">
           <h3 className="dash-h">表的联动</h3>
           <p className="dash-sub">点表看它牵动到谁</p>
 
@@ -250,7 +264,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
         </section>
 
         {/* 中/右：详情 + 待确认/体检 */}
-        <section className="dash-right">
+        <section className="dash-right rise rise-1">
           {active && graph && (
             <div className="node-detail">
               {/* 选中的表 = 这一屏的主角，做成"仪器铭牌"：
@@ -352,7 +366,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
           <span className="dash-muted">还没有改动记录</span>
         ) : (
           ledger.map((e, i) => (
-            <span key={i} className="dl-row">
+            <span key={`${e.ts}-${e.cell}-${e.old}-${e.new}`} className={`dl-row${i === 0 ? " fresh" : ""}`}>
               <em>{e.ts}</em> {e.table} {e.cell} {e.old}→{e.new}
               <span className={e.status === "ok" ? "ok" : "rj"}>{e.status}</span>
             </span>
@@ -377,10 +391,12 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
 
 /* ---------- 仪表读数 ---------- */
 function Readout({ label, value, tone }: { label: string; value: string; tone?: "act" | "warn" }) {
+  // 读数变了就闪一下：这是用户最常盯的三个数，变化必须"演"出来而不是悄悄变
+  const changed = useChanged(value);
   return (
     <span className={`readout${tone ? " " + tone : ""}`}>
       <span className="ro-label">{label}</span>
-      <span className="ro-value">{value}</span>
+      <span className={`ro-value${changed ? " value-changed" : ""}`}>{value}</span>
     </span>
   );
 }
@@ -581,7 +597,7 @@ function NodeStats({ node }: { node: GraphNode }) {
     return () => { alive = false; };
   }, [node.sheet, node.file]);
 
-  if (!pv) return <div className="nd-stats muted">汇总读取中…</div>;
+  if (!pv) return <div className="sk-group nd-stats-sk"><SkPanel rows={3} /></div>;
 
   // 空表（无数据行）时 summaries/sample/header 可能是 null，必须兜底
   const sums = pv.summaries ?? [];

@@ -3,6 +3,7 @@ import "./sheet.css";
 import { agentApi } from "../api-agent";
 import type { SheetPreview } from "../api-agent";
 import { IconXls } from "../components/icons";
+import { SkTable } from "../components/Skeleton";
 
 /* 表预览（见 docs/agent-architecture/19-界面设计.md 阶段 1）
    这是"进入表格的入口"：看真实数据、点坐标跳体检条目。
@@ -72,7 +73,12 @@ export default function SheetView({ file, sheet, highlight, onBack }: {
 
       {pv?.note && <p className="sv-note">{pv.note}</p>}
 
-      {loading && <p className="sv-msg">读取中…</p>}
+      {loading && (
+        <div className="sv-scroll">
+          {/* 表格用表骨架：格子对格子，不写"读取中…"（动画 > 文字） */}
+          <SkTable rows={10} cols={7} />
+        </div>
+      )}
       {err && (
         <div className="sv-msg">
           <p>读不出这张表：{err}</p>

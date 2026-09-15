@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SkPanel } from "../components/Skeleton";
 import { useLocation, NavLink } from "react-router-dom";
 import { IconUsers, IconSpark, IconLink } from "../components/icons";
 import { listConnectors, type ConnectorDto } from "../api";
@@ -52,7 +53,7 @@ export default function Connectors() {
             <p className="conn-note">{c.note}</p>
           </div>
         ))}
-        {conns.length === 0 && !err && <div className="conn-note">加载中…</div>}
+        {conns.length === 0 && !err && <div className="sk-group" style={{ maxWidth: 320 }}><SkPanel rows={4} /></div>}
       </div>
     </div>
   );
