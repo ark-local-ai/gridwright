@@ -2,8 +2,6 @@
 
 # gridwright
 
-**你的表，有人替你看着。**
-
 跑在自己机器上的 Excel 台账管家 —— 新数据一进 inbox，它按你定的规矩自动改表；
 每一格改动都留账目、能回滚、改完通知你。**数据不出本机。**
 
@@ -185,7 +183,7 @@ cd apps/agent && go test ./...     # 144 个用例，覆盖 19 个包
 
 ## 参与贡献
 
-见 [CONTRIBUTING.md](CONTRIBUTING.md)。提交信息用英文，一个 commit 一个逻辑变更。
+见 [CONTRIBUTING.md](CONTRIBUTING.md)。提交信息按照规定保持格式，一个 commit 一个逻辑变更。
 更多细节见 [ARCHITECTURE.md](ARCHITECTURE.md) 与 [PAGES.md](PAGES.md)。
 
 ## 卸载
