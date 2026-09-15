@@ -188,6 +188,18 @@ cd apps/agent && go test ./...     # 144 个用例，覆盖 19 个包
 见 [CONTRIBUTING.md](CONTRIBUTING.md)。提交信息用英文，一个 commit 一个逻辑变更。
 更多细节见 [ARCHITECTURE.md](ARCHITECTURE.md) 与 [PAGES.md](PAGES.md)。
 
+## 卸载
+
+**不要直接删安装文件夹**，那样会留下孤儿注册项（控制面板里还留着条目，
+但卸载程序已经跟着文件夹没了，点卸载必然失败）。正确的做法：
+
+- 装完后**开始菜单 → gridwright → 卸载 gridwright**
+- 或 **设置 → 应用 → 已安装的应用 → gridwright → 卸载**
+
+> 如果你曾经手删过文件夹、现在卸不掉：重新装一次（会装到默认目录），
+> 再用上面任一方式卸载即可。这个坑的成因见
+> `apps/desktop/src-tauri/installer/hooks.nsh` 的注释。
+
 ## 已知限制
 
 - 面板数值以 Excel 打开为准（程序不重算公式）

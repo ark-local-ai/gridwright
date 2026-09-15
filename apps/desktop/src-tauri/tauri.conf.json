@@ -42,7 +42,8 @@
         "headerImage": "installer/header.bmp",
         "sidebarImage": "installer/sidebar.bmp",
         "installerIcon": "icons/icon.ico",
-        "installerHooks": "installer/hooks.nsh"
+        "installerHooks": "installer/hooks.nsh",
+        "startMenuFolder": "gridwright"
       }
     }
   }

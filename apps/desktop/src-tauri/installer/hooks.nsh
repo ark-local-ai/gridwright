@@ -20,3 +20,47 @@
 ; 完成页：卸下"装完了然后呢"的疑问（官网 CTA 的同一句话）
 !define MUI_FINISHPAGE_TITLE "gridwright 装好了"
 !define MUI_FINISHPAGE_TEXT "双击桌面图标即可开始。首次打开会拉起本地引擎，稍等几秒。$\r$\n$\r$\n你的表放在哪个文件夹，就在里面建一个 inbox——丢进去的数据会被自动认领。"
+
+; =====================================================================
+; 安装/卸载钩子
+;
+; 为什么需要这两个：模板（tauri-bundler 2.9.4 的 installer.nsi）有两处会导致
+; **卸载不掉**，实测踩到过：
+;
+;   ① RestorePreviousInstallLocation（模板 850 行）把注册表里记的上次安装路径
+;      直接写进 $INSTDIR，**不检查那个目录还在不在**。用户手删文件夹当卸载
+;      （很常见）之后，注册项就成了孤儿：重装会默认又指向那个已删除的路径。
+;   ② 卸载段只做 DeleteRegKey /ifempty，而 MANUPRODUCTKEY 的默认值存着
+;      $INSTDIR，默认值在 → 键**永远不为空** → 那条陈旧路径永远删不掉。
+;
+; 钩子必须在模板之前 !define 好（本文件正是这个时机），模板里用
+; !ifmacrodef NSIS_HOOK_POSTINSTALL / POSTUNINSTALL 插入。
+; =====================================================================
+
+; 装完（POSTINSTALL 在开始菜单/桌面快捷方式之后执行）：
+; 补一个「卸载」快捷方式。模板默认不建，于是用户还以为没有卸载程序。
+!macro NSIS_HOOK_POSTINSTALL
+  ; 与主快捷方式同目录：有 startMenuFolder 就进那个子目录，否则放开始菜单根
+  !if "${STARTMENUFOLDER}" != ""
+    CreateShortcut "$SMPROGRAMS\$AppStartMenuFolder\卸载 gridwright.lnk" "$INSTDIR\uninstall.exe"
+  !else
+    CreateShortcut "$SMPROGRAMS\卸载 gridwright.lnk" "$INSTDIR\uninstall.exe"
+  !endif
+!macroend
+
+; 卸载时：
+;   - 删掉自己建的那个「卸载」快捷方式。模板的清理逻辑只删**指向主程序**的
+;     快捷方式（IsShortcutTarget 比对 exe 路径），我这个指向 uninstall.exe，
+;     匹配不上，不删就会留在开始菜单里变成一个打不开的死链接。
+;   - 清掉路径记录本身（而不只是"空了才删"）。否则 MANUPRODUCTKEY 的默认值
+;     还在 → 键永不为空 → 那条陈旧路径永远删不掉，下次重装又回到已删目录。
+!macro NSIS_HOOK_POSTUNINSTALL
+  !insertmacro MUI_STARTMENU_GETFOLDER Application $AppStartMenuFolder
+  !if "${STARTMENUFOLDER}" != ""
+    Delete "$SMPROGRAMS\$AppStartMenuFolder\卸载 gridwright.lnk"
+    RMDir "$SMPROGRAMS\$AppStartMenuFolder"
+  !else
+    Delete "$SMPROGRAMS\卸载 gridwright.lnk"
+  !endif
+  DeleteRegValue HKCU "${MANUPRODUCTKEY}" ""
+!macroend
