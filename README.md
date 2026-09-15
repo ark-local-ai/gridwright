@@ -13,12 +13,7 @@
 [![Go](https://img.shields.io/badge/Go-1.21+-2f5d8a?logo=go&logoColor=white)](apps/agent)
 [![React](https://img.shields.io/badge/React-19-2f5d8a?logo=react&logoColor=white)](apps/frontend)
 
-**在线体验：** http://111.231.166.31/ —— ⚠️ 待开放端口（见下）
-
-> 官网已部署到该服务器（Caddy，`/var/www/gridwright`），**服务端已验证可访问**：
-> 首页 200、静态资源 200、SPA 深链回退 200、页面里的下载链接指向 v0.1.2。
-> 但**目前从公网打不开**：该机器的云安全组只放行了 22 端口，80 被挡在外面
-> （实测 80/443/8080 均不可达）。到腾讯云控制台 → 安全组 → 放行 TCP 80 即可。
+**在线体验：** http://111.231.166.31/
 
 [下载](#下载) · [为什么做这个](#为什么做这个) · [快速开始](#快速开始) · [架构](#架构) · [参与贡献](CONTRIBUTING.md)
 
