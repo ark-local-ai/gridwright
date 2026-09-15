@@ -1,11 +1,10 @@
 import { useEffect, useCallback, useState } from "react";
 import "./dashboard.css";
 import { agentApi, nodeId } from "../api-agent";
-import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, SheetShape, WorkspaceListItem, Proposal, WeightScore, ScanIssue, SafetyReport, SelfCheckReport } from "../api-agent";
+import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, WorkspaceListItem, Proposal, WeightScore, ScanIssue, SafetyReport, SelfCheckReport } from "../api-agent";
 import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark, IconClock } from "../components/icons";
-import SheetThumb from "../components/SheetThumb";
-import WeightBar from "../components/WeightBar";
 import AttentionList from "../components/AttentionList";
+import LinkMap from "../components/LinkMap";
 import SheetView from "./SheetView";
 import { SkPanel } from "../components/Skeleton";
 import { useChanged } from "../lib/useChanged";
@@ -28,8 +27,6 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   const [wsPath, setWsPath] = useState("");
   const [chosen, setChosen] = useState(true); // 是否显式选过工作区
   const [files, setFiles] = useState<WorkspaceFiles | null>(null);
-  // 每张表的"形状"（行/列/公式数）——左栏缩略图用。key = "文件!工作表"
-  const [shapes, setShapes] = useState<Record<string, SheetShape>>({});
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [weights, setWeights] = useState<Record<string, WeightScore>>({});
   const [weightsNote, setWeightsNote] = useState("");
@@ -73,12 +70,6 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
         agentApi.weights().catch(() => null),
       ]);
       setFiles(f);
-      // 表的形状：给左栏缩略图。和主数据并行拉，失败也不影响看板（缩略图画成空骨架）
-      agentApi.sheetShapes().then((r) => {
-        const m: Record<string, SheetShape> = {};
-        for (const sp of r.shapes ?? []) m[`${sp.file}!${sp.sheet}`] = sp;
-        setShapes(m);
-      }).catch(() => setShapes({}));
       setGraph(g);
       setScan(s?.report ?? null);
       setCounts({ error: s?.errors ?? 0, warn: s?.warns ?? 0 });
@@ -262,23 +253,17 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
           <p className="dash-sub">跨月才对得出来的问题，点开可跳到那一格</p>
           <AttentionList issues={issues} onOpen={(it) => setOpened({ sheet: it.sheet, file: it.file, ref: it.ref })} />
 
-          <h3 className="dash-h dash-h-links">表的联动</h3>
-          <p className="dash-sub">点表看它牵动到谁</p>
-
+          {/* 连接用**图**表达：一行一族，实心=连着、空心=断开。
+              原来那种平铺列表既看不出结构，也说不出"哪断了"。 */}
+          <h3 className="dash-h dash-h-links">表的连接</h3>
+          <p className="dash-sub">哪些表该连着，现在断开了</p>
           {graph ? (
-            <div className="chain-groups">
-              {groupByFile(graph, 0, weights).map((grp) => (
-                <SheetGroup
-                  key={grp.file}
-                  grp={grp}
-                  weights={weights}
-                  shapes={shapes}
-                  active={active}
-                  hot={hot}
-                  onPick={(n) => void pickNode(n)}
-                />
-              ))}
-            </div>
+            <LinkMap
+              graph={graph}
+              issues={issues}
+              onOpenSheet={(n) => void pickNode(n)}
+              onOpenIssue={(it) => setOpened({ sheet: it.sheet, file: it.file, ref: it.ref })}
+            />
           ) : <p className="dash-muted">未发现表间依赖</p>}
 
           {weightsNote && <p className="dash-weight-note">{weightsNote}</p>}
@@ -510,184 +495,6 @@ function ScanList({ issues, onOpen }: {
 
 /* ---------- 联动链（按文件分组 → 同系列折叠） ---------- */
 
-/** 同系列判断：表名去掉期数（年/月/日等数字）后相同 → 视为同一系列。 */
-function seriesKey(sheet: string): string {
-  return sheet.replace(/\d+/g, "#").replace(/\s+/g, "");
-}
-
-function SheetGroup({ grp, weights, shapes, active, hot, onPick }: {
-  grp: Group;
-  weights: Record<string, WeightScore>;
-  shapes: Record<string, SheetShape>;
-  active: GraphNode | null;
-  hot: Set<string>;
-  onPick: (n: GraphNode) => void;
-}) {
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  // 默认收起：读之前不该先把 24 行标题全铺出来（那是"还没读就占屏"）。
-  // 形状数据到位（=读完了）才渲染列表——这形成你要的"读取后才展开"。
-  const loaded = Object.keys(shapes).length > 0;
-
-  const shapeOf = (n: GraphNode) => shapes[`${grp.file}!${n.sheet}`];
-
-  // 把同"系列"的收成一组（如 2026年9月租金 → 「租金（日）」系列 13 张）
-  const byKey = new Map<string, GraphNode[]>();
-  for (const n of grp.items) {
-    const k = seriesKey(n.sheet);
-    if (!byKey.has(k)) byKey.set(k, []);
-    byKey.get(k)!.push(n);
-  }
-  const series = [...byKey.entries()].map(([key, items]) => ({
-    key, label: seriesLabel(items[0].sheet), items,
-  }));
-  series.sort((a, b) => b.items.length - a.items.length);
-
-  // 按"有没有分量"分区——这是这一栏唯一值得分层的信号。
-  // 真实台账里 24 张表有 22 张权重为 0：把它们和 2 张枢纽平铺在一起，
-  // 等于 11 行等重、9 根空条，读者无从下眼。
-  // 分成两区之后：上面 2 行是"先看这个"，下面 9 行安静躺平即可。
-  const attnOf = (sr: { items: GraphNode[] }) =>
-    sr.items.reduce((m, n) => Math.max(m, weights[nodeId(n)]?.attention ?? 0), 0);
-  const ranked = [...series].sort((a, b) => attnOf(b) - attnOf(a));
-  const hubs = ranked.filter((sr) => attnOf(sr) > 0);
-  const rest = ranked.filter((sr) => attnOf(sr) <= 0);
-  // 计数用**张**（工作表数），不是行数——「租金」是 1 行但含 14 张表，
-  // 报"2 张"会让用户以为只有两张表。如实报表的张数。
-  const sheetsIn = (list: { items: GraphNode[] }[]) =>
-    list.reduce((n, sr) => n + sr.items.length, 0);
-
-  /** 渲染一个系列。hot=true 时是"枢纽"（带条 + 信号），否则是"其余"（安静紧凑）。 */
-  const renderSeries = (sr: { key: string; label: string; items: GraphNode[] }, hotSec: boolean) => {
-    const single = sr.items.length === 1;
-    const open = expanded[sr.key] ?? false;
-    const head = sr.items[0];
-    const headActive = active && nodeId(active) === nodeId(head);
-    const headHot = hot.has(nodeId(head));
-    const members = sr.items.map((n) => weights[nodeId(n)]).filter(Boolean) as WeightScore[];
-    const best = members.reduce<WeightScore | null>(
-      (acc, w) => (!acc || w.attention > acc.attention ? w : acc), null);
-    const seriesAttn = best?.attention ?? 0;
-    return (
-      <li key={sr.key} className={`cr-series${hotSec ? " hub" : ""}`}>
-        <button
-          className={`chain-row series-head${headHot ? " hot" : ""}${single && headActive ? " on" : ""}`}
-          onClick={() => {
-            if (single) onPick(head);
-            else setExpanded((e) => ({ ...e, [sr.key]: !open }));
-          }}
-          title={single ? `${head.file}!${head.sheet}` : sr.items.map((x) => x.sheet).join("、")}
-        >
-          <SheetThumb shape={shapeOf(head)} active={single && !!headActive}
-            tone={best?.master ? "master" : undefined} />
-          <span className="cr-body">
-            <span className="cr-name">{sr.label}</span>
-            <span className="cr-sub">
-              {single ? shortName(head.sheet)
-                : `${sr.items.length} 张 · 最近 ${shortName(head.sheet)}`}
-            </span>
-          </span>
-          {/* 枢纽区才显示信号（条 + 主数据）。其余区不画空条：
-              空条不是诚实，是噪音——安静本身就是这一区的表达。 */}
-          {hotSec && (
-            <>
-              {best?.master && <span className="cr-tag">主数据</span>}
-              <WeightBar value={seriesAttn} master={best?.master}
-                title={best ? `注意力 ${seriesAttn.toFixed(2)}（${best.reasons.join(" · ")}）` : ""} />
-            </>
-          )}
-          {!single && <span className={`cr-caret${open ? " open" : ""}`}>›</span>}
-        </button>
-
-        {!single && open && (
-          <ul className="cr-sub-list">
-            {sr.items.map((n) => {
-              const id = nodeId(n);
-              const isActive = active && nodeId(active) === id;
-              const isHot = hot.has(id);
-              const wn = weights[id];
-              const sh = shapeOf(n);
-              return (
-                <li key={id}>
-                  <button
-                    className={`chain-row sub${isHot ? " hot" : ""}${isActive ? " on" : ""}`}
-                    onClick={() => onPick(n)}
-                    title={`${n.file}!${n.sheet}${wn ? " ｜ " + wn.reasons.join(" · ") : ""}`}
-                  >
-                    <span className="cr-body">
-                      <span className="cr-name">{shortName(n.sheet)}</span>
-                      {sh && <span className="cr-sub">{sh.rows} 行 · {sh.cols} 列</span>}
-                    </span>
-                    {wn && wn.attention > 0 && (
-                      <WeightBar value={wn.attention} title={`注意力 ${wn.attention.toFixed(2)}`} />
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </li>
-    );
-  };
-
-  return (
-    <div className="chain-group">
-      <div className="cg-file">
-        <IconXls size={12} />
-        <span>{grp.file}</span>
-        <span className="cg-n">{series.length} 类 · {grp.items.length} 张</span>
-      </div>
-
-      {/* 读之前：一行骨架，不铺标题（"读取后才展开"） */}
-      {!loaded && (
-        <div className="cg-skel" aria-label="正在读表的形状" role="status">
-          <SkPanel rows={4} />
-        </div>
-      )}
-
-      {loaded && (
-        <>
-          {/* ① 枢纽：有权重才有资格进这一区。带条、带信号——它们是"先看这个" */}
-          {hubs.length > 0 && (
-            <div className="cg-sec">
-              <div className="cg-sec-h">
-                <span>枢纽</span>
-                <span className="cg-sec-n">{sheetsIn(hubs)} 张</span>
-              </div>
-              <ul className="chain-list">
-                {hubs.map((sr) => renderSeries(sr, true))}
-              </ul>
-            </div>
-          )}
-
-          {/* ② 其余：紧凑行、**不画空条**。空条不是诚实，是 9 个噪音——
-              这一区本来就"安静"，安静本身就把上面的分量衬出来了。 */}
-          {rest.length > 0 && (
-            <div className="cg-sec cg-sec-rest">
-              <div className="cg-sec-h">
-                <span>其余</span>
-                <span className="cg-sec-n">{sheetsIn(rest)} 张</span>
-              </div>
-              <ul className="chain-list">
-                {rest.map((sr) => renderSeries(sr, false))}
-              </ul>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-/** 系列显示名：去掉期数后的主干（如「2026年9月租金 （日） 」→「租金（日）」）。 */
-function seriesLabel(sheet: string): string {
-  return sheet
-    .replace(/\d+/g, "")
-    .replace(/\s+/g, "")
-    .replace(/^[年月日]+/, "")
-    .replace(/^[（(]?[日月末初]+[）)]?/, "")
-    || sheet;
-}
 
 /* ---------- 节点汇总（用户要的"点模块展示大概汇总数据"） ---------- */
 
@@ -1158,11 +965,6 @@ function incoming(g: GraphData, n: GraphNode): string[] {
 }
 
 type Group = { file: string; items: GraphNode[]; refs: Record<string, number> };
-
-/** 按文件分组节点，并统计每个节点被引用次数（用于徽标）。limit=0 表示不截断。 */
-function groupByFile(g: GraphData, limit = 0, weights?: Record<string, WeightScore>): Group[] {
-  return groupNodes(g, g.nodes, limit, weights);
-}
 
 /** 把给定节点按文件分组（用于"有关联 / 留白"分区渲染）。
     传了 weights 时，**组内按注意力权重降序**——重要的表排前面，否则权重看不见。 */

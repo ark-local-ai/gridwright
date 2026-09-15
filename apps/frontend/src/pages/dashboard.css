@@ -811,3 +811,63 @@
 }
 .att-sub-msg { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .att-more { font-size: var(--fs-2xs); color: var(--text-3); margin: 2px 0 0; }
+
+/* =====================================================================
+   表的连接（LinkMap）—— 画"断口"，不画关系网
+   真表只有 6 条边、24 节点，力导向图画出来是个稀疏星形，什么都看不出。
+   真正有信息量的是**断裂**：14 张月表里 9 张断了（2026 全年）。
+   ===================================================================== */
+.lm { display: flex; flex-direction: column; gap: var(--sp-3); }
+
+/* 一句话结论：用户不该自己读图得出结论 */
+.lm-verdict {
+  margin: 0; font-size: var(--fs-2xs); line-height: 1.6;
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl);
+}
+.lm-verdict.warn { background: var(--warn-bg); color: var(--warn); }
+.lm-verdict.ok { background: var(--ok-bg); color: var(--ok); }
+
+/* 读数：连着 / 断开 / 共 */
+.lm-stats { display: flex; gap: var(--sp-3); font-size: var(--fs-2xs); color: var(--text-2); }
+.lm-st { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+.lm-st i { width: 7px; height: 7px; border-radius: 2px; flex: none; }
+.lm-st.led i { background: var(--brand); }
+.lm-st.iso i { border: 1.5px dashed var(--warn); }
+.lm-st b { color: var(--ink); font-family: var(--mono); }
+
+/* 族谱：一行一族，成员排成一条点阵 */
+.lm-fams { display: flex; flex-direction: column; gap: var(--sp-3); }
+.lm-fam { display: flex; flex-direction: column; gap: 5px; }
+.lm-fam-h { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
+.lm-fam-n { font-size: var(--fs-2xs); color: var(--text-2); font-weight: var(--fw-h); }
+.lm-fam-c { font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.lm-dots { display: flex; flex-wrap: wrap; gap: 4px; }
+/* 实心方块 = 连着；空心虚线 = 断开。一眼扫过去就知道断了几格。 */
+.lm-dot {
+  width: 13px; height: 13px; padding: 0; cursor: pointer;
+  border-radius: 3px; border: 1.5px dashed var(--warn); background: transparent;
+  transition: transform var(--d-fast) var(--ease-out), background var(--d-fast) var(--ease-out);
+}
+.lm-dot.on { border: none; background: var(--brand); }
+.lm-dot:hover { transform: scale(1.25); }
+
+/* 断口清单：具体哪张表、多少处，点了跳到那一格 */
+.lm-breaks { display: flex; flex-direction: column; gap: var(--sp-2); }
+.lm-breaks-h { display: flex; align-items: baseline; justify-content: space-between; }
+.lm-breaks-h > span:first-child {
+  font-size: var(--fs-2xs); font-weight: var(--fw-h); color: var(--text-2); letter-spacing: var(--ls-label);
+}
+.lm-breaks-n { font-size: var(--fs-2xs); color: var(--danger); font-weight: var(--fw-h); font-variant-numeric: tabular-nums; }
+.lm-break-list { list-style: none; margin: 0; padding: 0; }
+.lm-break-row {
+  display: flex; align-items: baseline; gap: var(--sp-2); width: 100%;
+  padding: 6px var(--sp-2); border: none; background: none; cursor: pointer;
+  border-radius: var(--r-ctl); text-align: left; font-family: var(--font);
+  font-size: var(--fs-2xs); border-left: 2px solid var(--danger-line);
+  transition: background var(--d-fast) var(--ease-out);
+}
+.lm-break-row:hover { background: var(--danger-bg); }
+.lm-break-sheet { flex: 1; min-width: 0; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lm-break-ref { flex: none; font-family: var(--mono); color: var(--brand); }
+.lm-break-n { flex: none; color: var(--danger); font-variant-numeric: tabular-nums; }
+.lm-break-hint { margin: 0; font-size: var(--fs-2xs); color: var(--text-3); line-height: 1.6; }
