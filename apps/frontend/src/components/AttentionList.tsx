@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { ScanIssue } from "../api-agent";
 import { hotspots, bySheet, shortMoney } from "../lib/issues";
+import { IconShield, IconChart } from "./icons";
 
 /**
  * AttentionList —— 「该查什么」的清单。
@@ -61,6 +62,11 @@ export default function AttentionList({ issues, onOpen }: {
               return (
                 <li key={s.name} className="att-item">
                   <button className="att-row" onClick={() => setOpenName(open ? null : s.name)}>
+                    {/* 图标列：macOS 侧栏每行都有图标，它给行一个"类别"的锚点。
+                        这里用颜色区分严重度——差得多的行图标是暖色。 */}
+                    <span className={`att-ic${s.gap !== undefined && s.gap >= 10000 ? " hot" : ""}`}>
+                      <IconChart size={14} />
+                    </span>
                     <span className="att-name">{s.name}</span>
                     <span className="att-cnt" title={`在 ${s.sheets.length} 张表里共 ${s.count} 处对不上`}>
                       {s.count} 处
@@ -110,6 +116,7 @@ export default function AttentionList({ issues, onOpen }: {
               return (
                 <li key={kind} className="att-item">
                   <button className="att-row" onClick={() => onOpen(first)}>
+                    <span className="att-ic bad"><IconShield size={14} /></span>
                     <span className="att-name">{kindLabel(kind)}</span>
                     <span className="att-cnt">{n} 处</span>
                     <span className="cr-caret">›</span>

@@ -782,6 +782,11 @@
 }
 .att-row:hover { background: var(--sidebar-sel); }
 /* 铺位名 = 主信息，用等宽（它是财务嘴里的"那个铺位"） */
+/* 图标列：给每行一个类别锚点（macOS 侧栏的通行做法）。
+   颜色区分严重度：差额 ≥1 万的行图标是暖色，其余中性。 */
+.att-ic { flex: none; display: grid; place-items: center; width: 18px; height: 18px; color: var(--text-3); }
+.att-ic.hot { color: var(--warn); }
+.att-ic.bad { color: var(--danger); }
 .att-name {
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-family: var(--mono); font-size: var(--fs-xs); font-weight: var(--fw-h); color: var(--ink);
