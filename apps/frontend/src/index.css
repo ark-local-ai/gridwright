@@ -218,12 +218,21 @@ button { font-family: inherit; cursor: pointer; }
 .sk-cell-narrow { flex: 0 0 46px; }
 .sk-table-head .sk-cell { height: 32px; }
 
-/* ---------- ② 入场编排：淡入 + 轻微上移，错开递进 ---------- */
+/* ---------- ② 入场编排：淡入 + 轻微上移，错开递进 ----------
+   ⚠️ 大容器（占满视口高度的栏）**只做透明度、不做位移**。
+   踩过的坑：给两栏（各 790px 高、几乎铺满屏幕）加 translateY + fill-mode both，
+   在真实渲染里会让整块内容不进合成帧——截图量到墨迹从 3.57% 掉到 0.30%，
+   也就是"整页空白"。位移只留给小块内容，大块用纯淡入（这也是极简克制风
+   本身的要求：极柔的淡入，尽量少的位移）。 */
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes rise-in {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }
 }
-.rise { animation: rise-in var(--d-slow) var(--ease-out) both; }
+/* .rise = 大容器/整栏：纯淡入（安全） */
+.rise { animation: fade-in var(--d-slow) var(--ease-out) both; }
+/* .rise-sm = 小块内容（卡片、分组、列表）：可以有轻微位移 */
+.rise-sm { animation: rise-in var(--d-slow) var(--ease-out) both; }
 /* 错开：只递进 4 档（再多就等得久，反而显慢），每档 40ms */
 .rise-1 { animation-delay: 40ms; }
 .rise-2 { animation-delay: 80ms; }
@@ -427,7 +436,7 @@ button { font-family: inherit; cursor: pointer; }
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
   /* 编排动效在降级时**必须清掉 delay 和初始位移**——否则元素会先卡在
      "透明且下移 8px"的状态等完 delay 才出现，比不动更糟。 */
-  .rise, .rise-1, .rise-2, .rise-3, .rise-4, .pop-spring {
+  .rise, .rise-sm, .rise-1, .rise-2, .rise-3, .rise-4, .pop-spring {
     animation-delay: 0ms !important; opacity: 1 !important; transform: none !important;
   }
   /* 骨架屏是"加载状态"的语义，不能变成一块静止的灰——降级时改为静态底色 */
