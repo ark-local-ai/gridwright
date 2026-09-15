@@ -26,7 +26,7 @@ ark/
 │  ├─ desktop/           # 桌面版（Tauri 2）· 复用 frontend 界面 ✅ 已实现
 │  └─ backend/           # 后端 API / Agent 编排 · 规划中
 ├─ docs/                  # 全部规格 / 计划 / 日志文档（本地，不提交）
-├─ screenshots/           # 界面效果展示图（README 引用）
+├─ assets/diagrams/       # README 引用的工程图（SVG，脚本生成）
 ├─ ARCHITECTURE.md        # 本文档
 ├─ README.md              # 仓库入口说明
 ├─ CONTRIBUTING.md        # 协作约定

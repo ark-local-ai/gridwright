@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="430" viewBox="0 0 1000 430" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">
+<rect width="1000" height="430" fill="#fbfcfd"/>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f5d8a"/></marker></defs>
+<text x="40" y="44" font-size="16" fill="#141821" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">一次改表：规则能定的短路，定不了的才问模型；你确认才写</text>
+<rect x="40" y="66" width="440" height="74" rx="10" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<text x="58" y="90" font-size="12.5" fill="#21805f" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">规则命中 → 直接算，不花 token</text>
+<text x="58" y="109" font-size="11" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">rules.yaml 里 when/then 齐全的规则</text>
+<text x="58" y="126" font-size="10.5" fill="#5f6a7a" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">可复现 · 离线可用 · 毫秒级</text>
+<rect x="520" y="66" width="440" height="74" rx="10" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<text x="538" y="90" font-size="12.5" fill="#2f5d8a" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">规则定不了 → 问模型（只做这一件事）</text>
+<text x="538" y="109" font-size="11" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">「听懂你要改什么」→ 结构化编辑指令</text>
+<text x="538" y="126" font-size="10.5" fill="#5f6a7a" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">算、定位、影响面一律不由模型决定</text>
+<rect x="40" y="168" width="232" height="62" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<text x="56" y="193" font-size="12.5" fill="#141821" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">读懂输入</text>
+<text x="56" y="213" font-size="10.5" fill="#5f6a7a" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">inbox / 一句话</text>
+<line x1="273" y1="199.0" x2="287" y2="199.0" stroke="#2f5d8a" stroke-width="1.3" marker-end="url(#ah)"/>
+<rect x="288" y="168" width="232" height="62" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<text x="304" y="193" font-size="12.5" fill="#141821" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">定位到格</text>
+<text x="304" y="213" font-size="10.5" fill="#5f6a7a" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">语义坐标 → 具体格子</text>
+<line x1="521" y1="199.0" x2="535" y2="199.0" stroke="#2f5d8a" stroke-width="1.3" marker-end="url(#ah)"/>
+<rect x="536" y="168" width="232" height="62" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<text x="552" y="193" font-size="12.5" fill="#141821" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">算出清单</text>
+<text x="552" y="213" font-size="10.5" fill="#5f6a7a" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">改哪格 · 旧值→新值</text>
+<line x1="769" y1="199.0" x2="783" y2="199.0" stroke="#2f5d8a" stroke-width="1.3" marker-end="url(#ah)"/>
+<rect x="784" y="168" width="232" height="62" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<text x="800" y="193" font-size="12.5" fill="#141821" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">影响面</text>
+<text x="800" y="213" font-size="10.5" fill="#5f6a7a" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">会牵动哪些表</text>
+<rect x="40" y="268" width="232" height="62" rx="8" fill="#fbf2e2" stroke="#9a5f0d" stroke-width="1.5"/>
+<text x="56" y="293" font-size="12.5" fill="#9a5f0d" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">你确认</text>
+<text x="56" y="313" font-size="10.5" fill="#5f6a7a" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">确认才写</text>
+<line x1="273" y1="299.0" x2="287" y2="299.0" stroke="#2f5d8a" stroke-width="1.3" marker-end="url(#ah)"/>
+<rect x="288" y="268" width="232" height="62" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<text x="304" y="293" font-size="12.5" fill="#141821" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">备份 + 写回</text>
+<text x="304" y="313" font-size="10.5" fill="#5f6a7a" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">改动前先备份</text>
+<line x1="521" y1="299.0" x2="535" y2="299.0" stroke="#2f5d8a" stroke-width="1.3" marker-end="url(#ah)"/>
+<rect x="536" y="268" width="232" height="62" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<text x="552" y="293" font-size="12.5" fill="#141821" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">记账</text>
+<text x="552" y="313" font-size="10.5" fill="#5f6a7a" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">每格一行，含旧值</text>
+<line x1="769" y1="299.0" x2="783" y2="299.0" stroke="#2f5d8a" stroke-width="1.3" marker-end="url(#ah)"/>
+<rect x="784" y="268" width="232" height="62" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<text x="800" y="293" font-size="12.5" fill="#141821" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">自检</text>
+<text x="800" y="313" font-size="10.5" fill="#5f6a7a" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">只查相关表</text>
+<polyline points="900.0,230 900.0,252 22,252 22,299.0 39,299.0" fill="none" stroke="#2f5d8a" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#ah)"/>
+<text x="40" y="368" font-size="11.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">回滚：账目里存着旧值，随时倒回去；回滚本身也记账，所以能再倒回来（=重做）</text>
+<text x="40" y="390" font-size="11.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">护栏：含宏的表硬拒绝（写回会丢宏）；动到禁止列的那一条被拦下并说明原因</text>
+</svg>

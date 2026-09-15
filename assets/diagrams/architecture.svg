@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="490" viewBox="0 0 980 490" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">
+<rect width="980" height="490" fill="#fbfcfd"/>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f5d8a"/></marker></defs>
+<text x="40" y="44" font-size="16" fill="#141821" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">组成：一份 API + 一个 Go 引擎 + 两种外壳（界面只是引擎的视图）</text>
+<text x="40" y="78" font-size="12" fill="#5f6a7a" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif" letter-spacing="0.08em">外壳</text>
+<rect x="100" y="66" width="300" height="46" rx="10" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<text x="116" y="86" font-size="12.5" fill="#141821" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">桌面客户端（Tauri 2）</text>
+<text x="116" y="103" font-size="11" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">有窗口 · 引擎随包 · 双击即用</text>
+<rect x="430" y="66" width="250" height="46" rx="10" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<text x="446" y="86" font-size="12.5" fill="#141821" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">网页（官网 only）</text>
+<text x="446" y="103" font-size="11" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">落地页 + 下载入口</text>
+<rect x="710" y="66" width="230" height="46" rx="10" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<text x="726" y="86" font-size="12.5" fill="#141821" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">免安装单文件</text>
+<text x="726" y="103" font-size="11" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">界面已内嵌 exe</text>
+<text x="40" y="152" font-size="12" fill="#5f6a7a" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif" letter-spacing="0.08em">引擎（唯一业务实现）</text>
+<rect x="100" y="140" width="840" height="200" rx="12" fill="#f4f6f9" stroke="#d3dae4" stroke-width="1"/>
+<text x="118" y="166" font-size="12.5" fill="#2f5d8a" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">Go 引擎 · 本地 HTTP API 127.0.0.1:7700</text>
+<rect x="118" y="182" width="192" height="66" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<rect x="118" y="182" width="3" height="66" rx="2" fill="#2f5d8a" stroke="#2f5d8a" stroke-width="1"/>
+<text x="132" y="206" font-size="11.5" fill="#2f5d8a" font-weight="600" text-anchor="start" font-family="'Cascadia Mono','Consolas','SF Mono',monospace">graph / locate</text>
+<text x="132" y="224" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">表结构图</text>
+<text x="132" y="238" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">语义坐标定位</text>
+<rect x="326" y="182" width="192" height="66" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<rect x="326" y="182" width="3" height="66" rx="2" fill="#21805f" stroke="#21805f" stroke-width="1"/>
+<text x="340" y="206" font-size="11.5" fill="#21805f" font-weight="600" text-anchor="start" font-family="'Cascadia Mono','Consolas','SF Mono',monospace">scan</text>
+<text x="340" y="224" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">只读体检</text>
+<text x="340" y="238" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">跨表一致性</text>
+<rect x="534" y="182" width="192" height="66" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<rect x="534" y="182" width="3" height="66" rx="2" fill="#a55a2b" stroke="#a55a2b" stroke-width="1"/>
+<text x="548" y="206" font-size="11.5" fill="#a55a2b" font-weight="600" text-anchor="start" font-family="'Cascadia Mono','Consolas','SF Mono',monospace">rules</text>
+<text x="548" y="224" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">规则引擎</text>
+<text x="548" y="238" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">命中短路</text>
+<rect x="742" y="182" width="192" height="66" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<rect x="742" y="182" width="3" height="66" rx="2" fill="#6b4a7a" stroke="#6b4a7a" stroke-width="1"/>
+<text x="756" y="206" font-size="11.5" fill="#6b4a7a" font-weight="600" text-anchor="start" font-family="'Cascadia Mono','Consolas','SF Mono',monospace">propose / rollback</text>
+<text x="756" y="224" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">确认制改表</text>
+<text x="756" y="238" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">可回滚</text>
+<rect x="118" y="260" width="192" height="66" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<rect x="118" y="260" width="3" height="66" rx="2" fill="#0d7f8b" stroke="#0d7f8b" stroke-width="1"/>
+<text x="132" y="284" font-size="11.5" fill="#0d7f8b" font-weight="600" text-anchor="start" font-family="'Cascadia Mono','Consolas','SF Mono',monospace">ledger</text>
+<text x="132" y="302" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">账目</text>
+<text x="132" y="316" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">每格含旧值</text>
+<rect x="326" y="260" width="192" height="66" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<rect x="326" y="260" width="3" height="66" rx="2" fill="#64748b" stroke="#64748b" stroke-width="1"/>
+<text x="340" y="284" font-size="11.5" fill="#64748b" font-weight="600" text-anchor="start" font-family="'Cascadia Mono','Consolas','SF Mono',monospace">safety</text>
+<text x="340" y="302" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">含宏=硬拒绝</text>
+<text x="340" y="316" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">不毁表</text>
+<rect x="534" y="260" width="192" height="66" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<rect x="534" y="260" width="3" height="66" rx="2" fill="#6b7a2b" stroke="#6b7a2b" stroke-width="1"/>
+<text x="548" y="284" font-size="11.5" fill="#6b7a2b" font-weight="600" text-anchor="start" font-family="'Cascadia Mono','Consolas','SF Mono',monospace">impact / selfcheck</text>
+<text x="548" y="302" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">影响面</text>
+<text x="548" y="316" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">改动后自检</text>
+<rect x="742" y="260" width="192" height="66" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<rect x="742" y="260" width="3" height="66" rx="2" fill="#a34d63" stroke="#a34d63" stroke-width="1"/>
+<text x="756" y="284" font-size="11.5" fill="#a34d63" font-weight="600" text-anchor="start" font-family="'Cascadia Mono','Consolas','SF Mono',monospace">memory / weight</text>
+<text x="756" y="302" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">长期记忆</text>
+<text x="756" y="316" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">表权重</text>
+<text x="40" y="378" font-size="12" fill="#5f6a7a" font-weight="600" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif" letter-spacing="0.08em">工作区 = 一个文件夹（数据都在这里，不出本机）</text>
+<rect x="100" y="394" width="156" height="46" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<text x="112" y="414" font-size="11.5" fill="#141821" font-weight="600" text-anchor="start" font-family="'Cascadia Mono','Consolas','SF Mono',monospace">*.xlsx</text>
+<text x="112" y="430" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">被看管的表</text>
+<rect x="270" y="394" width="156" height="46" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<text x="282" y="414" font-size="11.5" fill="#141821" font-weight="600" text-anchor="start" font-family="'Cascadia Mono','Consolas','SF Mono',monospace">inbox/</text>
+<text x="282" y="430" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">新数据 → done/</text>
+<rect x="440" y="394" width="156" height="46" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<text x="452" y="414" font-size="11.5" fill="#141821" font-weight="600" text-anchor="start" font-family="'Cascadia Mono','Consolas','SF Mono',monospace">rules.yaml</text>
+<text x="452" y="430" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">规矩</text>
+<rect x="610" y="394" width="156" height="46" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<text x="622" y="414" font-size="11.5" fill="#141821" font-weight="600" text-anchor="start" font-family="'Cascadia Mono','Consolas','SF Mono',monospace">ledger.csv</text>
+<text x="622" y="430" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">账目</text>
+<rect x="780" y="394" width="156" height="46" rx="8" fill="#ffffff" stroke="#e9edf2" stroke-width="1"/>
+<text x="792" y="414" font-size="11.5" fill="#141821" font-weight="600" text-anchor="start" font-family="'Cascadia Mono','Consolas','SF Mono',monospace">生成/</text>
+<text x="792" y="430" font-size="10.5" fill="#5a6472" font-weight="400" text-anchor="start" font-family="'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif">草稿，不动原表</text>
+</svg>
