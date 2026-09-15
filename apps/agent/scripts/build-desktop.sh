@@ -6,8 +6,9 @@
 #
 # 它做什么：
 #   1) 编译 Go 引擎，放到 Tauri 的 sidecar 目录（应用启动时随包拉起）
-#   2) 编译前端（工作台界面）
-#   3) cargo tauri build → NSIS 安装包（把上面的引擎一起装进去）
+#   2) 重画安装界面品牌图（颜色跟着品牌令牌走，避免手工图悄悄过期）
+#   3) 编译前端（工作台界面）
+#   4) cargo tauri build → NSIS 安装包（把上面的引擎一起装进去）
 #
 # 用法：
 #   bash apps/agent/scripts/build-desktop.sh
@@ -25,7 +26,7 @@ SIDECAR_DIR="$DESKTOP/src-tauri/binaries"
 # externalBin: ["binaries/gridwright"] 对应。
 TARGET_TRIPLE="x86_64-pc-windows-msvc"
 
-echo "==> 1/3 编译 Go 引擎 → sidecar"
+echo "==> 1/4 编译 Go 引擎 → sidecar"
 cd "$AGENT"
 mkdir -p "$SIDECAR_DIR"
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
@@ -33,7 +34,16 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
   -o "$SIDECAR_DIR/gridwright-$TARGET_TRIPLE.exe" ./cmd/gridwright
 ls -lh "$SIDECAR_DIR/gridwright-$TARGET_TRIPLE.exe"
 
-echo "==> 2/3 编译前端（界面）"
+echo "==> 2/4 重画安装界面品牌图"
+# 由脚本产出而非手工放图：颜色是品牌令牌的副本，重画才跟得上调色。
+# 缺 Python/Pillow 时跳过（已提交的图仍在，安装包照出）。
+if command -v python >/dev/null 2>&1 && python -c "import PIL" >/dev/null 2>&1; then
+  python "$DESKTOP/scripts/gen_installer_art.py"
+else
+  echo "    跳过（需要 python + Pillow）；沿用仓库里已提交的图"
+fi
+
+echo "==> 3/4 编译前端（界面）"
 cd "$DESKTOP"
 if [ ! -d node_modules ]; then
   echo "    npm install ..."
@@ -41,7 +51,7 @@ if [ ! -d node_modules ]; then
 fi
 npm run build
 
-echo "==> 3/3 cargo tauri build（NSIS 安装包）"
+echo "==> 4/4 cargo tauri build（NSIS 安装包）"
 cd "$DESKTOP"
 npx tauri build --bundles nsis
 
