@@ -14,6 +14,12 @@ import (
 
 func newTestServerWithRegistry(t *testing.T) (*Server, string) {
 	t.Helper()
+	// 关键：把用户配置目录指到临时目录再构造服务端。
+	// 否则 PUT /api/v1/settings（见 TestSettingsGetPut）会 Save 到开发机真实的
+	// %APPDATA%\gridwright\config.yaml —— 跑一次测试就把使用者的工作区和密钥
+	// 覆盖成测试值（实测发生过：workspace 变成 Temp\TestSettingsGetPut…、
+	// 密钥变成 sk-test）。
+	t.Setenv("GRIDWRIGHT_CONFIG_DIR", t.TempDir())
 	dir := t.TempDir()
 	layout, err := workspace.LayoutOf(dir)
 	if err != nil {
