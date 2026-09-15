@@ -745,3 +745,69 @@
 .bd-bar.bad  { background: var(--danger); }
 .bd-bar.none { background: var(--surface-3); }
 .bd-axis { display: flex; justify-content: space-between; font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+/* =====================================================================
+   待查清单（AttentionList）—— 只放"跨表才能得出"的结论
+   财务真正要的是"哪个铺位错了、错多少"，不是"多少条问题"。
+   ===================================================================== */
+.att { display: flex; flex-direction: column; gap: var(--sp-4); }
+.att-sec { display: flex; flex-direction: column; gap: var(--sp-2); }
+.att-h { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
+.att-h > span:first-child {
+  font-size: var(--fs-2xs); font-weight: var(--fw-h); color: var(--text-2);
+  letter-spacing: var(--ls-label);
+}
+.att-n { font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.att-n.warn { color: var(--warn); font-weight: var(--fw-h); }
+
+/* 哪个月集中出错：一排小chip，把"那个月有问题"直接说出来 */
+.att-load { display: flex; flex-wrap: wrap; gap: 4px; }
+.att-load-i {
+  display: inline-flex; align-items: baseline; gap: 4px;
+  padding: 1px 7px; border-radius: var(--r-full);
+  background: var(--warn-bg); color: var(--warn);
+  font-size: var(--fs-2xs);
+}
+.att-load-i b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.att-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.att-item { display: flex; flex-direction: column; }
+.att-row {
+  display: flex; align-items: center; gap: var(--sp-2); width: 100%;
+  padding: 7px var(--sp-2); border: none; background: none; cursor: pointer;
+  border-radius: var(--r-ctl); text-align: left; font-family: var(--font);
+  border-left: 2px solid transparent;
+  transition: background var(--d-fast) var(--ease-out);
+}
+.att-row:hover { background: var(--surface-2); }
+/* 铺位名 = 主信息，用等宽（它是财务嘴里的"那个铺位"） */
+.att-name {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--mono); font-size: var(--fs-xs); font-weight: var(--fw-h); color: var(--ink);
+}
+.att-cnt { flex: none; font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+/* 差额：最要命的数字，用暖色标出（钱少了） */
+.att-gap {
+  flex: none; font-size: var(--fs-2xs); color: var(--warn); font-weight: var(--fw-h);
+  font-variant-numeric: tabular-nums;
+}
+/* 展开的每一处：月份 + 坐标 + 说明，坐标可点跳到表里 */
+.att-sub { list-style: none; margin: 0; padding: 0 0 0 18px; position: relative; }
+.att-sub::before {
+  content: ""; position: absolute; left: 8px; top: 2px; bottom: 2px;
+  width: 1px; background: var(--line);
+}
+.att-sub-row {
+  display: flex; align-items: baseline; gap: var(--sp-2); width: 100%;
+  padding: 4px 6px; border: none; background: none; cursor: pointer;
+  border-radius: var(--r-ctl); text-align: left; font-family: var(--font);
+  font-size: var(--fs-2xs); color: var(--text-2);
+}
+.att-sub-row:hover { background: var(--surface-2); color: var(--text-1); }
+.att-sub-sheet { flex: none; color: var(--text-3); }
+.att-sub-ref {
+  flex: none; font-family: var(--mono); color: var(--brand);
+  font-variant-numeric: tabular-nums;
+}
+.att-sub-msg { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.att-more { font-size: var(--fs-2xs); color: var(--text-3); margin: 2px 0 0; }

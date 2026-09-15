@@ -5,7 +5,7 @@ import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, She
 import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark, IconClock } from "../components/icons";
 import SheetThumb from "../components/SheetThumb";
 import WeightBar from "../components/WeightBar";
-import LedgerBoard from "../components/LedgerBoard";
+import AttentionList from "../components/AttentionList";
 import SheetView from "./SheetView";
 import { SkPanel } from "../components/Skeleton";
 import { useChanged } from "../lib/useChanged";
@@ -256,9 +256,11 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
       <div className="dash-body">
         {/* 左：联动摘要（按文件分组） */}
         <section className="dash-left rise">
-          {/* 账目展示台：先答"账怎么样"（收租率/应收/实收/走势），
-              再答"有哪些表"。以前只有后者，最该看的数字全躺着没人看。 */}
-          <LedgerBoard shapes={shapes} onOpen={(sheet, file) => setOpened({ sheet, file })} />
+          {/* 待查清单：先答"该查什么"。收租率那种单表汇总 Excel 自己做得了，
+              这里只放**跨表才能得出**的结论——同一个铺位在 13 张月表里对不上。 */}
+          <h3 className="dash-h">该查什么</h3>
+          <p className="dash-sub">跨月才对得出来的问题，点开可跳到那一格</p>
+          <AttentionList issues={issues} onOpen={(it) => setOpened({ sheet: it.sheet, file: it.file, ref: it.ref })} />
 
           <h3 className="dash-h dash-h-links">表的联动</h3>
           <p className="dash-sub">点表看它牵动到谁</p>
