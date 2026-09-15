@@ -1,6 +1,6 @@
 [package]
 name = "gridwright-desktop"
-version = "0.1.2"
+version = "0.1.3"
 description = "gridwright 桌面版 — 本地数据管家：盯表、按规矩改表、每格改动留账"
 edition = "2021"
 
