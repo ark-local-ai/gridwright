@@ -176,6 +176,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/ledger", s.handleLedger)
 	mux.HandleFunc("/api/v1/sheets", s.handleListSheets)
 	mux.HandleFunc("/api/v1/sheets/preview", s.handleSheetPreview)
+	mux.HandleFunc("/api/v1/sheets/shapes", s.handleSheetShapes)
 	mux.HandleFunc("/api/v1/health", s.handleHealth)
 
 	// 界面：把前端产物嵌进二进制（Win7/8 单文件版靠它自带界面，无需 WebView2）。

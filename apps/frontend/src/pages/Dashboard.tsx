@@ -1,8 +1,9 @@
 import { useEffect, useCallback, useState } from "react";
 import "./dashboard.css";
 import { agentApi, nodeId } from "../api-agent";
-import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, WorkspaceListItem, Proposal, WeightScore, ScanIssue, SafetyReport, SelfCheckReport } from "../api-agent";
+import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, SheetShape, WorkspaceListItem, Proposal, WeightScore, ScanIssue, SafetyReport, SelfCheckReport } from "../api-agent";
 import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark, IconClock } from "../components/icons";
+import SheetThumb from "../components/SheetThumb";
 import SheetView from "./SheetView";
 import { SkPanel } from "../components/Skeleton";
 import { useChanged } from "../lib/useChanged";
@@ -25,6 +26,8 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   const [wsPath, setWsPath] = useState("");
   const [chosen, setChosen] = useState(true); // 是否显式选过工作区
   const [files, setFiles] = useState<WorkspaceFiles | null>(null);
+  // 每张表的"形状"（行/列/公式数）——左栏缩略图用。key = "文件!工作表"
+  const [shapes, setShapes] = useState<Record<string, SheetShape>>({});
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [weights, setWeights] = useState<Record<string, WeightScore>>({});
   const [weightsNote, setWeightsNote] = useState("");
@@ -68,6 +71,12 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
         agentApi.weights().catch(() => null),
       ]);
       setFiles(f);
+      // 表的形状：给左栏缩略图。和主数据并行拉，失败也不影响看板（缩略图画成空骨架）
+      agentApi.sheetShapes().then((r) => {
+        const m: Record<string, SheetShape> = {};
+        for (const sp of r.shapes ?? []) m[`${sp.file}!${sp.sheet}`] = sp;
+        setShapes(m);
+      }).catch(() => setShapes({}));
       setGraph(g);
       setScan(s?.report ?? null);
       setCounts({ error: s?.errors ?? 0, warn: s?.warns ?? 0 });
@@ -247,6 +256,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
                   key={grp.file}
                   grp={grp}
                   weights={weights}
+                  shapes={shapes}
                   active={active}
                   hot={hot}
                   onPick={(n) => void pickNode(n)}
@@ -489,27 +499,31 @@ function seriesKey(sheet: string): string {
   return sheet.replace(/\d+/g, "#").replace(/\s+/g, "");
 }
 
-function SheetGroup({ grp, weights, active, hot, onPick }: {
+function SheetGroup({ grp, weights, shapes, active, hot, onPick }: {
   grp: Group;
   weights: Record<string, WeightScore>;
+  shapes: Record<string, SheetShape>;
   active: GraphNode | null;
   hot: Set<string>;
   onPick: (n: GraphNode) => void;
 }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  // 默认收起：读之前不该先把 24 行标题全铺出来（那是"还没读就占屏"）。
+  // 形状数据到位（=读完了）才渲染列表——这形成你要的"读取后才展开"。
+  const loaded = Object.keys(shapes).length > 0;
 
-  // 把同"系列"的收成一组（如 2026年9月租金 / 2026年10月租金 → 「租金（日）」系列 12 张）
-  const series: { key: string; label: string; items: GraphNode[] }[] = [];
+  const shapeOf = (n: GraphNode) => shapes[`${grp.file}!${n.sheet}`];
+
+  // 把同"系列"的收成一组（如 2026年9月租金 → 「租金（日）」系列 13 张）
   const byKey = new Map<string, GraphNode[]>();
   for (const n of grp.items) {
     const k = seriesKey(n.sheet);
     if (!byKey.has(k)) byKey.set(k, []);
     byKey.get(k)!.push(n);
   }
-  for (const [k, items] of byKey) {
-    series.push({ key: k, label: seriesLabel(items[0].sheet), items });
-  }
-  // 张数多的系列排前面（它们是这块的主体）
+  const series = [...byKey.entries()].map(([key, items]) => ({
+    key, label: seriesLabel(items[0].sheet), items,
+  }));
   series.sort((a, b) => b.items.length - a.items.length);
 
   return (
@@ -517,60 +531,89 @@ function SheetGroup({ grp, weights, active, hot, onPick }: {
       <div className="cg-file">
         <IconXls size={12} />
         <span>{grp.file}</span>
+        <span className="cg-n">{series.length} 类 · {grp.items.length} 张</span>
       </div>
-      <ul className="chain-list">
-        {series.map((sr) => {
-          const single = sr.items.length === 1;
-          const open = expanded[sr.key] ?? false;
-          const shown = single || open ? sr.items : sr.items.slice(0, 1);
-          const hidden = sr.items.length - shown.length;
-          return (
-            <li key={sr.key}>
-              {shown.map((n) => {
-                const id = nodeId(n);
-                const isActive = active && nodeId(active) === id;
-                const isHot = hot.has(id);
-                const w = weights[id];
-                return (
-                  <button
-                    key={id}
-                    className={`chain-row${isHot ? " hot" : ""}${isActive ? " on" : ""}`}
-                    onClick={() => onPick(n)}
-                    title={`${n.file}!${n.sheet}${w ? " ｜ " + w.reasons.join(" · ") : ""}`}
-                  >
-                    <span className="cr-name">{single ? shortName(n.sheet) : shortName(n.sheet)}</span>
-                    {/* 参考信息一律中性色，不用蓝 —— 蓝只留给"要你动"。
-                        如实说明：refs 是"引用它的公式处数"，不是"几张表"
-                        （曾经标成"被引用 114"而被误读为 114 张表）。 */}
-                    {w && w.inDegree > 0 && (
-                      <span className="cr-count" title={`${w.inDegree} 张表引用了它，共 ${grp.refs[id]} 处公式`}>
-                        {w.inDegree} 表引用
-                      </span>
-                    )}
-                    {w && w.master && <span className="cr-tag">主数据</span>}
-                    {w && w.attention >= 0.5 && (
-                      <span className="cr-weight" title={`注意力 ${w.attention.toFixed(2)}（${w.reasons.join(" · ")}）`}>
-                        {Math.round(w.attention * 100)}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-              {!single && !open && (
-                <button className="chain-more" onClick={() => setExpanded((e) => ({ ...e, [sr.key]: true }))}
-                  title={sr.items.map((x) => x.sheet).join("、")}>
-                  同系列另有 {hidden} 张，展开看看
+
+      {/* 读之前：一行骨架，不铺标题（"读取后才展开"） */}
+      {!loaded && (
+        <div className="cg-skel" aria-label="正在读表的形状" role="status">
+          <SkPanel rows={4} />
+        </div>
+      )}
+
+      {loaded && (
+        <ul className="chain-list">
+          {series.map((sr) => {
+            const single = sr.items.length === 1;
+            // 单张表直接就是一行；多张表默认只露"最新一期"，避免 13 行同名
+            const open = expanded[sr.key] ?? false;
+            const head = sr.items[0];
+            const headActive = active && nodeId(active) === nodeId(head);
+            const headHot = hot.has(nodeId(head));
+            const w = weights[nodeId(head)];
+            return (
+              <li key={sr.key} className="cr-series">
+                <button
+                  className={`chain-row series-head${headHot ? " hot" : ""}${single && headActive ? " on" : ""}`}
+                  onClick={() => {
+                    if (single) onPick(head);
+                    else setExpanded((e) => ({ ...e, [sr.key]: !open }));
+                  }}
+                  title={single ? head.sheet : sr.items.map((x) => x.sheet).join("、")}
+                >
+                  <SheetThumb shape={shapeOf(head)} active={single && !!headActive}
+                    tone={w?.master ? "master" : undefined} />
+                  <span className="cr-body">
+                    <span className="cr-name">{sr.label}</span>
+                    <span className="cr-sub">
+                      {single ? shortName(head.sheet) : `${sr.items.length} 张 · 最近 ${shortName(head.sheet)}`}
+                    </span>
+                  </span>
+                  {w && w.inDegree > 0 && (
+                    <span className="cr-count" title={`${w.inDegree} 张表引用了它，共 ${grp.refs[nodeId(head)]} 处公式`}>
+                      {w.inDegree} 表引用
+                    </span>
+                  )}
+                  {w && w.master && <span className="cr-tag">主数据</span>}
+                  {!single && <span className={`cr-caret${open ? " open" : ""}`}>›</span>}
                 </button>
-              )}
-              {!single && open && (
-                <button className="chain-more" onClick={() => setExpanded((e) => ({ ...e, [sr.key]: false }))}>
-                  收起
-                </button>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+
+                {/* 展开后的各期：每期也带自己的缩略图（同系列形状相近，但行数会差） */}
+                {!single && open && (
+                  <ul className="cr-sub-list">
+                    {sr.items.map((n) => {
+                      const id = nodeId(n);
+                      const isActive = active && nodeId(active) === id;
+                      const isHot = hot.has(id);
+                      const wn = weights[id];
+                      return (
+                        <li key={id}>
+                          <button
+                            className={`chain-row sub${isHot ? " hot" : ""}${isActive ? " on" : ""}`}
+                            onClick={() => onPick(n)}
+                            title={`${n.file}!${n.sheet}${wn ? " ｜ " + wn.reasons.join(" · ") : ""}`}
+                          >
+                            <SheetThumb shape={shapeOf(n)} active={!!isActive} />
+                            <span className="cr-body">
+                              <span className="cr-name">{shortName(n.sheet)}</span>
+                              {shapeOf(n) && (
+                                <span className="cr-sub">
+                                  {shapeOf(n)!.rows} 行 · {shapeOf(n)!.cols} 列
+                                  {shapeOf(n)!.formulas > 0 && ` · ${shapeOf(n)!.formulas} 公式`}
+                                </span>
+                              )}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

@@ -159,6 +159,15 @@ export interface SheetPreview {
   note?: string;
 }
 
+/** 一张表的"形状"（行/列/公式数）——画微缩缩略图用。 */
+export interface SheetShape {
+  sheet: string;
+  file: string;
+  rows: number;
+  cols: number;
+  formulas: number;
+}
+
 export interface WorkspaceListItem {
   path: string;
   name: string;
@@ -367,6 +376,11 @@ export const agentApi = {
   ledger: (limit = 50) => get<{ entries: LedgerEntry[]; limit: number }>(`/api/v1/ledger?limit=${limit}`),
   sheets: (file?: string) =>
     get<{ file: string; sheets: string[] }>(`/api/v1/sheets${file ? `?file=${encodeURIComponent(file)}` : ""}`),
+  // 批量取所有表的"形状"（行/列/公式数）——给左栏微缩缩略图用。
+  // 一次开文件拿全部，避免 24 张表打 24 次请求。
+  sheetShapes: (file?: string) =>
+    get<{ file: string; shapes: SheetShape[] }>(
+      `/api/v1/sheets/shapes${file ? `?file=${encodeURIComponent(file)}` : ""}`),
   preview: (sheet: string, file?: string, rows = 50) => {
     const q = new URLSearchParams({ sheet, rows: String(rows) });
     if (file) q.set("file", file);

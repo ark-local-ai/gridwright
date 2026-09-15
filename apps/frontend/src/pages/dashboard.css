@@ -128,6 +128,69 @@
    现在改成"一条列表"：层级靠字重/缩进/淡灰小字，不靠卡片和彩色徽标。 */
 .chain-groups { display: flex; flex-direction: column; gap: var(--sp-4); }
 .chain-group { display: flex; flex-direction: column; gap: var(--sp-1); }
+
+/* ===== 微缩缩略图（SheetThumb）=====
+   表本来就"有形状"：304×15 和 64×8 的轮廓完全不同。用形状认表比读名字快——
+   "2026年9月租金"和"2026年8月租金"读起来几乎一样，但格子密度一眼可辨。 */
+.sh-thumb {
+  flex: none; display: grid; gap: 1px; width: 46px; height: 26px;
+  padding: 2px; border-radius: 3px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.sh-thumb i { background: var(--text-3); opacity: .55; border-radius: 1px; min-height: 1px; }
+.sh-thumb i.off { background: transparent; opacity: 0; }
+/* 表头行更实：让人看出"这是一张有表头的表" */
+.sh-thumb i:not(.off):nth-child(-n+12) { opacity: .85; }
+.sh-thumb.master i { background: var(--brand); }
+.sh-thumb.on { box-shadow: inset 0 0 0 1px var(--brand), 0 0 0 3px var(--brand-soft); }
+.sh-thumb-empty i { background: var(--line-strong); opacity: .3; }
+
+/* ===== 左栏：系列行（缩略图 + 名称 + 副行）===== */
+.cg-n { margin-left: auto; font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.cg-skel { padding: var(--sp-2) 0; }
+
+.chain-list { list-style: none; margin: 0; padding: 0; }
+.cr-series { display: flex; flex-direction: column; }
+
+/* 行高从 24px 提到 38px：现在一行里有缩略图 + 两行文字，不再是纯文本条 */
+.chain-row {
+  display: flex; align-items: center; gap: var(--sp-2); width: 100%;
+  padding: 7px var(--sp-2); border: none; background: none; cursor: pointer;
+  border-radius: var(--r-ctl); text-align: left; font-family: var(--font);
+  border-left: 2px solid transparent; color: var(--text-1);
+  transition: background var(--d-fast) var(--ease-out);
+}
+.chain-row:hover { background: var(--surface-2); }
+.chain-row.on { background: var(--brand-soft); border-left-color: var(--brand); }
+.chain-row.on .cr-name { color: var(--brand); }
+.chain-row.hot { border-left-color: var(--live); }
+
+/* 文字块：名称在上、说明在下（两行才能塞下"13 张 · 最近 2026年9月"） */
+.cr-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.cr-name {
+  font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cr-sub {
+  font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.chain-row.series-head .cr-name { font-weight: var(--fw-h); }
+/* 展开箭头：多张表的系列才有 */
+.cr-caret {
+  flex: none; color: var(--text-3); font-size: 14px; line-height: 1;
+  transition: transform var(--d-fast) var(--ease-out);
+}
+.cr-caret.open { transform: rotate(90deg); }
+
+/* 展开的各期：缩进 + 左侧一条极淡的轴（"它们是同一系列下的"） */
+.cr-sub-list { list-style: none; margin: 0; padding: 0 0 0 18px; position: relative; }
+.cr-sub-list::before {
+  content: ""; position: absolute; left: 8px; top: 2px; bottom: 2px;
+  width: 1px; background: var(--line);
+}
+.chain-row.sub { padding-left: 6px; }
+.chain-row.sub .sh-thumb { width: 38px; height: 22px; }
 /* 文件名头：它是一组的分隔，弱化到"标签"级别（不跟表名争） */
 .cg-file {
   display: flex; align-items: center; gap: var(--sp-2);
@@ -137,32 +200,11 @@
 .cg-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cg-file svg { color: var(--text-3); flex: none; }
 
-.chain-list { list-style: none; margin: 0; padding: 0 0 0 var(--sp-1); display: flex; flex-direction: column; }
-.chain-list li { display: flex; flex-direction: column; align-items: stretch; }
-
-/* 一项 = 一行文字，不是卡片。左条只在"选中/被牵动"时出现（静态时留白）。 */
-.chain-row {
-  display: flex; align-items: baseline; gap: var(--sp-2); width: 100%;
-  padding: var(--sp-1) var(--sp-2); border: none; background: none; cursor: pointer;
-  border-radius: var(--r-ctl); text-align: left; font-family: var(--font);
-  font-size: var(--fs-xs); color: var(--text-1);
-  border-left: 2px solid transparent;
-  transition: background var(--d-fast) var(--ease-out), border-color var(--d-fast) var(--ease-out);
-}
-.chain-row:hover { background: var(--surface-2); }
-/* 选中/被牵动：**唯一用蓝的地方**（细左条，不是整块底色） */
-.chain-row.on { border-left-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
-.chain-row.hot { border-left-color: var(--live); }
-.cr-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 参考信息：中性淡灰，不用彩色徽标 */
 .cr-count { flex: none; font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
 .cr-tag {
   flex: none; font-size: var(--fs-2xs); color: var(--text-2);
   background: var(--surface-2); padding: 0 var(--sp-1); border-radius: var(--r-ctl);
-}
-.cr-weight {
-  flex: none; font-size: var(--fs-2xs); color: var(--text-3);
-  font-variant-numeric: tabular-nums;
 }
 
 /* 同系列折叠：默认只露一张，其余收起来 —— 24 张表里 20 张是月度同系列 */
@@ -389,12 +431,6 @@
 @media (max-width: 900px) {
   .dash-body { grid-template-columns: 1fr; }
   .dash-left { border-right: none; border-bottom: 1px solid var(--line); }
-}
-/* 权重徽标：注意力分（0-100）。只在高分节点上显示，避免满屏数字。 */
-.cn-weight {
-  flex: none; font-size: var(--fs-2xs); font-variant-numeric: tabular-nums;
-  color: var(--brand); background: var(--brand-soft);
-  padding: 0 var(--sp-1); border-radius: 999px; line-height: 16px;
 }
 /* 权重来源说明（如"还没积累使用数据，只按结构排序"） */
 .dash-weight-note { font-size: var(--fs-2xs); color: var(--text-2); margin: var(--sp-3) 0 0; line-height: 1.5; }
