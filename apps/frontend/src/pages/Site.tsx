@@ -50,13 +50,17 @@ export default function Site() {
         </div>
       </nav>
 
-      {/* Hero：主题特征物 = 新数据 → 决策 → 改表 → 记账/通知 的活体示意 */}
+      {/* Hero。
+          标题改过一次：原来是「你的表，有人替你看着」——那是句广告语，
+          读的人第一眼看不出**这是什么产品**（"表"是 Excel 还是别的？
+          "有人"是谁？）。现在先说清是什么（Excel 台账管家），
+          再说它做什么（盯、改、留账），最后才是那句价值主张。 */}
       <header className="site-hero">
         <div className="hero-copy">
-          <h1>你的表，<br />有人替你<em>看着</em></h1>
+          <h1>守 Excel 台账的<em>本地助手</em></h1>
           <p className="sub">
-            Gridwright 是跑在办公机上的数据管家：新数据一进 inbox，它按你定的规矩
-            自动改表 —— 每一格改动都留账目、能回滚、改完就通知你。
+            盯着你的台账文件夹：新数据一进来，按你定的规矩自动改表；
+            每一格改动都留账、能回滚、改完通知你。数据不出本机。
           </p>
           <div className="hero-cta">
             <a className="btn primary lg" href="#download">下载 Gridwright</a>
@@ -211,7 +215,7 @@ export default function Site() {
       </section>
 
       <footer className="site-foot">
-        <span>Gridwright — 你的表，有人替你看着</span>
+        <span>gridwright — 守 Excel 台账的本地助手</span>
         <span>Windows 桌面客户端 · 数据不出本机 · 免费开源</span>
       </footer>
     </div>
