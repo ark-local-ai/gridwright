@@ -158,7 +158,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
             <span className="ws-name">{wsName || "工作区"}</span>
             <IconChevD size={14} />
           </button>
-          {!brainReady && <span className="dash-offline" title="未配置模型：看表/体检可用，改表需先在设置里配">未配模型</span>}
+          {!brainReady && <span className="dash-offline" title="未配置模型：查看与体检可用；修改表格前需在设置中配置模型">未配模型</span>}
           {switcherOpen && (
             <WorkspaceSwitcher
               onPick={() => { setSwitcherOpen(false); void refresh(); }}
@@ -209,7 +209,7 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
           <header className="cd-head">
             <IconSpark size={14} />
             <b>对话</b>
-            <span className="cd-hint">说一句让它安排工作；它只建议，改表要你确认</span>
+            <span className="cd-hint">输入指令即可安排工作；系统仅提供建议，修改表格需经确认</span>
             <button className="cd-x" onClick={() => setChatOpen(false)} aria-label="关闭对话"><IconX size={14} /></button>
           </header>
           <div className="cd-body">
@@ -245,12 +245,13 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
             <span className={`dh-num${totalIssues === 0 ? " calm" : ""}`}>{totalIssues}</span>
             <div className="dh-copy">
               <span className="dh-lead">
-                {totalIssues === 0 ? "账目都对得上" : "处要你处理"}
+                {totalIssues === 0 ? "账目都对得上" : "处待核对"}
               </span>
+              {/* 一行之内"表"只指一种东西：工作簿说"个"，工作表说"张"，
+                  两边不再打架（曾出现"1 张表 · 15 张表已断开"的自相矛盾）。 */}
               <span className="dh-meta">
-                {tableCount} 张表
-                {spots.length > 0 && ` · ${spots.length} 个铺位`}
-                {lh && lh.isolated > 0 && ` · ${lh.isolated} 张表已断开`}
+                {tableCount > 0 && `${tableCount} 个工作簿${graph && graph.nodes.length > 0 ? ` · ${graph.nodes.length} 张工作表` : ""}`}
+                {spots.length > 0 && ` · ${spots.length} 个铺位对不上`}
               </span>
             </div>
             <div className="dh-act">

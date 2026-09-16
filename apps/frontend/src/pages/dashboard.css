@@ -826,18 +826,19 @@
 .att-n { font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
 .att-n.warn { color: var(--warn); font-weight: var(--fw-h); }
 
-/* 哪个月集中出错：一排小chip，把"那个月有问题"直接说出来。
-   每片的底色深浅由该月问题数决定（viz 刻度，在组件里算好），
-   所以"最忙的那个月"自己就最深——不必逐个读数字。 */
-.att-load { display: flex; flex-wrap: wrap; gap: 4px; }
-.att-load-i {
-  display: inline-flex; align-items: baseline; gap: 4px;
-  padding: 2px 8px; border-radius: var(--r-full);
-  font-size: var(--fs-2xs); font-weight: var(--fw-med);
-  transition: transform var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out);
+/* 哪个月集中出错：**一行文字 + 小方格刻度**。
+   原来是 6 个长 pill（"2025年11月租金 22"），换行堆两三行、抢成第二主角。
+   现在结论是文字（"集中在 2025年11月 · 22 处最多"），方格只是量感的暗码，
+   悬停才出明细——它是提示，不配当主角。 */
+.att-load-line {
+  display: flex; align-items: center; gap: var(--sp-2);
+  margin: 0 0 var(--sp-2); font-size: var(--fs-2xs); color: var(--text-2);
 }
-.att-load-i:hover { transform: translateY(-1px); box-shadow: var(--el-1); }
-.att-load-i b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.att-load-squares { display: inline-flex; gap: 3px; }
+.att-load-squares .sq {
+  width: 8px; height: 8px; border-radius: 2px; display: inline-block;
+}
+.att-load-more { color: var(--text-3); font-variant-numeric: tabular-nums; }
 
 .att-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .att-item { display: flex; flex-direction: column; }

@@ -58,7 +58,7 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
       <div className="act-empty">
         <IconCheck size={14} />
         <span>没有待确认的改动</span>
-        <span className="act-empty-hint">在「对话」里说一句，它会算出清单让你确认</span>
+        <span className="act-empty-hint">在「对话」中输入指令，系统会生成清单供您确认</span>
       </div>
     );
   }
@@ -328,7 +328,7 @@ export function ChatPane({ onPlanReady }: { onPlanReady: (p: Proposal) => void }
         {msgs.length === 0 && (
           <div className="chat-hello">
             <IconSpark size={18} />
-            <p>说一句话，让它安排工作</p>
+            <p>输入指令，安排工作</p>
             <span className="chat-ex">“记一笔：B31 收到 8 月租金 23540”</span>
             <span className="chat-ex">“每天下班前体检一次”</span>
             <span className="chat-ex">“含运费的以后都算进去”</span>
@@ -406,7 +406,7 @@ export function ChatPane({ onPlanReady }: { onPlanReady: (p: Proposal) => void }
         </button>
         <input ref={picRef} type="file" accept="image/*" multiple style={{ display: "none" }}
           onChange={(e) => { void addPics(e.target.files); e.target.value = ""; }} />
-        <input value={input} placeholder={images.length ? "说说这几张图…" : "说一句…"}
+        <input value={input} placeholder={images.length ? "补充说明这几张图…" : "输入指令…"}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) void send(); }}
           disabled={busy} />

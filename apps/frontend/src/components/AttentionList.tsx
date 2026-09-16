@@ -49,36 +49,30 @@ export default function AttentionList({ issues, onOpen }: {
       {spots.length > 0 && (
         <section className="att-sec">
           <div className="att-h">
-            <span>账对不上</span>
+            <span>账目对不上</span>
             <span className="att-n warn">{mism.length} 处 · {spots.length} 个铺位</span>
           </div>
-          {/* 哪个月集中出错：一行小字说清"那个月有问题"。
-              每片的深浅按该月问题数走——问题多的月自己会"沉下去"，不用读数字。 */}
+          {/* 哪个月集中出错：**一行**结论 + 深浅小方格，不再铺 6 个长 pill。
+              之前那种"2025年11月租金 22"整排 pill 会换行堆成两三行，
+              视觉上抢成了第二主角——而它只是个提示，不配。 */}
           {load.length > 0 && (() => {
             const max = Math.max(...load.map((l) => l.count));
+            const top = load[0];
             return (
-              <div className="att-load">
-                {load.map((l) => {
-                  const step = loadStep(l.count, max);
-                  // viz-1/2 是浅底 → 深字；viz-4/5 是深底 → 白字。写死映射以免读不出。
-                  const light = step <= 2;
-                  return (
-                    <span
-                      key={l.sheet}
-                      className="att-load-i"
-                      data-step={step}
-                      style={{
-                        background: `var(--viz-${step})`,
-                        color: light ? "var(--text-1)" : "#fff",
-                      }}
-                      title={`${l.sheet}：${l.count} 处对不上`}
-                    >
-                      {l.sheet.replace(/\s*（日）\s*/, "")}
-                      <b>{l.count}</b>
-                    </span>
-                  );
-                })}
-              </div>
+              <p className="att-load-line">
+                <span>集中在 {top.sheet.replace(/\s*（日）\s*/, "").replace(/租金$/, "")}</span>
+                <span className="att-load-squares">
+                  {load.map((l) => {
+                    const step = loadStep(l.count, max);
+                    return (
+                      <i key={l.sheet} className="sq" data-step={step}
+                        style={{ background: `var(--viz-${step})` }}
+                        title={`${l.sheet}：${l.count} 处`} />
+                    );
+                  })}
+                </span>
+                <span className="att-load-more">{top.count} 处最多</span>
+              </p>
             );
           })()}
           <ul className="att-list">

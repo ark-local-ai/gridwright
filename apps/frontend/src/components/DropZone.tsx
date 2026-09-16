@@ -147,7 +147,7 @@ export default function DropZone({ onDone, pickFolder }: {
         disabled={busy}
       >
         <span className="dz-ic"><IconXls size={30} /></span>
-        <b className="dz-title">{busy ? "正在读表…" : over ? "松手，放进来" : "把你的表拖进来"}</b>
+        <b className="dz-title">{busy ? "正在读取表格…" : over ? "松开鼠标即可放入" : "将表格文件拖入此处"}</b>
         <span className="dz-sub">
           支持 .xlsx / .xlsm / .xls · 也可以点这里选文件夹
           <br />
@@ -171,7 +171,7 @@ export default function DropZone({ onDone, pickFolder }: {
         <button className="btn ghost sm" onClick={() => setCreating(true)} disabled={busy}>
           新建工作区
         </button>
-        <span className="dz-alt-note">表已经在某个文件夹里了？指过去就行</span>
+        <span className="dz-alt-note">表格已在某个文件夹中？直接选择该文件夹即可</span>
       </div>
 
       {/* 新建：建一个空文件夹当工作区，再把表拖进去 */}
@@ -180,7 +180,7 @@ export default function DropZone({ onDone, pickFolder }: {
           <input
             autoFocus
             value={newName}
-            placeholder="工作区名称，如 御龙湾台账"
+            placeholder="工作区名称，例如：御龙湾台账"
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") void createWs();
@@ -188,7 +188,7 @@ export default function DropZone({ onDone, pickFolder }: {
             }}
           />
           <button className="btn primary sm" onClick={() => void createWs()} disabled={busy || !newName.trim()}>
-            建好
+            创建
           </button>
           <button className="btn ghost sm" onClick={() => setCreating(false)}>取消</button>
         </div>
