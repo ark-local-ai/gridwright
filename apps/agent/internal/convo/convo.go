@@ -28,6 +28,9 @@ const (
 type Message struct {
 	Role string `json:"role"`
 	Text string `json:"text"`
+	// Images 是这条消息附的图（data URL）。存下来才能回看当时给的是什么图——
+	// 只送给模型不落库的话，翻会话时用户会看到一段没有上下文的回复。
+	Images []string `json:"images,omitempty"`
 	// 结构化产物：这条回复把用户的话变成了什么（任务/规则/工具申请/澄清问题）
 	Proposal *Proposal `json:"proposal,omitempty"`
 	Time     string    `json:"time"`

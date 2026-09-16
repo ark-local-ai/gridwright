@@ -187,3 +187,39 @@
 .gc-file { display: flex; align-items: baseline; gap: var(--sp-2); }
 .gc-file code { font-family: var(--mono); font-size: var(--fs-2xs); color: var(--brand); }
 .gc-note { font-size: var(--fs-2xs); color: var(--text-3); }
+
+/* ---------- 会话里的图片 ---------- */
+/* 传图按钮：与输入框同高，安静地待在左侧 */
+.chat-attach {
+  flex: none; width: var(--h-md); height: var(--h-md);
+  display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: var(--r-ctl);
+  background: var(--surface); color: var(--text-2); cursor: pointer;
+  transition: color var(--d-fast) var(--ease-out), border-color var(--d-fast) var(--ease-out);
+}
+.chat-attach:hover:not(:disabled) { color: var(--brand); border-color: var(--brand-line); }
+.chat-attach:disabled { opacity: .5; cursor: not-allowed; }
+
+/* 待发送的缩略图：小图而不是文件名——截图文件名多半无意义 */
+.chat-pics { display: flex; flex-wrap: wrap; gap: var(--sp-2); padding: var(--sp-2) 0; }
+.chat-pic { position: relative; display: block; }
+.chat-pic img {
+  display: block; width: 56px; height: 56px; object-fit: cover;
+  border: 1px solid var(--line); border-radius: var(--r-ctl);
+}
+.chat-pic button {
+  position: absolute; top: -6px; right: -6px;
+  width: 18px; height: 18px; border-radius: var(--r-full);
+  display: grid; place-items: center; cursor: pointer;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--text-2);
+}
+.chat-pic button:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+/* 消息里的图：点击放大看细节（表格截图经常要看清数字） */
+.msg-pics { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.msg-pics img {
+  max-width: 200px; max-height: 150px; object-fit: cover; cursor: zoom-in;
+  border: 1px solid var(--line); border-radius: var(--r-ctl);
+  transition: transform var(--d-fast) var(--ease-out);
+}
+.msg-pics img:hover { transform: scale(1.03); }

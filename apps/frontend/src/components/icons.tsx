@@ -84,6 +84,13 @@ export const IconSend = (p: P) => (
     <path d="M20 4l-8.7 9.7" />
   </svg>
 );
+export const IconImage = (p: P) => (
+  <svg {...base(p.size, p.className)}>
+    <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
+    <circle cx="8.5" cy="10" r="1.8" />
+    <path d="M4 17l4.8-4.8 3.4 3.4 2.6-2.6L20 17.5" />
+  </svg>
+);
 export const IconSearch = (p: P) => (
   <svg {...base(p.size, p.className)}>
     <circle cx="11" cy="11" r="6.2" />

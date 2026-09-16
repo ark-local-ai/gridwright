@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import "./confirm.css";
 import { agentApi } from "../api-agent";
 import type { Proposal, ApplyResult, ImpactResult, SafetyReport, SelfCheckReport, GenerateResult } from "../api-agent";
-import { IconCheck, IconSpark, IconSend, IconNote, IconLink, IconShield, IconRefresh } from "../components/icons";
+import { IconCheck, IconSpark, IconSend, IconNote, IconLink, IconShield, IconRefresh, IconImage, IconX } from "../components/icons";
 
 /* 待确认（A）+ 会话（B）（见 docs/agent-architecture/19-界面设计.md 阶段 3-4）
    用户的规则：看清单 → 你确认 → 才改。会话是配置入口，产出结构化建议。 */
@@ -228,6 +228,8 @@ function fmt(v: unknown): string {
 type ConvoMsg = {
   role: "user" | "agent" | "system";
   text: string;
+  /** 这条消息附的图（data URL）。回看会话时能看见当时给的是什么图。 */
+  images?: string[];
   time: string;
   proposal?: {
     kind: string; title: string; detail: string; schedule?: string;
@@ -239,23 +241,46 @@ export function ChatPane({ onPlanReady }: { onPlanReady: (p: Proposal) => void }
   const [convoId, setConvoId] = useState<string>("");
   const [msgs, setMsgs] = useState<ConvoMsg[]>([]);
   const [input, setInput] = useState("");
+  // 附着的图（data URL）。图片走多模态消息送给模型——财务常拿到的不是 csv，
+  // 而是一张截图（微信里发来的收款记录、别人拍的表格）。
+  const [images, setImages] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [err, setErr] = useState("");
   const endRef = useRef<HTMLDivElement | null>(null);
+  const picRef = useRef<HTMLInputElement | null>(null);
+
+  // 读图并**先压再送**：手机截图动辄 3–5MB，直接发会拖慢请求、
+  // 甚至超过模型对单图的上限。长边压到 1600 足够模型读数。
+  const addPics = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setErr("");
+    const out: string[] = [];
+    for (const f of [...files].slice(0, 4)) {
+      try {
+        out.push(await shrinkImage(f));
+      } catch {
+        setErr(`读不了这张图：${f.name}`);
+      }
+    }
+    if (out.length) setImages((a) => [...a, ...out].slice(0, 4));
+  };
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
 
   const send = async () => {
     const text = input.trim();
-    if (!text || busy) return;
+    // 只有图片、没文字也算一条消息（"帮我看看这张图"常常就是拍张照）
+    if ((!text && images.length === 0) || busy) return;
     setBusy(true);
     setErr("");
     setInput("");
-    // 乐观显示用户这句
-    setMsgs((m) => [...m, { role: "user", text, time: "" }]);
+    const pics = images;
+    setImages([]);
+    // 乐观显示用户这句（含图）
+    setMsgs((m) => [...m, { role: "user", text, images: pics, time: "" }]);
     try {
-      const r = await agentApi.chat(text, convoId || undefined);
+      const r = await agentApi.chat(text, convoId || undefined, pics.length ? pics : undefined);
       setConvoId(r.conversationId);
       setMsgs(r.conversation.messages);
     } catch (e) {
@@ -311,6 +336,14 @@ export function ChatPane({ onPlanReady }: { onPlanReady: (p: Proposal) => void }
         )}
         {msgs.map((m, i) => (
           <div key={i} className={`msg ${m.role}`}>
+            {/* 图在文字之前：回看会话时"当时给的是哪张图"比这句话更要紧 */}
+            {m.images && m.images.length > 0 && (
+              <div className="msg-pics">
+                {m.images.map((src, k) => (
+                  <img key={k} src={src} alt={`附图 ${k + 1}`} loading="lazy" />
+                ))}
+              </div>
+            )}
             <div className="msg-text">{m.text}</div>
             {m.proposal && (
               <div className="msg-prop">
@@ -349,12 +382,36 @@ export function ChatPane({ onPlanReady }: { onPlanReady: (p: Proposal) => void }
         <div ref={endRef} />
       </div>
 
+      {/* 附着的图：发送前可逐个删掉。缩略图而不是文件名——
+          截图往往文件名无意义（微信图片_20260916.png），看小图才能确认放对了。 */}
+      {images.length > 0 && (
+        <div className="chat-pics">
+          {images.map((src, i) => (
+            <span key={i} className="chat-pic">
+              <img src={src} alt={`附图 ${i + 1}`} />
+              <button onClick={() => setImages((a) => a.filter((_, k) => k !== i))}
+                aria-label={`移除第 ${i + 1} 张图`} title="移除">
+                <IconX size={11} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="chat-input">
-        <input value={input} placeholder="说一句…"
+        {/* 传图：截图/照片里的数据也要能进得来。财务手上常常不是 csv 而是一张图 */}
+        <button className="chat-attach" onClick={() => picRef.current?.click()}
+          disabled={busy} title="传图（截图或照片）" aria-label="传图">
+          <IconImage size={15} />
+        </button>
+        <input ref={picRef} type="file" accept="image/*" multiple style={{ display: "none" }}
+          onChange={(e) => { void addPics(e.target.files); e.target.value = ""; }} />
+        <input value={input} placeholder={images.length ? "说说这几张图…" : "说一句…"}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) void send(); }}
           disabled={busy} />
-        <button className="btn primary sm" onClick={() => void send()} disabled={busy || !input.trim()}>
+        <button className="btn primary sm" onClick={() => void send()}
+          disabled={busy || (!input.trim() && images.length === 0)}>
           <IconSend size={13} />
         </button>
       </div>
@@ -398,5 +455,42 @@ function kindLabel(k: string): string {
     case "clarify": return "需要你确认";
     case "plan": return "改动清单提案";
     default: return "建议";
+  }
+}
+
+/**
+ * shrinkImage 把选中的图压到合理尺寸再转成 data URL。
+ *
+ * 为什么必须先压：手机截图动辄 3–5MB，几张一起发会让请求变慢，
+ * 而且多数模型对单图有大小上限，超了直接报错——用户只会看到"发不出去"。
+ * 长边压到 1600、JPEG 0.82：足够模型看清表格里的字，体积降一个数量级。
+ *
+ * 用 canvas 而不是读原文件：浏览器里没有更轻的缩放手段，
+ * 而这里只需要"看得清"，不需要保留原始画质。
+ */
+async function shrinkImage(file: File, maxEdge = 1600, quality = 0.82): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((res, rej) => {
+      const el = new Image();
+      el.onload = () => res(el);
+      el.onerror = () => rej(new Error("图片解码失败"));
+      el.src = url;
+    });
+    const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const cv = document.createElement("canvas");
+    cv.width = w;
+    cv.height = h;
+    const ctx = cv.getContext("2d");
+    if (!ctx) throw new Error("无法创建画布");
+    // 白底：截图多为浅色内容，透明底转 JPEG 会发黑
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    return cv.toDataURL("image/jpeg", quality);
+  } finally {
+    URL.revokeObjectURL(url);
   }
 }

@@ -7,17 +7,33 @@ import (
 	"strings"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/convo"
+	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
 )
 
 // Chat 是"会话"入口（见 docs/agent-architecture/7-对话与自动化任务.md）：
 // 用户说一句话 → 模型回话 + 一个结构化 proposal（任务/规则/工具申请/澄清/改表计划）。
 // **模型只建议，人拍板**——proposal 要界面上确认才生效。
 func (a *Agent) Chat(ctx context.Context, userText string, files []string) (*convo.Message, error) {
+	return a.ChatWithImages(ctx, userText, files, nil)
+}
+
+// ChatWithImages 与 Chat 相同，但可以随消息带上图片（截图/照片里的数据）。
+//
+// 为什么值得单独一条路径：财务手上常常是**一张截图**——微信里发来的收款
+// 记录、别人拍的表格——而不是一个规整的 csv。只能收文字，等于把最省事的
+// 那条输入通道关掉。
+//
+// files 仍会拼进提示词（模型据此知道有哪些表），图片则走多模态消息。
+func (a *Agent) ChatWithImages(ctx context.Context, userText string, files []string, imgs []llm.ImageInput) (*convo.Message, error) {
 	if a.Brain == nil || !a.Brain.Ready() {
 		return nil, fmt.Errorf("还没配置模型（脑）：请在设置里填 base_url 与 api_key 后就能对话了")
 	}
 	prompt := assembleChatPrompt(userText, files)
-	content, err := a.Brain.ChatJSON(ctx, prompt)
+	if len(imgs) > 0 {
+		// 明确告诉模型图里是什么，否则它可能只当装饰
+		prompt += fmt.Sprintf("\n\n（用户随消息附了 %d 张图，通常是截图或照片里的数据；请从中读数。）", len(imgs))
+	}
+	content, err := a.Brain.ChatJSONWithImages(ctx, prompt, imgs)
 	if err != nil {
 		return nil, err
 	}

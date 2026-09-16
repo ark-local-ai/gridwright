@@ -454,8 +454,8 @@ export const agentApi = {
   selfCheck: (node: string, kind?: string, files?: string[]) =>
     post<SelfCheckReport>("/api/v1/selfcheck", { node, kind, files }),
   // 会话
-  chat: (message: string, conversationId?: string) =>
-    post<{ conversationId: string; conversation: ConvoDto }>("/api/v1/chat", { message, conversationId }),
+  chat: (message: string, conversationId?: string, images?: string[]) =>
+    post<{ conversationId: string; conversation: ConvoDto }>("/api/v1/chat", { message, conversationId, images }),
   conversations: () => get<{ items: ConvoSummary[] }>("/api/v1/conversations"),
   conversation: (id: string) => get<ConvoDto>(`/api/v1/conversation?id=${encodeURIComponent(id)}`),
   // 影响面 / 语义映射 / 安全

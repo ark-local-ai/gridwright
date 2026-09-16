@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"path/filepath"
+	"strings"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/agent"
 	"github.com/ark-local-ai/ark/apps/agent/internal/convo"
+	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
 )
 
 // 会话接口（见 docs/agent-architecture/7-对话与自动化任务.md）。
@@ -51,6 +53,26 @@ func (s *Server) handleConversation(w http.ResponseWriter, r *http.Request) {
 type chatReq struct {
 	ConversationID string `json:"conversationId"`
 	Message        string `json:"message"`
+	// Images 是随消息附的图（data URL，形如 "data:image/png;base64,..."）。
+	// 走 JSON 而不是 multipart：一张截图通常几百 KB，data URL 足够；
+	// 而且要跟着会话一起落库才能"回看当时给的是什么图"。
+	Images []string `json:"images,omitempty"`
+}
+
+// imgsForStore 过滤出合法的图片 data URL。
+//
+// 单独成函数是为了**只校验一次**：落库与送模型必须看到同一份数据，
+// 否则会出现"库里存了 3 张、模型只收到 2 张"这种对不上的情况。
+// 只放行 data:image/ 前缀——不信任客户端传来的任意 URL（否则等于让它
+// 通过我们的密钥去访问任意地址）。
+func imgsForStore(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, d := range in {
+		if strings.HasPrefix(d, "data:image/") {
+			out = append(out, d)
+		}
+	}
+	return out
 }
 
 // handleChat POST /api/v1/chat —— 说一句话，得到回话 + 结构化建议
@@ -80,7 +102,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if _, err := store.Append(c.ID, convo.Message{Role: convo.RoleUser, Text: req.Message}); err != nil {
+	if _, err := store.Append(c.ID, convo.Message{Role: convo.RoleUser, Text: req.Message, Images: imgsForStore(req.Images)}); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -92,7 +114,11 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		names = append(names, filepath.Base(f))
 	}
 	ag := agent.New(cfg, layout, led, s.brainClient())
-	reply, err := ag.Chat(r.Context(), req.Message, names)
+	imgs := make([]llm.ImageInput, 0, len(req.Images))
+	for _, d := range imgsForStore(req.Images) {
+		imgs = append(imgs, llm.ImageInput{DataURL: d})
+	}
+	reply, err := ag.ChatWithImages(r.Context(), req.Message, names, imgs)
 	if err != nil {
 		// 记下失败，避免对话看起来"没反应"
 		_, _ = store.Append(c.ID, convo.Message{Role: convo.RoleSystem, Text: "出错：" + err.Error()})

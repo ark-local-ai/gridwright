@@ -73,6 +73,45 @@ func (c *Client) ChatJSON(ctx context.Context, prompt string) (string, error) {
 	return c.chat(ctx, chatSystemPrompt, prompt)
 }
 
+// ImageInput 是一张随消息一起发出去的图。
+// DataURL 形如 "data:image/png;base64,...."。
+type ImageInput struct {
+	DataURL string
+}
+
+// ChatJSONWithImages 与 ChatJSON 相同，但带图（截图/照片里的数据）。
+//
+// 为什么需要它：财务常拿到的不是 csv，而是**一张截图**——微信里对方发的
+// 收款记录、别人拍的表格。只能收文字，等于把最省事的那条输入通道关掉。
+//
+// 实现要点：图片在 OpenAI 兼容接口里是**内容数组**里的一个对象，不是字符串。
+// 原来那套 map[string]string 表达不了，所以这里换成 map[string]any。
+func (c *Client) ChatJSONWithImages(ctx context.Context, prompt string, imgs []ImageInput) (string, error) {
+	if len(imgs) == 0 {
+		return c.ChatJSON(ctx, prompt)
+	}
+	if !c.Ready() {
+		return "", fmt.Errorf("还没配置模型（脑）：请在设置里填 base_url 与 api_key")
+	}
+	user := []any{map[string]any{"type": "text", "text": prompt}}
+	for _, im := range imgs {
+		user = append(user, map[string]any{
+			"type":      "image_url",
+			"image_url": map[string]string{"url": im.DataURL},
+		})
+	}
+	body := map[string]any{
+		"model":           c.model,
+		"temperature":     0,
+		"response_format": map[string]string{"type": "json_object"},
+		"messages": []map[string]any{
+			{"role": "system", "content": chatSystemPrompt},
+			{"role": "user", "content": user},
+		},
+	}
+	return c.post(ctx, body)
+}
+
 const chatSystemPrompt = `你是 gridwright「数据管家」的配置入口，负责把用户的自然语言变成可执行的安排。
 你只输出一个 JSON 对象，不要解释、不要 markdown。`
 
@@ -111,15 +150,22 @@ func (c *Client) chat(ctx context.Context, system, user string) (string, error) 
 	if !c.Ready() {
 		return "", fmt.Errorf("还没配置模型（脑）：请在设置里填 base_url 与 api_key，之后才能让它判断/改表；只读的看表与体检不受影响")
 	}
-	body := map[string]any{
+	return c.post(ctx, map[string]any{
 		"model":           c.model,
 		"temperature":     0,
 		"response_format": map[string]string{"type": "json_object"},
-		"messages": []map[string]string{
+		"messages": []map[string]any{
 			{"role": "system", "content": system},
 			{"role": "user", "content": user},
 		},
-	}
+	})
+}
+
+// post 是所有请求共用的出口（单条消息与带图消息都走这里）。
+// 抽出来是因为带图那条路（ChatJSONWithImages）只有一个地方不同——messages 的
+// 形状——其余（鉴权头、超时、错误包装、取正文）必须完全一致，否则两条路
+// 迟早会在错误处理上分叉。
+func (c *Client) post(ctx context.Context, body map[string]any) (string, error) {
 	bs, err := json.Marshal(body)
 	if err != nil {
 		return "", err
