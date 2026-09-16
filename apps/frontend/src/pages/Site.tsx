@@ -64,9 +64,9 @@ export default function Site() {
           </p>
           <div className="hero-cta">
             <a className="btn primary lg" href="#download">下载 Gridwright</a>
-            <a className="btn ghost lg" href="#watch">看它怎么守表</a>
+            <a className="btn ghost lg" href="#watch">了解工作方式</a>
           </div>
-          <p className="hero-meta">Windows 桌面客户端 · 装完即用 · 规矩你定、账你看得见</p>
+          <p className="hero-meta">Windows 桌面客户端 · 数据存储于本机 · 改动全程可查</p>
         </div>
 
         <div className="hero-pipe" aria-label="数据管家运行示意">
@@ -98,9 +98,9 @@ export default function Site() {
 
       {/* 盯表：新数据进来，它自己会动 */}
       <section id="watch" className="site-section">
-        <h2 className="sec-title">新数据进来，它自己会动</h2>
+        <h2 className="sec-title">新数据进来，自动入账</h2>
         <p className="sec-sub">
-          不用盯着。把新表、新数据丢进工作区的 inbox，Gridwright 自己接住：
+          无需人工盯守。将新表或新数据放入工作区的 inbox，Gridwright 会自动接续：
           读懂表头和新数据，交给"脑"决定怎么改，改完写回 Excel。
         </p>
         <div className="site-grid cols-3">
@@ -121,9 +121,9 @@ export default function Site() {
 
       {/* 规则：规矩你定，它不敢越线 */}
       <section id="rules" className="site-section site-alt">
-        <h2 className="sec-title">规矩你定，它不敢越线</h2>
+        <h2 className="sec-title">规则先行，越界即拦</h2>
         <p className="sec-sub">
-          怎么改，是规则说了算，不是模型拍脑袋。规则是个人能读懂的 yaml，记事本就能改。
+          如何修改由规则决定，而非模型自行判断。规则是可读的 yaml 文件，用记事本即可编辑。
         </p>
         <div className="site-grid cols-2">
           <div className="site-card">
@@ -147,7 +147,7 @@ export default function Site() {
 
       {/* 账目：每一格改动，都留有账 */}
       <section id="ledger" className="site-section">
-        <h2 className="sec-title">每一格改动，都留有账</h2>
+        <h2 className="sec-title">每一格改动，均有记录</h2>
         <p className="sec-sub">
           不是"改完了"三个字就完事。ledger 是 append-only 的流水，每一格一条，
           旧值留着——改错了能回滚，审计时翻得出。
@@ -172,7 +172,7 @@ export default function Site() {
 
       {/* 本地优先 + 脑可换 */}
       <section id="legacy" className="site-section site-alt">
-        <h2 className="sec-title">数据不出本机，脑可以换</h2>
+        <h2 className="sec-title">数据留在本机，模型可自选</h2>
         <p className="sec-sub">
           手脑分离：你的电脑只当"手"，负责盯表、改表、记账、备份；
           "脑"负责判断（OpenAI 兼容接口，换模型只改一个 baseUrl）。
@@ -185,10 +185,12 @@ export default function Site() {
         </div>
       </section>
 
-      {/* 下载：按系统版本选构建 */}
+      {/* 下载：按系统版本选构建。
+          这个标题原来是「把看表的活，交给 Gridwright」——"活"字太口语，
+          像街边吆喝。下载区的标题就该说清下载的是什么。 */}
       <section id="download" className="site-cta-end">
-        <h2>把看表的活，交给 Gridwright</h2>
-        <p>推荐安装版（双击安装、有窗口）。不想装就用免安装版，双击运行后用浏览器打开。</p>
+        <h2>下载 Gridwright，开始守你的台账</h2>
+        <p>推荐安装版：双击安装，自带窗口与引擎。免安装版为单文件，双击运行后在浏览器中使用。</p>
         <div className="dl-picker" role="group" aria-label="选择下载方式">
           {DOWNLOADS.map((d) => (
             <button
