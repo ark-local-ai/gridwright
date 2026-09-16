@@ -428,6 +428,11 @@ export const agentApi = {
     post<{ ok: boolean; root: string }>("/api/v1/workspace/create", { name, base }),
   forgetWorkspace: (dir: string) =>
     post<{ ok: boolean }>("/api/v1/workspace/forget", { dir }),
+  /** 把本机文件导入工作区（桌面版拖拽/选择后调用）。
+   *  走路径而非上传：文件就在同一台机器上，读成字节流再传一圈是绕路。 */
+  importFiles: (paths: string[]) =>
+    post<{ ok: boolean; results: { name: string; ok: boolean; err?: string }[] }>(
+      "/api/v1/workspace/import", { paths }),
   // 设置（脑）
   settings: () => get<SettingsDto>("/api/v1/settings"),
   saveSettings: (p: { baseUrl?: string; apiKey?: string; model?: string }) =>

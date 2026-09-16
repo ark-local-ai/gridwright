@@ -142,6 +142,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/workspace/files", s.handleWorkspaceFiles)
 	mux.HandleFunc("/api/v1/workspace/open", s.handleWorkspaceOpen)
 	mux.HandleFunc("/api/v1/workspace/create", s.handleWorkspaceCreate)
+	mux.HandleFunc("/api/v1/workspace/import", s.handleWorkspaceImport)
 	mux.HandleFunc("/api/v1/workspace/forget", s.handleWorkspaceForget)
 	mux.HandleFunc("/api/v1/workspaces", s.handleWorkspaces)
 	mux.HandleFunc("/api/v1/settings", s.handleSettings)
