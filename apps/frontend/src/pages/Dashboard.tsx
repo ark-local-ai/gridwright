@@ -1,18 +1,20 @@
 import { useEffect, useCallback, useState } from "react";
 import "./dashboard.css";
 import { agentApi, nodeId } from "../api-agent";
-import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, WorkspaceListItem, Proposal, WeightScore, ScanIssue, SafetyReport, SelfCheckReport } from "../api-agent";
+import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, WorkspaceListItem, Proposal, SafetyReport, SelfCheckReport } from "../api-agent";
 import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark, IconClock } from "../components/icons";
 import AttentionList from "../components/AttentionList";
+import DropZone from "../components/DropZone";
 import LinkMap from "../components/LinkMap";
 import SheetView from "./SheetView";
 import { SkPanel } from "../components/Skeleton";
-import { useChanged } from "../lib/useChanged";
 import Settings from "./Settings2";
 import LedgerPanel from "./LedgerPanel";
 import TasksPanel from "./TasksPanel";
 import RulesPanel from "./RulesPanel";
 import { PendingList, ChatPane } from "./Pending";
+import { hotspots } from "../lib/issues";
+import { linkHealth } from "../lib/linkage";
 
 /* 数据管家 · 主看板（见 docs/agent-architecture/14-第一屏设计.md、17-工作区与跨文件联动.md）
    一屏答一个问题：「我的表，有没有事？它要动什么？」
@@ -28,8 +30,6 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   const [chosen, setChosen] = useState(true); // 是否显式选过工作区
   const [files, setFiles] = useState<WorkspaceFiles | null>(null);
   const [graph, setGraph] = useState<GraphData | null>(null);
-  const [weights, setWeights] = useState<Record<string, WeightScore>>({});
-  const [weightsNote, setWeightsNote] = useState("");
   const [scan, setScan] = useState<ScanReport | null>(null);
   const [counts, setCounts] = useState({ error: 0, warn: 0 });
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
@@ -62,25 +62,19 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
         setBrainReady(ws.brainReady);
         setChosen(ws.workspaceChosen);
       });
-      const [f, g, s, l, w] = await Promise.all([
+      const [f, g, s, l] = await Promise.all([
         agentApi.files().catch(() => null),
         agentApi.graph().catch(() => null),
         agentApi.scanRun().catch(() => null),
         agentApi.ledger(5).catch(() => ({ entries: [], limit: 5 })),
-        agentApi.weights().catch(() => null),
       ]);
       setFiles(f);
       setGraph(g);
       setScan(s?.report ?? null);
       setCounts({ error: s?.errors ?? 0, warn: s?.warns ?? 0 });
       setLedger(l.entries ?? []);
+      // 安全报告：告诉用户"这张表能不能写"（含宏=硬拒绝）。确认改动前必须知道。
       agentApi.safety().then((r) => setSafetyRep(r.report)).catch(() => setSafetyRep(null));
-      if (w) {
-        const m: Record<string, WeightScore> = {};
-        for (const sc of w.scores) m[nodeId(sc.node)] = sc;
-        setWeights(m);
-        setWeightsNote(w.note);
-      }
       // 默认选中"被引用最多"的那个节点（最能说明这张表的影响力）
       setActive(g?.nodes?.length ? pickHub(g) : null);
       setLoad("ready");
@@ -149,6 +143,10 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   const propagate = graph?.propagate?.to ?? [];
   const hot = new Set(propagate);
   const issues = scan?.issues ?? [];
+  // 「要处理的处数」= 主角数字。用问题总数（体检报出的），不是 kind 分类数。
+  const totalIssues = counts.error + counts.warn;
+  const spots = hotspots(issues);
+  const lh = graph ? linkHealth(graph) : null;
 
   return (
     <div className="dash">
@@ -169,12 +167,9 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
           )}
         </div>
 
-        <div className="dash-readout">
-          <Readout label="表" value={isFirstRun ? "—" : String(tableCount)} />
-          <Readout label="待办" value={String(proposal?.items.length ?? 0)} tone={proposal && proposal.items.length > 0 ? "act" : undefined} />
-          <Readout label="问题" value={String(counts.error + counts.warn)} tone={counts.error + counts.warn > 0 ? "warn" : undefined} />
-        </div>
-
+        {/* 顶栏不再放读数：三个并列数字（表/待办/问题）各说各的，
+            读者不知道该看哪个——这正是"乱"的一部分。
+            "现在怎么样"由下面那个**唯一的主角**回答。 */}
         <div className="dash-actions">
           {appliedNote && <span className="dash-applied"><IconCheck size={12} />{appliedNote}</span>}
           {lastSelfCheck && lastSelfCheck.level !== "ok" && (
@@ -182,13 +177,8 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
               自检 {lastSelfCheck.findings.length} 项待看
             </span>
           )}
-          {/* 主行动（与"看这张表"同一档）：联动图 + 体检。留文字标签。 */}
-          {!isEmpty && !isFirstRun && (
-            <button className="btn ghost sm" onClick={() => setZoomed(true)}><IconLink size={13} />联动图</button>
-          )}
-          {!isEmpty && !isFirstRun && (
-            <button className="btn ghost sm" onClick={() => void refresh()}><IconRefresh size={13} />体检</button>
-          )}
+          {/* 也不放"联动图 / 体检"：联动图已收进下方折叠块，
+              体检就在主角那一行（有事没事该在那儿说），放这里只会重复。 */}
           {/* 次要入口：图标 + 提示（tooltip），不占文字宽度。
               它们不是日常动作——每天要看的是上面的数字与下面的体检，
               任务/规则/对话/设置是"偶尔去一趟"的地方，做成小方块即可。 */}
@@ -235,7 +225,9 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
       {/* 空地盘：只有这一块，但顶栏在，能换工作区 */}
       {isFirstRun ? (
         <div className="dash-body dash-body-empty">
-          <FirstRun root={wsPath} pickFolder={pickFolder} onDone={() => void refresh()} />
+          <div className="dash-col">
+            <DropZone pickFolder={pickFolder} onDone={() => void refresh()} />
+          </div>
         </div>
       ) : isEmpty ? (
         <div className="dash-body dash-body-empty">
@@ -245,93 +237,45 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
         <>
 
       <div className="dash-body">
-        {/* 左：联动摘要（按文件分组） */}
-        <section className="dash-left rise">
-          {/* 待查清单：先答"该查什么"。收租率那种单表汇总 Excel 自己做得了，
-              这里只放**跨表才能得出**的结论——同一个铺位在 13 张月表里对不上。 */}
-          <h3 className="dash-h">该查什么</h3>
-          <p className="dash-sub">跨月才对得出来的问题，点开可跳到那一格</p>
-          <AttentionList issues={issues} onOpen={(it) => setOpened({ sheet: it.sheet, file: it.file, ref: it.ref })} />
-
-          {/* 连接用**图**表达：一行一族，实心=连着、空心=断开。
-              原来那种平铺列表既看不出结构，也说不出"哪断了"。 */}
-          <h3 className="dash-h dash-h-links">表的连接</h3>
-          <p className="dash-sub">哪些表该连着，现在断开了</p>
-          {graph ? (
-            <LinkMap
-              graph={graph}
-              issues={issues}
-              onOpenSheet={(n) => void pickNode(n)}
-              onOpenIssue={(it) => setOpened({ sheet: it.sheet, file: it.file, ref: it.ref })}
-            />
-          ) : <p className="dash-muted">未发现表间依赖</p>}
-
-          {weightsNote && <p className="dash-weight-note">{weightsNote}</p>}
-          <p className="dash-muted dash-foot">
-            共 {graph?.nodes.length ?? 0} 张表 · {graph?.edges.length ?? 0} 条关联
-            {(graph?.edges.filter((e) => e.crossFile).length ?? 0) > 0 &&
-              ` · ${graph?.edges.filter((e) => e.crossFile).length} 条跨文件`}
-          </p>
-        </section>
-
-        {/* 中/右：详情 + 待确认/体检 */}
-        <section className="dash-right rise rise-1">
-          {active && graph && (
-            <div className="node-detail">
-              {/* 选中的表 = 这一屏的主角，做成"仪器铭牌"：
-                  大标题给名字，右侧一个主行动，下面一行等宽读数。
-                  以前是"一段平文本 + 一个小按钮"，主角感全无。 */}
-              <div className="nd-plate">
-                <div className="nd-plate-h">
-                  <h2 className="nd-name">{active.sheet}</h2>
-                  <button
-                    className="btn primary sm nd-open"
-                    onClick={() => setOpened({ sheet: active.sheet, file: active.file })}
-                  >
-                    打开表格
-                  </button>
-                </div>
-                <p className="nd-file">
-                  <IconXls size={12} />
-                  {active.file || "外部文件"}
-                </p>
-              </div>
-              <NodeStats node={active} />
-              {/* 关联只在其一时才显示对应那行；两边都空就整块不要——
-                  避免两行"无"白占两百像素。 */}
-              {(() => {
-                const dependsOn = incoming(graph, active);
-                const affects = [...hot];
-                if (dependsOn.length === 0 && affects.length === 0) return null;
-                return (
-                  <div className="nd-links">
-                    {affects.length > 0 && (
-                      <>
-                        <span className="nd-lab">牵动</span>
-                        {affects.map((id) => <span key={id} className="nd-chip">{shortId(id)}</span>)}
-                      </>
-                    )}
-                    {dependsOn.length > 0 && (
-                      <>
-                        <span className="nd-lab">依赖</span>
-                        {dependsOn.map((id) => <span key={id} className="nd-chip dep">{shortId(id)}</span>)}
-                      </>
-                    )}
-                  </div>
-                );
-              })()}
+        <div className="dash-col">
+          {/* ① 主角：一句话说清"现在怎么样"。
+              这是整页唯一可以大的东西。以前顶栏三个并列读数（表/待办/问题）
+              + 左栏"该查什么" + 右栏"体检"各说一遍，读者不知道看哪。 */}
+          <section className="dh">
+            <span className={`dh-num${totalIssues === 0 ? " calm" : ""}`}>{totalIssues}</span>
+            <div className="dh-copy">
+              <span className="dh-lead">
+                {totalIssues === 0 ? "账目都对得上" : "处要你处理"}
+              </span>
+              <span className="dh-meta">
+                {tableCount} 张表
+                {spots.length > 0 && ` · ${spots.length} 个铺位`}
+                {lh && lh.isolated > 0 && ` · ${lh.isolated} 张表已断开`}
+              </span>
             </div>
+            <div className="dh-act">
+              {!isEmpty && (
+                <button className="btn ghost sm" onClick={() => void refresh()}>
+                  <IconRefresh size={13} />重新体检
+                </button>
+              )}
+            </div>
+          </section>
+
+          {/* ② 明细：这就是页面主体。按铺位聚合——同一批 71 处账不平，
+              以前左栏聚一遍、右栏"体检"又原样列一遍，那才是"乱"的真因。 */}
+          {issues.length > 0 && (
+            <section className="dsec">
+              <AttentionList issues={issues} onOpen={(it) => setOpened({ sheet: it.sheet, file: it.file, ref: it.ref })} />
+            </section>
           )}
 
-          {/* 两块堆叠，不是一个平级 tab 组：
-              上=「需要你处理」唯一要你动手的地方，给最强视觉权重；
-              下=「体检」信息，安静呈现。
-              （以前三个 tab 等权，用户得自己点进去才知道有没有事。） */}
-          <div className="dash-pane">
-            <section className={`act-block${proposal && proposal.items.length > 0 ? " has-work" : ""}`}>
+          {/* ③ 需要你处理：待确认的改动（要动手的只有这一处） */}
+          {proposal && proposal.items.length > 0 && (
+            <section className="dsec act-block has-work">
               <div className="blk-head">
-                <h4>需要你处理</h4>
-                {proposal && proposal.items.length > 0 && <span className="blk-n act">{proposal.items.length} 处待确认</span>}
+                <h4>需要你确认</h4>
+                <span className="blk-n act">{proposal.items.length} 处待确认</span>
               </div>
               <PendingList
                 proposal={proposal}
@@ -346,44 +290,59 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
                 onDiscarded={() => setProposal(null)}
               />
             </section>
+          )}
 
-            {!isEmpty && (
-              <section className="scan-block">
-                <div className="blk-head">
-                  <h4>体检</h4>
-                  <span className="blk-n">
-                    {counts.error + counts.warn > 0
-                      ? `${counts.error + counts.warn} 处`
-                      : "无问题"}
-                  </span>
-                  <span className="blk-meta">{scan?.cells.toLocaleString() ?? 0} 格 · {scan?.elapsed ?? "—"}</span>
-                </div>
-                <ScanList
-                  issues={sortedIssues(issues, weights)}
-                  onOpen={(it) => setOpened({ sheet: it.sheet, file: it.file, ref: it.ref })}
+          {/* ④ 收起来的：这些都是"偶尔去一趟"的，不该和主角抢屏。
+              表的连接压成一行摘要（原来是 7 层文字堆在左栏）。 */}
+          <section className="dsec dsec-quiet">
+            {graph && (
+              <Collapsed
+                label="表的连接"
+                summary={lh ? `${lh.connected} 连着 · ${lh.isolated} 断开` : "—"}
+                tone={lh && lh.isolated > 0 ? "warn" : "ok"}
+              >
+                <LinkMap
+                  graph={graph}
+                  issues={issues}
+                  onOpenSheet={(n) => void pickNode(n)}
+                  onOpenIssue={(it) => setOpened({ sheet: it.sheet, file: it.file, ref: it.ref })}
                 />
-              </section>
+              </Collapsed>
             )}
-          </div>
-        </section>
+            {active && graph && (
+              <Collapsed label="当前这张表" summary={active.sheet}>
+                <div className="node-detail">
+                  <div className="nd-plate">
+                    <div className="nd-plate-h">
+                      <h2 className="nd-name">{active.sheet}</h2>
+                      <button className="btn primary sm nd-open"
+                        onClick={() => setOpened({ sheet: active.sheet, file: active.file })}>
+                        打开表格
+                      </button>
+                    </div>
+                    <p className="nd-file"><IconXls size={12} />{active.file || "外部文件"}</p>
+                  </div>
+                  <NodeStats node={active} />
+                </div>
+              </Collapsed>
+            )}
+            <Collapsed
+              label="账目"
+              summary={ledger.length === 0 ? "还没有改动记录" : `最近 ${ledger.length} 条`}
+            >
+              <div className="ledger-inline">
+                {ledger.length === 0 ? <p className="dash-muted">还没有改动记录</p> : ledger.map((e, i) => (
+                  <span key={`${e.ts}-${e.cell}-${e.old}-${e.new}`} className={`dl-row${i === 0 ? " fresh" : ""}`}>
+                    <em>{e.ts}</em> {e.table} {e.cell} {e.old}→{e.new}
+                    <span className={e.status === "ok" ? "ok" : "rj"}>{e.status}</span>
+                  </span>
+                ))}
+              </div>
+              <button className="btn ghost sm" onClick={() => setLedgerOpen(true)}>查看 / 回滚</button>
+            </Collapsed>
+          </section>
+        </div>
       </div>
-
-      <footer className="dash-ledger">
-        <button className="dl-h" onClick={() => setLedgerOpen(true)}>
-          <IconNote size={13} />账目
-          <span className="dl-open">查看 / 回滚</span>
-        </button>
-        {ledger.length === 0 ? (
-          <span className="dash-muted">还没有改动记录</span>
-        ) : (
-          ledger.map((e, i) => (
-            <span key={`${e.ts}-${e.cell}-${e.old}-${e.new}`} className={`dl-row${i === 0 ? " fresh" : ""}`}>
-              <em>{e.ts}</em> {e.table} {e.cell} {e.old}→{e.new}
-              <span className={e.status === "ok" ? "ok" : "rj"}>{e.status}</span>
-            </span>
-          ))
-        )}
-      </footer>
 
       {ledgerOpen && (
         <LedgerPanel onClose={() => setLedgerOpen(false)} onChanged={() => void refresh()} />
@@ -400,98 +359,34 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   );
 }
 
-/* ---------- 仪表读数 ---------- */
-function Readout({ label, value, tone }: { label: string; value: string; tone?: "act" | "warn" }) {
-  // 读数变了就闪一下：这是用户最常盯的三个数，变化必须"演"出来而不是悄悄变
-  const changed = useChanged(value);
+/**
+ * Collapsed —— 一行摘要 + 点开才展开。
+ *
+ * 为什么要有它：这些内容（表连接、当前表、账目）都**不该和主角抢屏**。
+ * 它们原来各自带标题、说明、统计，平铺在一屏里，读者找不到重点。
+ * 收成一行后：想知道细节的人点开，不关心的人一眼扫过。
+ *
+ * 摘要必须在**收起状态**就说清结论（"5 连着 · 9 断开"），否则收起等于藏起来。
+ */
+function Collapsed({ label, summary, tone, children }: {
+  label: string; summary: string; tone?: "ok" | "warn"; children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
   return (
-    <span className={`readout${tone ? " " + tone : ""}`}>
-      <span className="ro-label">{label}</span>
-      <span className={`ro-value${changed ? " value-changed" : ""}`}>{value}</span>
-    </span>
+    <div className={`col${open ? " open" : ""}`}>
+      <button className="col-h" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+        <span className={`cr-caret${open ? " open" : ""}`}>›</span>
+        <span className="col-label">{label}</span>
+        <span className={`col-sum${tone ? " " + tone : ""}`}>{summary}</span>
+      </button>
+      {open && <div className="col-body">{children}</div>}
+    </div>
   );
 }
 
 /* ---------- 体检结果（按种类分组，别让 196 条同类淹掉 45 条真问题） ---------- */
 
-/* 后端 kind 是下划线风格（bad_value / mismatch …），标签要与之对应 */
-const KIND_LABEL: Record<string, string> = {
-  mismatch: "账对不上（上月欠款 ≠ 本月上期）",
-  bad_ref: "公式引用已失效（#REF!）",
-  bad_value: "单元格是错误值",
-  sheet_missing: "月表缺失（跨月核对已跳过）",
-  sheet_unfit: "表缺关键列",
-  scan_error: "该表扫描出错",
-};
 
-function ScanList({ issues, onOpen }: {
-  issues: ScanIssue[];
-  onOpen: (it: ScanIssue) => void;
-}) {
-  // 按 kind 归类，**账对不上（mismatch）排最前**——它才是需要人判断的，
-  // 196 条同质的 #REF! 收成一行，不让它淹没有价值的信息。
-  // 账对不上放最前：它需要人判断；196 条同质的 #REF! 收成一行，不淹没它
-  const order = ["mismatch", "sheet_missing", "sheet_unfit", "bad_ref", "bad_value", "scan_error"];
-  const groups = new Map<string, ScanIssue[]>();
-  for (const it of issues) {
-    if (!groups.has(it.kind)) groups.set(it.kind, []);
-    groups.get(it.kind)!.push(it);
-  }
-  const [open, setOpen] = useState<Record<string, boolean>>({});
-  const sorted = [...groups.entries()].sort(
-    (a, b) => (order.indexOf(a[0]) + 1 || 99) - (order.indexOf(b[0]) + 1 || 99),
-  );
-
-  if (issues.length === 0) return <p className="dash-muted">本次未发现问题</p>;
-
-  return (
-    <ul className="scan-groups">
-      {sorted.map(([kind, items]) => {
-        // 账对不上默认摊开，但**限量**——71 行全开会把页面拉成一条长卷
-        // 账对不上默认摊开，但**限量**——71 行全开会把页面拉成一条长卷。
-        // 显式展开过（open[kind]===true）才给全部。
-        const explicit = open[kind] === true;
-        const isOpen = open[kind] ?? kind === "mismatch";
-        const cap = explicit ? items.length : kind === "mismatch" ? 8 : 40;
-        const sev = items[0].severity;
-        return (
-          <li key={kind} className={`scan-grp ${sev}`}>
-            <button className="sg-head" onClick={() => setOpen((o) => ({ ...o, [kind]: !isOpen }))}>
-              <span className="sg-arrow">{isOpen ? "▾" : "▸"}</span>
-              <span className="sg-label">{KIND_LABEL[kind] ?? kind}</span>
-              <span className="sg-n">{items.length} 处</span>
-            </button>
-            {isOpen && (
-              <ul className="scan-list">
-                {items.slice(0, cap).map((it, i) => (
-                  <li key={i} className={`scan-item ${it.severity}`}>
-                    <div className="si-main">
-                      <button
-                        className="si-ref si-ref-btn"
-                        onClick={() => onOpen(it)}
-                        title="打开表格并定位到该格"
-                      >
-                        {shortName(it.sheet)}!{it.ref}
-                      </button>
-                      <span className="si-msg">{it.message}</span>
-                    </div>
-                  </li>
-                ))}
-                {items.length > cap && (
-                  <li className="scan-more-row">
-                    <button className="chain-more" onClick={() => setOpen((o) => ({ ...o, [kind]: true }))}>
-                      还有 {items.length - cap} 处，展开全部
-                    </button>
-                  </li>
-                )}
-              </ul>
-            )}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
 
 /* ---------- 联动链（按文件分组 → 同系列折叠） ---------- */
 
@@ -595,109 +490,9 @@ function WorkspaceSwitcher({ onPick, onOpenSettings }: { onPick: () => void; onO
 
 /* ---------- 空地盘 ---------- */
 
-/** 首次运行：还没选过工作区。三件事说清 + 两个入口。 */
-function FirstRun({ root, pickFolder, onDone }: {
-  root: string;
-  pickFolder?: () => Promise<string | null>;
-  onDone: () => void;
-}) {
-  const [name, setName] = useState("");
-  const [path, setPath] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-  const [browsing, setBrowsing] = useState(false);
-
-  const openDir = async (dir: string) => {
-    setBusy(true);
-    setErr("");
-    try {
-      await agentApi.openWorkspace(dir);
-      onDone();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // 选文件夹：桌面壳用系统对话框；单文件版（浏览器里）用服务端列目录浏览。
-  const choose = async () => {
-    if (pickFolder) {
-      const dir = await pickFolder();
-      if (dir) await openDir(dir);
-      return;
-    }
-    setBrowsing(true);
-  };
-
-  const create = async () => {
-    if (!name.trim()) return;
-    setBusy(true);
-    setErr("");
-    try {
-      await agentApi.createWorkspace(name.trim());
-      onDone();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="first-run">
-      <h2>先选一个工作区</h2>
-      <p className="fr-sub">
-        工作区就是一个放表的文件夹。<b>你的表一直在你自己的机器上</b>，
-        选好之后它会盯着这个文件夹干活。
-      </p>
-
-      <div className="fr-ways">
-        <div className="fr-way">
-          <b>打开已有的文件夹</b>
-          <span>表已经在某个文件夹里了，直接指过去。</span>
-          <button className="btn primary" onClick={() => void choose()} disabled={busy}>
-            选择文件夹…
-          </button>
-          <div className="fr-manual">
-            <input value={path} placeholder="或直接填路径，如 D:\台账"
-              onChange={(e) => setPath(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && path.trim()) void openDir(path.trim()); }} />
-            <button className="btn ghost sm" onClick={() => void openDir(path.trim())}
-              disabled={busy || !path.trim()}>打开</button>
-          </div>
-        </div>
-
-        <div className="fr-way">
-          <b>新建一个工作区</b>
-          <span>还没有文件夹？建一个新的，再把表放进去。</span>
-          <div className="fr-manual">
-            <input value={name} placeholder="工作区名称，如 御龙湾台账"
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") void create(); }} />
-            <button className="btn ghost sm" onClick={() => void create()}
-              disabled={busy || !name.trim()}>新建</button>
-          </div>
-        </div>
-      </div>
-
-      {err && <p className="fr-err">{err}</p>}
-      <p className="fr-hint">
-        当前临时目录（还没选）：<code>{root}</code>
-      </p>
-
-      {browsing && (
-        <FolderPicker
-          onCancel={() => setBrowsing(false)}
-          onPick={(dir) => { setBrowsing(false); void openDir(dir); }}
-        />
-      )}
-    </div>
-  );
-}
 
 /** 服务端目录浏览：浏览器里也能"选文件夹"（列表来自本机服务）。 */
-function FolderPicker({ onPick, onCancel }: {
+export function FolderPicker({ onPick, onCancel }: {
   onPick: (dir: string) => void;
   onCancel: () => void;
 }) {
@@ -954,21 +749,10 @@ function pickHub(g: GraphData): GraphNode | null {
   return best;
 }
 
-/** 某节点依赖谁（它作为 from 的边，指向的 to）。 */
-function incoming(g: GraphData, n: GraphNode): string[] {
-  const id = nodeId(n);
-  const out = new Set<string>();
-  for (const e of g.edges) {
-    if (nodeId(e.from) === id && e.confidence === "high") out.add(nodeId(e.to));
-  }
-  return [...out];
-}
-
 type Group = { file: string; items: GraphNode[]; refs: Record<string, number> };
 
-/** 把给定节点按文件分组（用于"有关联 / 留白"分区渲染）。
-    传了 weights 时，**组内按注意力权重降序**——重要的表排前面，否则权重看不见。 */
-function groupNodes(g: GraphData, nodes: GraphNode[], limit = 0, weights?: Record<string, WeightScore>): Group[] {
+/** 把给定节点按文件分组（用于"有关联 / 留白"分区渲染）。 */
+function groupNodes(g: GraphData, nodes: GraphNode[], limit = 0): Group[] {
   const refs: Record<string, number> = {};
   for (const e of g.edges) refs[nodeId(e.to)] = (refs[nodeId(e.to)] ?? 0) + e.count;
   const byFile = new Map<string, GraphNode[]>();
@@ -977,40 +761,10 @@ function groupNodes(g: GraphData, nodes: GraphNode[], limit = 0, weights?: Recor
     if (!byFile.has(key)) byFile.set(key, []);
     byFile.get(key)!.push(n);
   }
-  const attn = (n: GraphNode) => (weights ? (weights[nodeId(n)]?.attention ?? 0) : 0);
   return [...byFile.entries()]
     .sort((a, b) => b[1].length - a[1].length)
-    .map(([file, items]) => {
-      const sorted = weights ? [...items].sort((x, y) => attn(y) - attn(x)) : items;
-      return { file, items: limit > 0 ? sorted.slice(0, limit) : sorted, refs };
-    });
+    .map(([file, items]) => ({ file, items: limit > 0 ? items.slice(0, limit) : items, refs }));
 }
 
-function shortName(name: string): string {
-  return name.replace(/\s*（[日月末]）\s*/g, "").replace(/\s+/g, "").trim();
-}
-
-function shortId(id: string): string {
-  const i = id.indexOf("!");
-  return i >= 0 ? shortName(id.slice(i + 1)) : shortName(id);
-}
 /** 体检条目按"所在表的注意力权重"排序：**高权重区的问题先看**（见 22-权重设计.md）。
     这实现用户要的"跑定时的时候根据权重着重校验"——界面层先做，定时层后续接同一套排序。 */
-function sortedIssues(issues: ScanIssue[], weights: Record<string, WeightScore>): ScanIssue[] {
-  const wOf = (sheet: string): number => {
-    // 体检条目只带 sheet 名（不含文件），按 sheet 匹配即可
-    for (const [id, w] of Object.entries(weights)) {
-      const i = id.indexOf("!");
-      const s = i >= 0 ? id.slice(i + 1) : id;
-      if (s === sheet) return w.attention;
-    }
-    return 0;
-  };
-  return [...issues].sort((a, b) => {
-    const d = wOf(b.sheet) - wOf(a.sheet);
-    if (d !== 0) return d;
-    // 同权重时：错误优先于警告
-    if (a.severity !== b.severity) return a.severity === "error" ? -1 : 1;
-    return 0;
-  });
-}
