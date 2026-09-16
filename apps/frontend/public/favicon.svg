@@ -1,6 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 38">
-  <!-- gridwright 字标（浏览器标签页图标），品牌钢蓝，重字重 + 紧字距 -->
-  <text x="2" y="30" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
-        font-size="30" font-weight="700" letter-spacing="-1"
-        fill="#3d5a80">gridwright</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f5d8a"/>
+      <stop offset="1" stop-color="#1e4063"/>
+    </linearGradient>
+  </defs>
+  <rect width="1" height="1" rx="0.22" fill="url(#g)"/>
+  <rect x="0.5275" y="0.1725" width="0.3000" height="0.3000" rx="0.045" fill="none" stroke="rgba(255,255,255,0.41)" stroke-width="0.022"/>
+  <rect x="0.1725" y="0.5275" width="0.3000" height="0.3000" rx="0.045" fill="none" stroke="rgba(255,255,255,0.41)" stroke-width="0.022"/>
+  <rect x="0.5275" y="0.5275" width="0.3000" height="0.3000" rx="0.045" fill="none" stroke="rgba(255,255,255,0.41)" stroke-width="0.022"/>
+  <rect x="0.1725" y="0.1725" width="0.3000" height="0.3000" rx="0.045" fill="#f6fafd" stroke="none" stroke-width="0"/>
 </svg>
