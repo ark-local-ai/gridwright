@@ -219,7 +219,12 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
       )}
 
       {settingsOpen && (
-        <Settings onClose={() => setSettingsOpen(false)} onWorkspaceChanged={() => void refresh()} pickFolder={pickFolder} />
+        <Settings
+          // 关闭时也刷新：配置模型后后端已 ready，但前端内存里还是旧的 false，
+          // 于是顶栏一直挂着"未配模型"——用户会以为配了没生效。
+          // 不是"只在工作区变了才刷"，因为模型配置不改变工作区。
+          onClose={() => { setSettingsOpen(false); void refresh(); }}
+        />
       )}
 
       {/* 空地盘：只有这一块，但顶栏在，能换工作区 */}

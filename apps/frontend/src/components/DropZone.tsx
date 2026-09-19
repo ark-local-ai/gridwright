@@ -71,15 +71,13 @@ export default function DropZone({ onDone, pickFolder }: {
   }, []);
 
   const importPaths = async (paths: string[]) => {
-    const excel = paths.filter(isExcel);
-    if (excel.length === 0) {
-      setErr("只收 Excel 表（.xlsx / .xlsm / .xls）");
-      return;
-    }
+    // 不在前端筛：拖进来的可能是文件夹（=打开为工作区）也可能是表（=复制进来），
+    // 只有后端能 stat 出是哪种。前端先筛一道会把文件夹误杀成"只收 Excel 表"。
+    if (paths.length === 0) return;
     setBusy(true);
     setErr("");
     try {
-      const r = await agentApi.importFiles(excel);
+      const r = await agentApi.importFiles(paths);
       setResults(r.results ?? []);
       // 有一个成功就刷新（哪怕同批里有的失败了）
       if ((r.results ?? []).some((x) => x.ok)) onDone();
@@ -147,11 +145,11 @@ export default function DropZone({ onDone, pickFolder }: {
         disabled={busy}
       >
         <span className="dz-ic"><IconXls size={30} /></span>
-        <b className="dz-title">{busy ? "正在读取表格…" : over ? "松开鼠标即可放入" : "将表格文件拖入此处"}</b>
+        <b className="dz-title">{busy ? "正在读取…" : over ? "松开鼠标即可放入" : "把表格或文件夹拖到这里"}</b>
         <span className="dz-sub">
-          支持 .xlsx / .xlsm / .xls · 也可以点这里选文件夹
+          拖表格 → 复制进当前工作区；拖文件夹 → 直接把它当作工作区
           <br />
-          表留在你自己的机器上，不会被上传到任何地方
+          支持 .xlsx / .xlsm / .xls · 表留在你自己的机器上，不会被上传
         </span>
       </button>
 

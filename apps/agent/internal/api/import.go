@@ -68,7 +68,13 @@ func (s *Server) importOne(root, src string) error {
 		return fmt.Errorf("找不到：%s", filepath.Base(src))
 	}
 	if st.IsDir() {
-		return fmt.Errorf("暂不支持整个文件夹，请把表一起选中")
+		// 拖进来的是文件夹 → 把它当成工作区打开，而不是"导入里面的表"。
+		// 这是用户的心智：整个文件夹就是他的台账目录，指过去就行，
+		// 不该逼他先把表一个个挑出来。
+		if err := s.SwitchWorkspace(src); err != nil {
+			return fmt.Errorf("打不开这个文件夹：%w", err)
+		}
+		return nil
 	}
 	// 只收表；其他类型明确拒绝并说明（而不是静默忽略，用户会以为成功了）
 	switch strings.ToLower(filepath.Ext(src)) {
