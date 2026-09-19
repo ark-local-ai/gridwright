@@ -34,10 +34,11 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
   -o "$SIDECAR_DIR/gridwright-$TARGET_TRIPLE.exe" ./cmd/gridwright
 ls -lh "$SIDECAR_DIR/gridwright-$TARGET_TRIPLE.exe"
 
-echo "==> 2/4 重画安装界面品牌图"
+echo "==> 2/4 重画应用图标与安装界面品牌图"
 # 由脚本产出而非手工放图：颜色是品牌令牌的副本，重画才跟得上调色。
 # 缺 Python/Pillow 时跳过（已提交的图仍在，安装包照出）。
 if command -v python >/dev/null 2>&1 && python -c "import PIL" >/dev/null 2>&1; then
+  python "$DESKTOP/scripts/gen_app_icon.py"
   python "$DESKTOP/scripts/gen_installer_art.py"
 else
   echo "    跳过（需要 python + Pillow）；沿用仓库里已提交的图"
