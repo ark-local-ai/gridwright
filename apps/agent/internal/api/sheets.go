@@ -89,7 +89,14 @@ func (s *Server) handleSheetPreview(w http.ResponseWriter, r *http.Request) {
 
 	// 样例数据（表头之后）
 	for i := hdrIdx + 1; i < len(sh.Rows) && len(pv.Sample) < rows; i++ {
-		pv.Sample = append(pv.Sample, sh.Rows[i])
+		row := sh.Rows[i]
+		// 空行在 excelize 里是 nil 切片，JSON 出来就是 null——
+		// 前端拿到 null 行再取 row[0] 会直接抛错（实测切到"实收日报表"就白屏）。
+		// 这里统一成空数组：前端不必为"行可能不存在"到处特判。
+		if row == nil {
+			row = []string{}
+		}
+		pv.Sample = append(pv.Sample, row)
 	}
 
 	// 汇总：① 表头之前的概览行（如"本月收租率/应收/实收"）② 行内"合计/小计"

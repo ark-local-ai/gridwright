@@ -1,53 +1,67 @@
-# Ark · 方舟 （前端）
+# gridwright — 官网（apps/frontend）
 
-本地优先的 AI Agent 生产力工作台 —— 前端工程（React + TypeScript + Vite）。
+产品官网落地页。**纯静态、零请求**：只有锚点链接与 GitHub Releases 下载地址，
+不访问任何后端，也不需要后端。
 
-> 品牌名：**Ark · 方舟** —— "方舟承载你的工作与数据，安全独立、自主可控、成果归你。"
+> 工作台（改表界面）在 `apps/desktop`，不在本包。两者是两个独立发布的产品，
+> 没有代码共享——本包不 import `apps/desktop` 的任何东西，反之亦然。
 
 ## 技术栈
+
 - React 19 + TypeScript + Vite
-- React Router（路由）
-- 纯手写 CSS 设计令牌（暖灰 + 靛蓝，无 UI 框架依赖）
+- 纯手写 CSS 设计令牌（无 UI 框架）
+- 只用 React Router 做一条路由
 
 ## 快速开始
+
 ```bash
-cd ark-app
+cd apps/frontend
 npm install
 npm run dev        # 开发，http://localhost:5173
-npm run build      # 生产构建 dist/
+npm run build      # 构建到 dist/
 npm run preview    # 预览构建产物
 ```
 
-## 页面与路由
-| 路由 | 页面 |
-|---|---|
-| `/` | **官网落地页**（逃销：Hero / 技能 / 移动端远程 / 本地操作 / 持续交付 / 专家 / CTA）|
-| `/app` | 新会话首页（场景卡 + 输入 -> 提交跳任务页）|
-| `/app/task` | 任务执行页（步骤推进 / 产物 / 交付 / 验收清单）|
-| `/app/chat` | 助理对话 |
-| `/app/experts` | 专家广场 |
-| `/app/skills` | 技能与连接器 |
-| `/app/prompts` | 提示词库 |
-| `/app/automation` | 自动化（定时任务）|
-| `/app/settings` | 设置（模型渠道）|
-| `/app/workspace` | 工作空间与成果 |
-
 ## 目录结构
+
 ```
 src/
-  data/mock.ts       # 静态类型 + 示例数据（专家/技能/渠道/任务/文件…）
-  components/icons.tsx # SVG 图标集
-  layout/            # 应用壳：Sidebar + Layout + shell.css
-  pages/             # 页面组件 + pages.css（含 Site.tsx 官网落地页 + site.css）
-  index.css          # 设计令牌（CSS 变量）
-  App.tsx            # 路由表（/ 官网；/app/* 客户端工作台）
+  main.tsx         # 入口
+  App.tsx          # 路由表（只有 /）
+  pages/Site.tsx   # 官网落地页
+  pages/site.css
+  pages/pages.css
+  index.css        # 设计令牌（CSS 变量）
+  layout/shell.css # 应用壳样式（与桌面端各自一份，见下）
+  lib/version.ts   # 读构建期注入的版本号
+scripts/
+  deploy-site.sh   # 发布到服务器（含产物校验与运行期数据硬拦）
 ```
 
-## 设计系统
-单一品牌色靛蓝 `#4F46E5` + 暖灰中性色。令牌定义见 `src/index.css`。
-配套规格文档见 `../docs/`：设计令牌、功能模块规格书、模块坑位清单、建造计划。
+## 版本号从哪来
 
-## 现状 & 下一步
-- 前端 8 个页面全部实现、路由对接、任务执行闭环（mock 数据）已实测通过
-- 下一步：接真实后端 / LLM（见 `docs/模块坑位清单_ROADMAP.md` 的"坑位 A 任务闭环"）
-- 最终打包为桌面应用（Tauri 2，见 `docs/建造计划_PLAN.md`）
+**本包自己的 `package.json`**。构建时由 `vite.config.ts` 注入
+`import.meta.env.VITE_APP_VERSION`，发布脚本再用 `scripts/read-app-version.mjs`
+读同一个文件、核对产物里确实带上了这个版本号。
+
+不读 `apps/desktop/package.json`：官网与桌面端各发各的版，钉在一起会让官网被迫
+跟桌面端的发版节奏走。代价是发版要 bump 两处。
+
+## 发布
+
+```bash
+bash apps/frontend/scripts/deploy-site.sh <user@host> [远端目录]
+
+# 先干跑看一眼要发什么（不连服务器、不需要私钥）
+DRY_RUN=1 bash apps/frontend/scripts/deploy-site.sh <user@host>
+```
+
+脚本会：构建 → 校验产物版本号 → **硬拦** `dist/` 里的表格 / 数据库文件与
+`workspace/`（那是本机跑出来的交付物，绝不能上公网）→ 打包 → scp → 远端解包。
+
+运行环境需要 Git Bash（提供 `grep` / `sed` / `find`）。开发机是 Windows。
+
+## 现状
+
+- 一条路由、一个页面，全部为静态内容
+- 深入文档在 `docs/agent-architecture/`（本地，不提交）

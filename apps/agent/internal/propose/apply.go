@@ -2,6 +2,8 @@ package propose
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/xuri/excelize/v2"
@@ -16,6 +18,7 @@ type ApplyResult struct {
 	Ref    string `json:"ref"`
 	Sheet  string `json:"sheet"`
 	Field  string `json:"field"`
+	Op     string `json:"op"` // 真实执行的操作，回滚层据此判断能不能倒
 	Old    any    `json:"old"`
 	New    any    `json:"new"`
 	Status string `json:"status"` // ok | rejected
@@ -55,7 +58,7 @@ func Apply(p *Proposal, led *ledger.Ledger, model string) ([]ApplyResult, error)
 	results := make([]ApplyResult, 0, len(p.Items))
 	applied := 0
 	for _, it := range p.Items {
-		r := ApplyResult{Ref: it.Ref, Sheet: it.Sheet, Field: it.Field, Old: it.Old, New: it.New}
+		r := ApplyResult{Ref: it.Ref, Sheet: it.Sheet, Field: it.Field, Op: it.Op, Old: it.Old, New: it.New}
 		sheet := it.Sheet
 		if sheet == "" {
 			sheet = f.GetSheetName(0)
@@ -66,6 +69,34 @@ func Apply(p *Proposal, led *ledger.Ledger, model string) ([]ApplyResult, error)
 			results = append(results, r)
 			continue
 		}
+
+		// append：新增一行。列名与行号都**现算**（确认期间表可能已经长了）。
+		if it.Op == "append" {
+			if len(it.Values) == 0 {
+				r.Status = "rejected"
+				r.Note = "新增行没有要给的值"
+				results = append(results, r)
+				continue
+			}
+			newRow, err := xl.AppendRow(f, sheet, it.HeaderRow, it.Values)
+			if err != nil {
+				r.Status = "rejected"
+				r.Note = err.Error()
+				results = append(results, r)
+				continue
+			}
+			r.New = valuesString(it.Values)
+			if it.Ref == "" {
+				if c, cerr := excelize.CoordinatesToCellName(1, newRow); cerr == nil {
+					r.Ref = c
+				}
+			}
+			r.Status = "ok"
+			applied++
+			results = append(results, r)
+			continue
+		}
+
 		// 取"当前实际旧值"，与清单里的 Old 不一致说明文件变了该格
 		cur, _ := f.GetCellValue(sheet, it.Ref)
 		if it.Op == "set" && cur != fmt.Sprint(it.Old) {
@@ -115,10 +146,37 @@ func recordAll(led *ledger.Ledger, p *Proposal, results []ApplyResult, model str
 		if status == "" {
 			status = "rejected"
 		}
-		_ = led.Append(now, table, r.Sheet, r.Ref, "set",
+		op := r.Op
+		if op == "" {
+			op = "set"
+		}
+		reason := r.Note
+		if op == "append" {
+			// 新增行回不了鸟：追加的行没有唯一位置可自动删除。
+			// 必须写进账目、也已反馈给界面（rollback.List 对 op=append 会标不可回滚）。
+			if reason == "" {
+				reason = "新增行"
+			}
+			reason += "（新增行：回滚不会自动删除，需手工处理）"
+		}
+		_ = led.Append(now, table, r.Sheet, r.Ref, op,
 			fmt.Sprint(r.Old), fmt.Sprint(r.New),
-			r.Note, "confirmed-plan", "", model, status)
+			reason, "confirmed-plan", "", model, status)
 	}
+}
+
+// valuesString 把「列名→值」拼成一行人能读的账目文本（map 直接 fmt 出来的形状太丑）。
+func valuesString(v map[string]any) string {
+	keys := make([]string, 0, len(v))
+	for k := range v {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%v", k, v[k]))
+	}
+	return strings.Join(parts, " ")
 }
 
 func lastSlash(s string) int {

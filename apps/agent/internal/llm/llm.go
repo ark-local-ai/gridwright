@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -126,7 +128,23 @@ type SemanticResponse struct {
 
 // PlanSemantic 用"语义坐标"契约问脑：模型给业务键（铺位/月份/字段），不给单元格坐标。
 func (c *Client) PlanSemantic(ctx context.Context, prompt string) (*SemanticResponse, error) {
-	content, err := c.chat(ctx, semanticSystemPrompt, prompt)
+	return c.PlanSemanticWithImages(ctx, prompt, nil)
+}
+
+// PlanSemanticWithImages 同 PlanSemantic，但可带图。
+//
+// 为什么必须有它：财务最常见的输入形式是**一张截图**（对方发来的收款记录、
+// 拍下来的表格）。而举例里"按 D 列名字把 E、F 列填进某表"这种指令，
+// 数据本身就在图里——只给文字的话，模型只能反过来问"数据来自哪张表"，
+// 把一件能做的事问成澄清（实测发生过）。图必须能进到出清单这一步。
+func (c *Client) PlanSemanticWithImages(ctx context.Context, prompt string, imgs []ImageInput) (*SemanticResponse, error) {
+	var content string
+	var err error
+	if len(imgs) == 0 {
+		content, err = c.chat(ctx, semanticSystemPrompt, prompt)
+	} else {
+		content, err = c.chatWithImages(ctx, semanticSystemPrompt, prompt, imgs)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -145,6 +163,30 @@ func (c *Client) PlanSemantic(ctx context.Context, prompt string) (*SemanticResp
 	}, nil
 }
 
+// chatWithImages 带图的一次 JSON 对话（与 chat 同样的解析路径，
+// 区别只在 messages 的形状——与 ChatJSONWithImages 同理，共用 post）。
+func (c *Client) chatWithImages(ctx context.Context, system, prompt string, imgs []ImageInput) (string, error) {
+	if !c.Ready() {
+		return "", fmt.Errorf("还没配置模型（脑）：请在设置里填 base_url 与 api_key")
+	}
+	user := []any{map[string]any{"type": "text", "text": prompt}}
+	for _, im := range imgs {
+		user = append(user, map[string]any{
+			"type":      "image_url",
+			"image_url": map[string]string{"url": im.DataURL},
+		})
+	}
+	return c.post(ctx, map[string]any{
+		"model":           c.model,
+		"temperature":     0,
+		"response_format": map[string]string{"type": "json_object"},
+		"messages": []map[string]any{
+			{"role": "system", "content": system},
+			{"role": "user", "content": user},
+		},
+	})
+}
+
 // chat 发一次对话请求，返回模型正文（已去掉 JSON 外的说明文字）。
 func (c *Client) chat(ctx context.Context, system, user string) (string, error) {
 	if !c.Ready() {
@@ -159,6 +201,18 @@ func (c *Client) chat(ctx context.Context, system, user string) (string, error) 
 			{"role": "user", "content": user},
 		},
 	})
+}
+
+// redactSecret 在把请求/响应正文写进日志前抹掉密钥。
+//
+// 这行日志会落到用户本机的 engine.log 里，而 engine.log 正是用户可能随手发给
+// 别人排障的文件（本项目自己的排障流程就是这么做的）。密钥绝不能出现在里面。
+// 正常路径下 Authorization 头不进 body，但多一层保险的成本为零。
+func redactSecret(b []byte, secret string) string {
+	if secret != "" {
+		b = bytes.ReplaceAll(b, []byte(secret), []byte("***"))
+	}
+	return truncate(string(b), 500)
 }
 
 // post 是所有请求共用的出口（单条消息与带图消息都走这里）。
@@ -177,14 +231,33 @@ func (c *Client) post(ctx context.Context, body map[string]any) (string, error) 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 
+	// 记下**问了什么**。此前这里只有一行 "ok（7.2s，4501B）"，于是出问题时
+	// 完全无法回答"模型到底收到了什么提示、返回了哪句话"，只能靠猜。
+	// 放在 Debug：平时不吵，需要时 -log-level=debug 就有摘要。
+	if slog.Default().Enabled(ctx, slog.LevelDebug) {
+		slog.Debug("[llm] 请求正文", "model", c.model, "body", redactSecret(bs, c.apiKey))
+	}
+
+	start := time.Now()
 	resp, err := c.http.Do(req)
 	if err != nil {
+		slog.Error("[llm] 请求失败", "model", c.model,
+			"耗时", time.Since(start).Round(time.Millisecond), "err", err)
 		return "", fmt.Errorf("调用 LLM: %w", err)
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
+		// 失败必须记全文：模型方的报错（额度/参数/鉴权）就藏在这个 body 里，
+		// 只回给前端一句"调用失败"等于把线索丢了。
+		slog.Error("[llm] 返回非 200", "model", c.model, "status", resp.StatusCode,
+			"耗时", time.Since(start).Round(time.Millisecond), "body", truncate(string(raw), 800))
 		return "", fmt.Errorf("LLM 返回 %d: %s", resp.StatusCode, truncate(string(raw), 500))
+	}
+	log.Printf("[llm] %s ok（%s，%dB）", c.model, time.Since(start).Round(time.Millisecond), len(raw))
+	// 记下**答了什么**：同样只在 Debug。
+	if slog.Default().Enabled(ctx, slog.LevelDebug) {
+		slog.Debug("[llm] 响应正文", "model", c.model, "body", redactSecret(raw, c.apiKey))
 	}
 
 	var out struct {
@@ -225,6 +298,11 @@ const semanticSystemPrompt = `你是 Gridwright 的"脑"，负责决定如何更
 - **绝对不要输出单元格坐标**（不要 A1、不要行列号）。用 key（业务键列）、field（字段列名）、
   可选的 month（年月如 2026-08）描述位置，坐标由程序计算。
 - op=add 表示在原值上累加（收退款类通常用 add）；op=set 表示覆盖。
+- **op=upsert 表示“查不到就新增”**，形状是 key + row（不给 field/value）：
+  {"sheet":"销售明细表","key":{"客户名称":"张三"},
+   "row":{"楼栋":"1栋","实收金额":12000},"op":"upsert","reason":"补录收款"}
+  语义：拿 key 里的列去表里找行，找到就按 row 覆盖那几列，找不到就在表尾新增一行。
+  用户说“按某列的名字填某几列，查不到就新增”时就用它。**不要**说“不能新增行”。
 - 一行备注若要拆到多个月（如"收到7月租金19256元，8月租金4284元"），拆成多条 edits，
   金额之和必须等于原额，逐条给 month。
 - 不确定 / 信息不足 / 疑似要动禁止列 → 放进 questions 或 skip_reasons。**不要猜。**

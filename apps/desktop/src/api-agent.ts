@@ -200,6 +200,11 @@ export interface ProposalItem {
   op: string;
   old: unknown;
   new: unknown;
+  /**
+   * 新增行时要写入的「列名 → 值」。op="append" 时用它——
+   * 新增一行是多列，单个 new 表达不了。
+   */
+  values?: Record<string, unknown>;
   reason?: string;
   affects?: string[];
 }
@@ -441,8 +446,10 @@ export const agentApi = {
   // 待确认闭环：计划 → 确认 → 执行
   // 归一化：Go 的空切片会 marshal 成 null，界面若直接 .length/.map 会整页崩，
   // 所以在 API 边界把 items/blocked/affects 一律收敛成数组。
-  plan: async (instruction: string, file?: string) => {
-    const r = await post<{ id: string; proposal: Proposal }>("/api/v1/plan", { instruction, file });
+  // images：随指令附的图。数据常常就在截图里（"按 D 列名字填 E、F 列"），
+  // 不带图的话模型只能反问数据来源，把能做的事停成澄清。
+  plan: async (instruction: string, file?: string, images?: string[]) => {
+    const r = await post<{ id: string; proposal: Proposal }>("/api/v1/plan", { instruction, file, images });
     if (r?.proposal) r.proposal = normalizeProposal(r.proposal);
     return r;
   },
@@ -458,6 +465,30 @@ export const agentApi = {
     post<{ conversationId: string; conversation: ConvoDto }>("/api/v1/chat", { message, conversationId, images }),
   conversations: () => get<{ items: ConvoSummary[] }>("/api/v1/conversations"),
   conversation: (id: string) => get<ConvoDto>(`/api/v1/conversation?id=${encodeURIComponent(id)}`),
+  renameConversation: (id: string, title: string) =>
+    put<{ ok: boolean; title: string }>(`/api/v1/conversation?id=${encodeURIComponent(id)}`, { title }),
+  deleteConversation: (id: string) =>
+    del<{ ok: boolean }>(`/api/v1/conversation?id=${encodeURIComponent(id)}`),
+  /** 从一段记录里提炼**记忆候选**（只提议，不落盘；落盘走 saveMemory） */
+  distill: (id: string) =>
+    post<{ conversationId: string; title: string; candidates: DistillCandidate[] }>(
+      `/api/v1/conversation/distill?id=${encodeURIComponent(id)}`, {}),
+  // 记忆（人批准后才写入）
+  memory: () => get<{ memory: MemoryFile; counts: { facts: number; decisions: number; stale: number }; path: string }>("/api/v1/memory"),
+  saveMemory: (m: MemoryInput) => post<{ ok: boolean }>("/api/v1/memory", { ...m, approve: true }),
+  /** 标记/清除"可能过时"（stale 机制：让记忆能自我纠错） */
+  memoryStale: (id: string, action: "mark" | "clear", note?: string) =>
+    post<{ ok: boolean }>("/api/v1/memory/stale", { id, action, note }),
+  /**
+   * 自动查一遍"哪些记忆点名的东西在表里已经没了"。
+   * 只做这一件可证明的事（**不比金额、不判语义**）：误报会让整套提示失去信任。
+   * 有表读不到时会拒绝下结论（返回 409），而不是照报。
+   */
+  checkMemoryStale: () =>
+    post<{ ok: boolean; count: number; marked: StaleMark[] }>("/api/v1/memory/stale/check", {}),
+  /** 删掉一条写错的记忆（错的记忆会污染以后所有判断，所以必须能删） */
+  deleteMemory: (kind: "fact" | "decision", id: string) =>
+    post<{ ok: boolean }>("/api/v1/memory/delete", { kind, id }),
   // 影响面 / 语义映射 / 安全
   impact: (node: string, kind?: string) =>
     post<ImpactResult>("/api/v1/impact", { node, kind }),
@@ -481,10 +512,84 @@ export interface ConvoSummary {
   updated: string;
 }
 
+/**
+ * 一条**记忆候选**：从对话记录里提炼出来的、还没落盘的东西。
+ *
+ * 为什么它是独立类型而不是直接复用记忆：候选是"提议"，记忆是"结论"。
+ * 前者模型说了不算，人要逐条过目；后者是已批准的长期资产。
+ * 类型分开，就不会有人不小心把候选直接当记忆用。
+ */
+export interface DistillCandidate {
+  kind: "fact" | "decision";
+  title: string;
+  text: string;
+  key?: Record<string, string>;
+  source?: string;
+  why?: string;
+}
+
+/** 写入一条记忆（走 /api/v1/memory，服务端强制要 approve=true）。 */
+export interface MemoryInput {
+  kind: "fact" | "decision";
+  id: string;
+  value?: string;
+  text?: string;
+  unit?: string;
+  key?: Record<string, string>;
+  source?: string;
+}
+
+export interface MemoryFact {
+  id: string;
+  kind?: string;
+  key?: Record<string, string>;
+  value: string;
+  unit?: string;
+  source?: string;
+  observed?: string;
+  confidence?: string;
+  updated?: string;
+}
+
+export interface MemoryDecision {
+  id: string;
+  key?: Record<string, string>;
+  text: string;
+  source?: string;
+  by?: string;
+  approved?: string;
+}
+
+/** 一条"可能过时"的标记（让记忆能自我纠错）。 */
+export interface MemoryStale {
+  id: string;
+  note: string;
+  found?: string;
+}
+
+/** 自动检查标出来的一条（给"查完告诉用户这次发现了什么"用）。 */
+export interface StaleMark {
+  id: string;
+  kind: "fact" | "decision";
+  value: string;
+  note: string;
+  where?: string;
+  source?: string;
+}
+
+export interface MemoryFile {
+  facts?: MemoryFact[];
+  decisions?: MemoryDecision[];
+  relations?: { kind?: string; tables?: string[]; source?: string; note?: string }[];
+  stale?: MemoryStale[];
+}
+
 export interface ConvoMsgDto {
   role: "user" | "agent" | "system";
   text: string;
   time: string;
+  /** 这条消息附的图（data URL）。落库了才能回看"当时给的是哪张图"。 */
+  images?: string[];
   proposal?: {
     kind: string; title: string; detail: string; schedule?: string;
     action?: string; tools?: string[]; options?: string[];

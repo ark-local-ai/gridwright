@@ -81,6 +81,57 @@ func TestLocateRowFieldAndMonth(t *testing.T) {
 	}
 }
 
+// TestMatchRowsSkipsSpacerRows 空行是分隔行，不是数据行：
+// 向下填充不能把上一行的铺位“带”过空行，否则一个键会凭空变成多行匹配。
+func TestMatchRowsSkipsSpacerRows(t *testing.T) {
+	f := excelize.NewFile()
+	_ = f.SetSheetName("Sheet1", "月租金")
+	for i, h := range []string{"序号", "物业位置", "本月实收"} {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+		_ = f.SetCellValue("月租金", cell, h)
+	}
+	_ = f.SetCellValue("月租金", "B2", "A03")
+	_ = f.SetCellValue("月租金", "C2", 100)
+	// 第 3 行整行留空（分隔行）
+	_ = f.SetCellValue("月租金", "B4", "A05")
+
+	s, err := LoadSheet(f, "月租金")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows := s.MatchRows(1, map[int]string{1: "A03"})
+	if len(rows) != 1 || rows[0] != 1 {
+		t.Fatalf("A03 应只匹配第 2 行，得到 %v（空行被当成数据行了）", rows)
+	}
+	if got := s.MatchRows(1, map[int]string{1: "A05"}); len(got) != 1 || got[0] != 3 {
+		t.Fatalf("A05 应只匹配第 4 行，得到 %v", got)
+	}
+}
+
+// TestLocateRowFieldRejectsAmbiguity 同一键落在**两行真实数据**上时必须报错，
+// 不静默取第一行——客户名重复在真实台账里很常见，取第一行就是改错行。
+func TestLocateRowFieldRejectsAmbiguity(t *testing.T) {
+	f := excelize.NewFile()
+	for i, h := range []string{"序号", "物业位置", "本月实收"} {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+		_ = f.SetCellValue("Sheet1", cell, h)
+	}
+	// 同名铺位两行（都不是空行）
+	_ = f.SetCellValue("Sheet1", "B2", "A03")
+	_ = f.SetCellValue("Sheet1", "C2", 100)
+	_ = f.SetCellValue("Sheet1", "A3", 2)
+	_ = f.SetCellValue("Sheet1", "B3", "A03")
+	_ = f.SetCellValue("Sheet1", "C3", 200)
+
+	s, err := LoadSheet(f, "Sheet1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.LocateRowField(nil, []string{"本月实收"}, map[string]string{"物业位置": "A03"}); err == nil {
+		t.Fatal("同一键落在两行真实数据上时应报错，而不是取第一行")
+	}
+}
+
 // TestLocateRealWorkbook 用真实台账验证定位器（表在就测，不在就跳过）。
 func TestLocateRealWorkbook(t *testing.T) {
 	root := filepath.Join("..", "..", "..", "..")

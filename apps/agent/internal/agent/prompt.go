@@ -82,10 +82,16 @@ func readXLSXText(path string) (string, error) {
 //
 // 与旧的 assemblePrompt 关键区别：**要求模型输出业务语义坐标，不要输出单元格坐标**。
 // 因为真实台账里（合并单元格、汇总表列是日期序列号）坐标极易错行错列，坐标由代码算。
-func assemblePlanPrompt(instruction string, structures []*xl.Structure, g *graph.Graph, memoryText string) string {
+func assemblePlanPrompt(instruction string, structures []*xl.Structure, g *graph.Graph, memoryText string, hasImages bool) string {
 	var b strings.Builder
 	b.WriteString("# 任务\n")
 	b.WriteString(strings.TrimSpace(instruction))
+	if hasImages {
+		// 图里的数据是**素材本身**。说清这一点，模型才不会反问"数据来自哪张表"——
+		// 那类追问会把一件能做的事停住（实测发生过）。
+		b.WriteString("\n\n（用户随指令附了图，**图里就是本次要处理的数据**，" +
+			"请直接从图里读数，不要再问数据来自哪张表。）")
+	}
 	b.WriteString("\n\n# 工作区表结构（表头 + 样例行）\n")
 	for _, s := range structures {
 		b.WriteString(s.Describe(5))
@@ -110,9 +116,18 @@ func assemblePlanPrompt(instruction string, structures []*xl.Structure, g *graph
 {"edits":[{"sheet":"工作表名","key":{"物业位置":"B31"},"month":"2026-08","field":"本月实收","op":"add","value":23540,"reason":"8月租金"}],
  "summary":"一句话总结","skip_reasons":["被跳过及原因"],"questions":["你不确定而需要问人的问题"]}
 规则：
-- **绝对不要给单元格坐标**。用 key（业务键列，如 物业位置/铺位号）、field（字段列名）、
-  可选的 month（年月，格式 2026-08）来描述位置；坐标由程序计算。
+- **绝对不要给单元格坐标**。用 key（业务键列，如 物业位置/铺位号/房号/客户名称）、
+  field（字段列名）、可选的 month（年月，格式 2026-08）来描述位置；坐标由程序计算。
 - op=add 表示在该格原值上累加（收款类通常用 add）；op=set 表示覆盖。
+- **op=upsert 表示“查不到就新增”**，形状是 key + row（不给 field/value）：
+  {"sheet":"销售明细表","key":{"客户名称":"张三"},
+   "row":{"楼栋":"1栋","实收金额":12000},"op":"upsert","reason":"补录收款"}
+  语义：拿 key 里的列去表里找行，**找到就按 row 覆盖那几列，找不到就在表尾新增一行**。
+  用户说“按某列的名字填某几列，查不到就新增”时就用它。
+  **这是系统本来就支持的能力**——不要把“表里没有这一行”当成做不到的事
+  （不要说“不能新增行”），那正是 upsert 要处理的。
+  注意：row 的列名必须与表头**完全一致**；row 与 key 同名时以 key 为准；
+  upsert 不用 month（它是按行定位，不是按月份列定位）。
 - 若一行备注说了要拆到多个月（如"收到7月租金19256元，8月租金4284元"），
   **拆成多条 edits**，金额之和必须等于原额，且逐条给出 month。
 - 不确定、信息不足、或疑似要动不允许改的列时，放进 questions 或 skip_reasons，
@@ -122,8 +137,13 @@ func assemblePlanPrompt(instruction string, structures []*xl.Structure, g *graph
 
 // assemblePrompt 组装发给脑的 prompt（spec §4 ①~⑤），发送量 O(1) 恒定。
 // 这是"inbox 自动处理"那条老路径用的（输出坐标为 edit 契约）；见 planner.go 的语义版。
+//
+// memText 是检索到的**相关记忆**（见 docs/agent-architecture/21-记忆设计.md）。
+// 加这一段是必须的：以前只有"用户在对话里下指令"那条路带记忆，于是用户拍板过的
+// 规矩（"含运费都算进去"）在 inbox 自动处理时根本不生效——同一条规矩，
+// 手动改表遵守、自动改表不遵守，**那比没有记忆更坏**（人会以为规矩已经立住了）。
 func assemblePrompt(cfg *config.Config, structures []*xl.Structure, source, data string,
-	recentLedger []string, rules memory.RulesFile, state memory.State) string {
+	recentLedger []string, rules memory.RulesFile, state memory.State, memText string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# 新数据（来自 %s）\n%s\n\n", source, data)
 
@@ -157,7 +177,17 @@ func assemblePrompt(cfg *config.Config, structures []*xl.Structure, source, data
 		}
 	}
 
+	b.WriteString("\n")
+	if strings.TrimSpace(memText) == "" {
+		// 如实说"没检索到"，而不是整段省略：模型该知道"这次没有历史结论可用"，
+		// 而不是分不清"没有记忆"和"记忆段被忘了加"。
+		b.WriteString("# 相关记忆\n（这次没有检索到相关记忆）\n")
+	} else {
+		b.WriteString(memText)
+	}
+
 	b.WriteString("\n请按输出契约返回 JSON 编辑指令。禁止列绝对不能动，若要动请放进 skip_reasons 并跳过。\n")
+	b.WriteString("记忆里的“以往决定”照办即可，除非新数据明显与它冲突；若冲突，请放进 skip_reasons 说明。\n")
 	return b.String()
 }
 

@@ -17,6 +17,7 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/ledger"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory"
+	"github.com/ark-local-ai/ark/apps/agent/internal/memory2"
 	"github.com/ark-local-ai/ark/apps/agent/internal/notify"
 	"github.com/ark-local-ai/ark/apps/agent/internal/plan"
 	"github.com/ark-local-ai/ark/apps/agent/internal/workspace"
@@ -224,8 +225,18 @@ func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
 			f.Close()
 			return fmt.Errorf("没有规则命中，且未配置模型：%s 留在 inbox 待处理", source)
 		}
-		prompt := assemblePrompt(a.Cfg, structures, source, data, recentLedger, rules, state)
-		log.Printf("调用脑（%s）…", a.Brain.Model())
+			// 相关记忆：按**这批新数据的内容**检索（而不是按用户指令——
+			// 自动这条路没有指令，进来的只有数据本身）。
+			// 用数据原文当查询，才能把"含运费""B31"这类词对应上的规矩带出来。
+			memText := ""
+			if mem, merr := memory2.Open(a.Layout.Root); merr == nil {
+				memText = mem.RetrieveByText(data).Describe()
+				if memText != "" {
+					log.Printf("带上相关记忆（%d 段）", strings.Count(memText, "\n  - "))
+				}
+			}
+			prompt := assemblePrompt(a.Cfg, structures, source, data, recentLedger, rules, state, memText)
+			log.Printf("调用脑（%s）…", a.Brain.Model())
 		p, err = a.Brain.Plan(ctx, prompt)
 		if err != nil {
 			f.Close()

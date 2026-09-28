@@ -1,7 +1,7 @@
 /* =====================================================================
    gridwright 桌面壳
    仅做两件事：自绘标题栏样式 + 把工作台高度降出标题栏。
-   颜色全部复用 frontend/src/index.css 的设计令牌。
+   颜色全部复用本包 src/index.css 的设计令牌。
    ===================================================================== */
 
 :root {
@@ -22,7 +22,7 @@
   flex-direction: column;
 }
 
-/* 工作台（.app/.main 来自 frontend shell.css）原为 100vh，
+/* 工作台（.app/.main 来自本包 layout/shell.css）原为 100vh，
    这里收进标题栏之下的内容区，改为占满剩余高度 */
 .desktop-body .app,
 .desktop-body .main {

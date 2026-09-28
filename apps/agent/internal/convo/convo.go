@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -176,6 +177,34 @@ func (s *Store) Delete(id string) error {
 	}
 	s.items = out
 	return s.saveLocked()
+}
+
+// Rename 改一条会话的标题。
+//
+// 为什么需要：标题默认取首句前 20 字，而首句未必说得清这件事是什么
+// （"帮我看下这个" 这种开场很常见）。记录要能翻回来，就得能起个记得住的名字。
+// 空标题不接受——那会让列表里出现一条无名的记录。
+func (s *Store) Rename(id, title string) (*Conversation, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return nil, fmt.Errorf("标题不能为空")
+	}
+	if len([]rune(title)) > 60 {
+		title = string([]rune(title)[:60])
+	}
+	for i := range s.items {
+		if s.items[i].ID == id {
+			s.items[i].Title = title
+			if err := s.saveLocked(); err != nil {
+				return nil, err
+			}
+			c := s.items[i]
+			return &c, nil
+		}
+	}
+	return nil, fmt.Errorf("会话不存在：%s", id)
 }
 
 func (s *Store) saveLocked() error {

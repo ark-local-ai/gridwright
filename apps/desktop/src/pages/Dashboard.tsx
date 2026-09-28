@@ -22,7 +22,11 @@ import { linkHealth } from "../lib/linkage";
 
 type Load = "idle" | "loading" | "ready" | "error";
 
-export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<string | null> } = {}) {
+export default function Dashboard({ pickFolder, watchDrop }: {
+  pickFolder?: () => Promise<string | null>;
+  /** 桌面壳注入的原生拖拽监听（浏览器里没有，退回 HTML5 drag-drop） */
+  watchDrop?: (h: { enter: () => void; leave: () => void; drop: (paths: string[]) => void }) => Promise<() => void>;
+} = {}) {
   const [load, setLoad] = useState<Load>("loading");
   const [err, setErr] = useState("");
   const [wsName, setWsName] = useState("");
@@ -31,10 +35,17 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   const [files, setFiles] = useState<WorkspaceFiles | null>(null);
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [scan, setScan] = useState<ScanReport | null>(null);
-  const [counts, setCounts] = useState({ error: 0, warn: 0 });
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [active, setActive] = useState<GraphNode | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  // 对话抽屉宽度：起始读上次拖到的值（不写死），拖动时实时更新。
+  // 记在本地而不是工作区里——"我喜欢多宽"是使用这台机器的人的习惯，
+  // 跟哪份台账无关。
+  const [chatW, setChatW] = useState<number>(() => {
+    const v = Number(localStorage.getItem("gw:chat-width"));
+    return Number.isFinite(v) && v >= 360 ? v : 460;
+  });
+  const [activeResize, setActiveResize] = useState(false);
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
@@ -48,11 +59,13 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [safetyRep, setSafetyRep] = useState<SafetyReport | null>(null);
   const [appliedNote, setAppliedNote] = useState("");
+  const [partErr, setPartErr] = useState<Record<string, string>>({});
   const [lastSelfCheck, setLastSelfCheck] = useState<SelfCheckReport | null>(null);
 
   const refresh = useCallback(async () => {
     setLoad("loading");
     setErr("");
+    setPartErr({});
     try {
       await agentApi.workspace().then((ws) => {
         // 工作区名取目录名（工作区是容器，可以含多个表）
@@ -62,19 +75,27 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
         setBrainReady(ws.brainReady);
         setChosen(ws.workspaceChosen);
       });
+      // 每项各自降级：一项挂了不影响其余照常显示，但挂过这件事必须留下来。
+      const failed = (part: string) => (e: unknown) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        setPartErr((p) => ({ ...p, [part]: msg }));
+        return null;
+      };
       const [f, g, s, l] = await Promise.all([
-        agentApi.files().catch(() => null),
-        agentApi.graph().catch(() => null),
-        agentApi.scanRun().catch(() => null),
-        agentApi.ledger(5).catch(() => ({ entries: [], limit: 5 })),
+        agentApi.files().catch(failed("文件清单")),
+        agentApi.graph().catch(failed("表间关联")),
+        agentApi.scanRun().catch(failed("体检")),
+        agentApi.ledger(5).catch(failed("账目")),
       ]);
       setFiles(f);
       setGraph(g);
       setScan(s?.report ?? null);
-      setCounts({ error: s?.errors ?? 0, warn: s?.warns ?? 0 });
-      setLedger(l.entries ?? []);
+      setLedger(l?.entries ?? []);
       // 安全报告：告诉用户"这张表能不能写"（含宏=硬拒绝）。确认改动前必须知道。
-      agentApi.safety().then((r) => setSafetyRep(r.report)).catch(() => setSafetyRep(null));
+      // 读不到时不能静静留空——那会显示成“没有风险”，而实际是“没查成”。
+      agentApi.safety()
+        .then((r) => setSafetyRep(r.report))
+        .catch(failed("安全检查"));
       // 默认选中"被引用最多"的那个节点（最能说明这张表的影响力）
       setActive(g?.nodes?.length ? pickHub(g) : null);
       setLoad("ready");
@@ -85,6 +106,44 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  // ---------- 对话抽屉：拖左缘改宽 ----------
+  //
+  // 用 pointer 事件 + setPointerCapture：鼠标拖出窗口（拖得快时很正常）
+  // 也不会丢事件。pointermove/up 挂在 window 上：pointerup 的目标是**被捕获的
+  // 元素**（把手本身），若只挂在遮罩上，松手那一刻根本轮不到它，
+  // 宽度就永远存不下来（实测踩到过）。
+  // 宽度上限取窗口的 88%：既留出看板的余量，也不至于拖到全屏失去"抽屉"的意思。
+  const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    setActiveResize(true);
+  };
+  useEffect(() => {
+    if (!activeResize) return;
+    const move = (e: PointerEvent) => {
+      const max = Math.round(window.innerWidth * 0.88);
+      // 抽屉贴右边：宽度 = 窗口右缘 - 指针位置
+      const w = Math.round(window.innerWidth - e.clientX);
+      setChatW(Math.max(360, Math.min(max, w)));
+    };
+    const up = () => {
+      setActiveResize(false);
+      // 松手才落盘：拖动过程中每帧都写 localStorage 是没必要的 IO
+      setChatW((w) => {
+        try { localStorage.setItem("gw:chat-width", String(w)); } catch { /* 存不下只影响下次打开 */ }
+        return w;
+      });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+  }, [activeResize]);
 
   const pickNode = useCallback(async (n: GraphNode) => {
     setActive(n);
@@ -143,10 +202,16 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
   const propagate = graph?.propagate?.to ?? [];
   const hot = new Set(propagate);
   const issues = scan?.issues ?? [];
-  // 「要处理的处数」= 主角数字。用问题总数（体检报出的），不是 kind 分类数。
-  const totalIssues = counts.error + counts.warn;
-  const spots = hotspots(issues);
+  // 主角数字只数**账目对不上**（mismatch）。以前数的是全部问题（含 #REF! 一类
+  // 表里本来就坏掉的格子），于是没有对不上也会报"2 处待核对"，而且下面那句
+  // "N 个铺位对不上"会把无铺位的错误值算成"（未标注）"——**数字与说法都对不上**。
+  // 用户要看的正是"改完之后数据对不对得上"，所以这里只认 mismatch。
+  const mismatches = issues.filter((i) => i.kind === "mismatch");
+  const totalIssues = mismatches.length;
+  const spots = hotspots(mismatches);
   const lh = graph ? linkHealth(graph) : null;
+  // 读取失败的板块名（有内容才渲染那条警示带）
+  const partNames = Object.keys(partErr);
 
   return (
     <div className="dash">
@@ -203,19 +268,46 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
         </div>
       </header>
 
-      {/* 对话：配置手段（说一句 → 出提案），不是常驻主界面 */}
-      {chatOpen && (
-        <div className="chat-drawer">
-          <header className="cd-head">
-            <IconSpark size={14} />
-            <b>对话</b>
-            <span className="cd-hint">输入指令即可安排工作；系统仅提供建议，修改表格需经确认</span>
-            <button className="cd-x" onClick={() => setChatOpen(false)} aria-label="关闭对话"><IconX size={14} /></button>
-          </header>
-          <div className="cd-body">
-            <ChatPane onPlanReady={(p) => { setProposal(p); setChatOpen(false); }} />
-          </div>
+      {/* 读取失败必须显形。失败的请求和“真的没有”在界面上一模一样，
+          所以这里只说自己知道的事：哪一项没读到、为什么、
+          以及下面那些空白可信不可信。 */}
+      {partNames.length > 0 && (
+        <div className="dash-degraded" role="alert">
+          <IconX size={13} />
+          <span className="dd-text">
+            <b>{partNames.length} 项没读到</b>
+            {partNames.map((k) => (
+              <span key={k} className="dd-item">{k}<em>{partErr[k]}</em></span>
+            ))}
+            <span className="dd-warn">下面的空白可能是读取失败，不一定是真的没有。</span>
+          </span>
+          <button className="btn ghost sm" onClick={() => void refresh()}>
+            <IconRefresh size={12} />重试
+          </button>
         </div>
+      )}
+
+      {/* 对话：配置手段（说一句 → 出提案），不是常驻主界面。
+          宽度可拖（左缘那道把手），并记住用户拖到的宽度——每个人读长句子
+          舒服的宽度不一样，固定 460px 对写长指令的人是折磨。 */}
+      {chatOpen && (
+        <>
+          {activeResize && <div className="chat-resize-veil" />}
+          <div className="chat-drawer" style={{ width: chatW ? `${chatW}px` : undefined }}>
+            <div className="cd-resize" role="separator" aria-orientation="vertical"
+              aria-label="拖动调整对话宽度"
+              onPointerDown={startResize} />
+            <header className="cd-head">
+              <IconSpark size={14} />
+              <b>对话</b>
+              <span className="cd-hint">输入指令即可安排工作；系统仅提供建议，修改表格需经确认</span>
+              <button className="cd-x" onClick={() => setChatOpen(false)} aria-label="关闭对话"><IconX size={14} /></button>
+            </header>
+            <div className="cd-body">
+              <ChatPane wsKey={wsPath} onPlanReady={(p) => { setProposal(p); setChatOpen(false); }} />
+            </div>
+          </div>
+        </>
       )}
 
       {settingsOpen && (
@@ -227,16 +319,23 @@ export default function Dashboard({ pickFolder }: { pickFolder?: () => Promise<s
         />
       )}
 
-      {/* 空地盘：只有这一块，但顶栏在，能换工作区 */}
+      {/* 空地盘：只有这一块，但顶栏在，能换工作区。
+          "还没选过工作区"和"选了一个空的"都该能**拖**——后者以前只给一句
+          "把 xlsx 拖进下面这个文件夹"，却没有任何地方接得住拖拽，等于把人
+          打发去用资源管理器。两种空态共用同一个 DropZone：
+          拖文件夹=把它当工作区，拖表=复制进当前工作区。 */}
       {isFirstRun ? (
         <div className="dash-body dash-body-empty">
           <div className="dash-col">
-            <DropZone pickFolder={pickFolder} onDone={() => void refresh()} />
+            <DropZone pickFolder={pickFolder} watchDrop={watchDrop} onDone={() => void refresh()} />
           </div>
         </div>
       ) : isEmpty ? (
         <div className="dash-body dash-body-empty">
-          <EmptyWorkspace root={wsPath} onRefresh={() => void refresh()} onNew={() => setSettingsOpen(true)} />
+          <div className="dash-col">
+            <EmptyHeader root={wsPath} />
+            <DropZone pickFolder={pickFolder} watchDrop={watchDrop} onDone={() => void refresh()} />
+          </div>
         </div>
       ) : (
         <>
@@ -401,14 +500,23 @@ function Collapsed({ label, summary, tone, children }: {
 
 function NodeStats({ node }: { node: GraphNode }) {
   const [pv, setPv] = useState<SheetPreview | null>(null);
+  const [pvErr, setPvErr] = useState("");
   useEffect(() => {
     let alive = true;
+    setPvErr("");
     agentApi.preview(node.sheet, node.file, 1)
       .then((d) => { if (alive) setPv(d); })
-      .catch(() => { if (alive) setPv(null); });
+      .catch((e: unknown) => {
+        if (!alive) return;
+        setPv(null);
+        setPvErr(e instanceof Error ? e.message : String(e));
+      });
     return () => { alive = false; };
   }, [node.sheet, node.file]);
 
+  // 读不到就明说。此前失败与“还在加载”共用同一个骨架屏，于是骨架会永远转下去：
+  // 用户既不知道出了错，也不知道在等什么——比报错还难查。
+  if (pvErr) return <div className="nd-note">预览读不到：{pvErr}</div>;
   if (!pv) return <div className="sk-group nd-stats-sk"><SkPanel rows={3} /></div>;
 
   // 空表（无数据行）时 summaries/sample/header 可能是 null，必须兜底
@@ -461,10 +569,14 @@ function Metric({ label, value }: { label: string; value: string }) {
 function WorkspaceSwitcher({ onPick, onOpenSettings }: { onPick: () => void; onOpenSettings: () => void }) {
   const [items, setItems] = useState<WorkspaceListItem[]>([]);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
   useEffect(() => {
     agentApi.workspaces()
       .then((r) => setItems(r.items))
-      .catch(() => setItems([]));
+      .catch((e: unknown) => {
+        setItems([]);
+        setErr(e instanceof Error ? e.message : String(e));
+      });
   }, []);
 
   const pick = async (dir: string) => {
@@ -476,7 +588,8 @@ function WorkspaceSwitcher({ onPick, onOpenSettings }: { onPick: () => void; onO
     <>
       <div className="ws-backdrop" onClick={onOpenSettings} />
       <div className="ws-menu" onClick={(e) => e.stopPropagation()}>
-        {items.length === 0 && <div className="ws-empty">还没有其他工作区</div>}
+        {err && <div className="ws-empty">读不到工作区列表：{err}</div>}
+        {!err && items.length === 0 && <div className="ws-empty">还没有其他工作区</div>}
         {items.map((w) => (
           <button key={w.path} className={`ws-item${w.current ? " on" : ""}`}
             disabled={busy || w.current} onClick={() => void pick(w.path)}>
@@ -567,28 +680,15 @@ export function FolderPicker({ onPick, onCancel }: {
   );
 }
 
-function EmptyWorkspace({ root, onRefresh, onNew }: {
-  root: string; onRefresh: () => void; onNew: () => void;
-}) {
+/* 空工作区（已选过、里面没表）以前是个纯文字页，只叫人"拖进这个文件夹"，
+   却没有任何地方接得住拖拽——说的和做的对不上。现在它和首屏共用同一个
+   DropZone（拖表=复制进来，拖文件夹=换成那个工作区），只在上面加一行说明。 */
+function EmptyHeader({ root }: { root: string }) {
   return (
-    <div className="dash-empty">
+    <div className="empty-lead">
       <h2>这个工作区还是空的</h2>
-      <p>工作区就是一个文件夹，表放在里面。两种做法：</p>
-      <div className="empty-ways">
-        <div className="empty-way">
-          <b>放表格进来</b>
-          <span>把 xlsx 拖进下面这个文件夹，然后点「重新读取」。</span>
-        </div>
-        <div className="empty-way">
-          <b>换个工作区</b>
-          <span>左上角点工作区名可切换；「设置」里能新建或打开别的文件夹。</span>
-        </div>
-      </div>
+      <p>工作区就是一个文件夹。把表拖进来，或者拖一个装着表的文件夹（会直接换过去）。</p>
       <p className="dash-hint">当前目录：<code>{root || "（未设置）"}</code></p>
-      <div className="empty-actions">
-        <button className="btn primary" onClick={onRefresh}><IconRefresh size={14} />重新读取</button>
-        <button className="btn ghost" onClick={onNew}><IconGear size={14} />打开设置</button>
-      </div>
     </div>
   );
 }

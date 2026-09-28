@@ -17,18 +17,28 @@ import (
 //
 // 环境变量仍然优先（密钥可以用 LLM_API_KEY 给，不必写进文件）。
 
+// UserConfigDir 返回应用数据目录（config.yaml 与工作区注册表都放这里）。
+// Windows: %APPDATA%\gridwright；其他：$XDG_CONFIG_HOME/gridwright 或 ~/.config/gridwright。
+//
+// 这个目录**只属于 gridwright**，与用户自己的工作区文件夹无关——
+// 凡是我们自己的状态文件（配置、注册表）都必须落在这一处，
+// 绝不能写进工作区、更不能写进工作区的上级目录（那是用户的地盘）。
+func UserConfigDir() string {
+	if dir := os.Getenv("GRIDWRIGHT_CONFIG_DIR"); dir != "" {
+		return dir
+	}
+	if cfg, err := os.UserConfigDir(); err == nil && cfg != "" {
+		return filepath.Join(cfg, "gridwright")
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".gridwright")
+}
+
 // UserConfigPath 返回用户级配置文件的路径。
 // Windows: %APPDATA%\gridwright\config.yaml
 // 其他：   $XDG_CONFIG_HOME 或 ~/.config/gridwright/config.yaml
 func UserConfigPath() string {
-	if dir := os.Getenv("GRIDWRIGHT_CONFIG_DIR"); dir != "" {
-		return filepath.Join(dir, "config.yaml")
-	}
-	if cfg, err := os.UserConfigDir(); err == nil && cfg != "" {
-		return filepath.Join(cfg, "gridwright", "config.yaml")
-	}
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".gridwright", "config.yaml")
+	return filepath.Join(UserConfigDir(), "config.yaml")
 }
 
 // Save 把当前配置写回 path（保持 YAML，机器可读、人可改）。

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/agent"
+	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
 	"github.com/ark-local-ai/ark/apps/agent/internal/notify"
 	"github.com/ark-local-ai/ark/apps/agent/internal/propose"
 )
@@ -25,6 +26,10 @@ import (
 type planReq struct {
 	Instruction string `json:"instruction"` // 一句话指令
 	File        string `json:"file"`        // 可选：目标文件
+	// Images 是随指令附的图（data URL）。举例："按 D 列名字把 E、F 列填进销售明细表"——
+	// 数据本身就在截图里。不把图传到"出清单"这一步，模型只能反问"数据来自哪张表"，
+	// 把一件能做的事停成澄清（实测发生过）。
+	Images []string `json:"images,omitempty"`
 }
 
 // handlePlan POST /api/v1/plan
@@ -46,7 +51,13 @@ func (s *Server) handlePlan(w http.ResponseWriter, r *http.Request) {
 	}
 	brain := s.brainClient()
 	ag := agent.New(cfg, layout, led, brain)
-	prop, err := ag.Plan(r.Context(), req.Instruction, agent.PlanOptions{File: req.File})
+	// 图只放行 data:image/ 前缀（与 /chat 同一道校验）：不信任客户端传来的任意 URL，
+	// 否则等于让对方通过我们的密钥去访问任意地址。
+	var imgs []llm.ImageInput
+	for _, d := range imgsForStore(req.Images) {
+		imgs = append(imgs, llm.ImageInput{DataURL: d})
+	}
+	prop, err := ag.Plan(r.Context(), req.Instruction, agent.PlanOptions{File: req.File, Images: imgs})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return

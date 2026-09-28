@@ -1,2 +1,15 @@
 dist/
 *.exe
+
+# internal/webui/dist 必须是"存在但可以为空"的目录。
+#
+# 原因：webui.go 里是 //go:embed all:dist —— go:embed 在**目录不存在**时直接
+# 编译失败（"pattern all:dist: no matching files found"），而在**目录为空**时
+# 正常编译（Available() 返回 false，二进制退化成"只有 API、没有界面"）。
+#
+# 它同时又是前端构建产物（由 scripts/build-single.sh 填充），不该提交。
+# 所以用 .gitkeep 把目录本身提交进去，内容仍然忽略。
+# 不加这三行的话，新克隆的仓库 go build ./... 直接挂。
+!internal/webui/dist/
+internal/webui/dist/*
+!internal/webui/dist/.gitkeep

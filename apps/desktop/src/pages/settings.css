@@ -1,0 +1,151 @@
+/* 设置面板（见 docs/agent-architecture/19/20） */
+
+.set-overlay {
+  position: fixed; inset: 0; z-index: 120; background: var(--scrim); backdrop-filter: var(--scrim-blur);
+  display: grid; place-items: center; padding: 32px;
+}
+.set-panel {
+  background: var(--surface); border-radius: var(--r-overlay);
+  box-shadow: var(--el-3); width: min(680px, 100%); max-height: 86vh;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.set-head {
+  display: flex; align-items: center; gap: 9px; padding: 14px 20px;
+  border-bottom: 1px solid var(--line); flex: none;
+}
+.set-head b { font-size: 14px; font-weight: var(--fw-h); }
+/* 两栏切换：放在标题栏里，紧挨"设置"——一眼看全有哪些可配。
+   比"分成两个弹窗"轻，也比"一页堆到底"清楚。 */
+.set-tabs { display: flex; align-items: center; gap: 2px; margin-left: var(--sp-4); }
+.set-tab {
+  display: inline-flex; align-items: center; gap: 5px; position: relative;
+  padding: 5px 12px; cursor: pointer; font-family: var(--font); font-size: var(--fs-2xs);
+  border: 1px solid transparent; border-radius: var(--r-full);
+  background: none; color: var(--text-2);
+  transition: color var(--d-fast) var(--ease-out), background var(--d-fast) var(--ease-out);
+}
+.set-tab:hover { background: var(--surface-2); color: var(--text-1); }
+.set-tab.on { background: var(--brand-soft); color: var(--brand); border-color: var(--brand-line); }
+/* 模型没配好时的小圆点：不切过去也知道这栏有事 */
+.set-tab-dot {
+  position: absolute; top: 3px; right: 4px;
+  width: 5px; height: 5px; border-radius: var(--r-full); background: var(--warn);
+}
+.set-x {
+  margin-left: auto; border: none; background: none; cursor: pointer;
+  color: var(--text-3); padding: 4px; border-radius: var(--r-ctl);
+}
+.set-x:hover { background: var(--surface-2); color: var(--text-1); }
+
+.set-body { overflow: auto; padding: 20px; display: flex; flex-direction: column; gap: 24px; }
+.set-sec { display: flex; flex-direction: column; gap: 10px; }
+.set-sec h3 { font-size: 13px; font-weight: var(--fw-h); color: var(--text-1); margin: 0; }
+.set-hint { font-size: 12px; color: var(--text-2); margin: 0; line-height: 1.6; }
+.set-hint b { color: var(--text-1); font-weight: var(--fw-med); }
+.set-hint-sm { font-size: 11.5px; color: var(--text-3); }
+.set-path {
+  font-family: var(--mono); font-size: 11px; color: var(--text-2);
+  background: var(--surface-2); padding: 1px 5px; border-radius: var(--r-ctl);
+  border: 1px solid var(--line); word-break: break-all;
+}
+
+.set-field { display: flex; align-items: center; gap: 12px; }
+.set-field > span { flex: none; width: 68px; font-size: 12px; color: var(--text-2); }
+.set-field input {
+  flex: 1; min-width: 0; padding: 7px 10px; font-size: 12.5px; font-family: var(--mono);
+  border: 1px solid var(--line-strong); border-radius: var(--r-ctl);
+  background: var(--surface); color: var(--text-1);
+}
+.set-field input:focus { outline: none; border-color: var(--brand); }
+
+.set-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.set-state { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
+.set-state.ok { color: var(--ok); }
+.set-state.off { color: var(--warn); }
+.set-msg { font-size: 12px; color: var(--text-2); }
+
+.set-spaces { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.set-space {
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center;
+  padding: 11px 14px; border-radius: var(--r-panel);
+  background: var(--surface); box-shadow: var(--el-1);
+}
+.set-space.on { background: var(--brand-soft); box-shadow: var(--el-1), inset 0 0 0 1px var(--brand-line); }
+.ss-name { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: var(--fw-med); color: var(--text-1); }
+.ss-name em {
+  font-style: normal; font-size: 10.5px; padding: 1px 6px; border-radius: 999px;
+  background: var(--brand); color: #fff; font-weight: var(--fw-h);
+}
+.ss-meta { font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.ss-path {
+  grid-column: 1 / -1; font-size: 11px; color: var(--text-3); font-family: var(--mono);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.set-empty { font-size: 12px; color: var(--text-3); padding: 8px 0; }
+.set-newspace {
+  flex: 1; min-width: 160px; padding: 7px 10px; font-size: 12.5px;
+  border: 1px solid var(--line); border-radius: var(--r-ctl);
+  background: var(--surface); color: var(--text-1);
+}
+.set-newspace:focus { outline: none; border-color: var(--brand); }
+
+/* ===== 记忆面板（设置里的第二栏）=====
+   记忆是长期资产，一条错的会污染以后所有判断。所以这一栏的重点不是"好看"，
+   而是**让人能一眼看出哪条危险、并当场处理掉**：过时的排最前、每条可标可删。 */
+.mem-err { font-size: var(--fs-2xs); color: var(--danger); margin: 0; }
+.mem-empty {
+  display: flex; flex-direction: column; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-6) var(--sp-4); text-align: center;
+  border: 1px dashed var(--line-strong); border-radius: var(--r-panel);
+  color: var(--text-3);
+}
+.mem-empty svg { color: var(--brand); }
+.mem-empty b { font-size: var(--fs-sm); color: var(--text-1); }
+.mem-empty span { font-size: var(--fs-2xs); color: var(--text-2); line-height: 1.7; max-width: 44ch; }
+
+/* 过时区：**排在最前**。系统还在照它办，但依据可能已经变了——最危险的一类。 */
+.mem-stale-box {
+  border: 1px solid var(--warn-line, var(--line-strong)); border-radius: var(--r-panel);
+  background: var(--warn-bg); padding: var(--sp-3);
+  display: flex; flex-direction: column; gap: var(--sp-2);
+}
+.mem-stale-h { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-2xs); color: var(--warn); }
+.mem-stale-h b { font-size: var(--fs-xs); }
+.mem-stale-h span { margin-left: auto; color: var(--text-3); }
+
+.mem-tabs { display: flex; gap: 2px; }
+.mem-tab {
+  padding: 4px 12px; cursor: pointer; font-family: var(--font); font-size: var(--fs-2xs);
+  border: 1px solid var(--line); border-radius: var(--r-full); background: var(--surface);
+  color: var(--text-2); font-variant-numeric: tabular-nums;
+}
+.mem-tab:hover { color: var(--text-1); border-color: var(--line-strong); }
+.mem-tab.on { background: var(--brand-soft); color: var(--brand); border-color: var(--brand-line); }
+
+.mem-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.mem-item {
+  display: flex; align-items: flex-start; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl);
+  border-left: 2px solid var(--line-strong); background: var(--surface-2);
+}
+.mem-item.stale { border-left-color: var(--warn); background: var(--warn-bg); }
+.mem-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.mem-text { font-size: var(--fs-2xs); color: var(--text-1); line-height: 1.6; overflow-wrap: anywhere; }
+.mem-meta { font-size: 10.5px; color: var(--text-3); line-height: 1.5; }
+.mem-acts { flex: none; display: flex; gap: 2px; }
+.mem-act {
+  border: none; background: none; cursor: pointer; padding: 5px;
+  border-radius: var(--r-ctl); color: var(--text-3); opacity: .6;
+}
+.mem-act:hover:not(:disabled) { color: var(--brand); background: var(--surface); opacity: 1; }
+.mem-act.ok:hover:not(:disabled) { color: var(--ok); }
+.mem-act.del:hover:not(:disabled) { color: var(--danger); background: var(--danger-bg); }
+.mem-act:disabled { opacity: .3; cursor: default; }
+.mem-none { font-size: var(--fs-2xs); color: var(--text-3); padding: var(--sp-3); }
+.mem-foot { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; margin-top: var(--sp-1); }
+/* 检查结果的回执：说清"这次查了什么、发现什么"，而不是一个空泛的"已完成" */
+.mem-check-msg {
+  margin: 0; font-size: var(--fs-2xs); color: var(--text-2); line-height: 1.6;
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl);
+  background: var(--surface-2); border-left: 2px solid var(--brand-line);
+}

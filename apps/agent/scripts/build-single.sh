@@ -35,6 +35,8 @@ echo "==> 2/4 把前端产物复制进 Go 源码树（供 go:embed）"
 rm -rf "$AGENT/internal/webui/dist"
 mkdir -p "$AGENT/internal/webui/dist"
 cp -r "$DESKTOP/dist/." "$AGENT/internal/webui/dist/"
+# go:embed 要求目录非空；上面 rm -rf 会把 .gitkeep 一起删掉，这里补回来。
+touch "$AGENT/internal/webui/dist/.gitkeep"
 
 echo "==> 3/4 交叉编译单文件（GOOS=$GOOS GOARCH=$GOARCH, 工具链 $GOTOOLCHAIN）"
 cd "$AGENT"

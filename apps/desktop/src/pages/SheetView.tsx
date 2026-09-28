@@ -17,7 +17,8 @@ function numericCols(rows: string[][], cols: number): boolean[] {
   for (let c = 0; c < cols; c++) {
     let num = 0, seen = 0;
     for (const row of rows) {
-      const v = (row[c] ?? "").trim();
+      // 空行可能是 null（见下方渲染处的同款处理），取列值前先兜底
+      const v = (row?.[c] ?? "").trim();
       if (!v) continue;
       seen++;
       // 容忍千分位、货币符号、百分号、括号负数
@@ -29,15 +30,32 @@ function numericCols(rows: string[][], cols: number): boolean[] {
   return out;
 }
 
-export default function SheetView({ file, sheet, highlight, onBack }: {
+export default function SheetView({ file, sheet: sheetProp, highlight, onBack }: {
   file?: string;
   sheet: string;
   highlight?: { ref: string } | null;
   onBack: () => void;
 }) {
+  // 当前看的是哪个 sheet。从外面点进来时用传入的那个，之后可在表内切换。
+  const [sheet, setSheet] = useState(sheetProp);
+  const [sheets, setSheets] = useState<string[]>([]);
   const [pv, setPv] = useState<SheetPreview | null>(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
+
+  // 外部（看板/体检）换了目标 sheet 时跟着走
+  useEffect(() => { setSheet(sheetProp); }, [sheetProp]);
+
+  // 取这个工作簿里的**全部 sheet**，做成可切换的标签。
+  // 为什么必须有：一个 xlsx 常有多个 sheet（实测那份销售报表有 4 个），
+  // 以前这里只渲染传进来的那一个，其余三个在界面上根本看不到、也进不去。
+  useEffect(() => {
+    let alive = true;
+    agentApi.sheets(file)
+      .then((d) => { if (alive) setSheets(d.sheets ?? []); })
+      .catch(() => { if (alive) setSheets([]); });
+    return () => { alive = false; };
+  }, [file]);
 
   useEffect(() => {
     let alive = true;
@@ -70,6 +88,24 @@ export default function SheetView({ file, sheet, highlight, onBack }: {
           </div>
         )}
       </header>
+
+      {/* 工作簿里的其他 sheet：点一下直接换。一个 xlsx 常有好几张表，
+          不列出来等于把它们藏了。"这张表/共几张"也说清，免得以为只有一页。 */}
+      {sheets.length > 1 && (
+        <nav className="sv-tabs" aria-label="工作表">
+          {sheets.map((s) => (
+            <button
+              key={s}
+              className={`sv-tab${s === sheet ? " on" : ""}`}
+              onClick={() => setSheet(s)}
+              aria-current={s === sheet ? "page" : undefined}
+            >
+              {s}
+            </button>
+          ))}
+          <span className="sv-tabs-n">共 {sheets.length} 张</span>
+        </nav>
+      )}
 
       {pv?.note && <p className="sv-note">{pv.note}</p>}
 
@@ -118,11 +154,13 @@ export default function SheetView({ file, sheet, highlight, onBack }: {
             <tbody>
               {pv.sample.map((row, ri) => {
                 const rowNum = pv.headerRow + ri + 1;
+                // 行可能是 null/空（空行）。**不能**直接 row[ci]——那会抛错把整页打白。
+                const cells = row ?? [];
                 return (
                   <tr key={ri} className={hlRow === rowNum ? "sv-row-hl" : ""}>
                     <td className="sv-rn">{rowNum}</td>
                     {pv.header.map((_, ci) => {
-                      const v = row[ci] ?? "";
+                      const v = cells[ci] ?? "";
                       const isHl = hlRow === rowNum && hlCol === ci + 1;
                       const cls = [numCols[ci] ? "sv-num" : "", isHl ? "sv-cell-hl" : ""].filter(Boolean).join(" ");
                       return (

@@ -7,9 +7,8 @@ dist/
 **/dist/
 *.tsbuildinfo
 
-# 运行期生成（任务交付物/后端本地数据，不提交）
+# 运行期生成（任务交付物，不提交）
 apps/frontend/public/workspace/
-apps/backend/data/
 # Rust (Tauri) 编译产物
 **/src-tauri/target/
 **/src-tauri/gen/schemas/
@@ -34,12 +33,8 @@ npm-debug.log*
 .zcode/
 ai-ui-aesthetics/
 
-# 旧目录残留（源码已迁至 apps/frontend）
-ark-app/
-
-# 内部文档（保存在本地，不推送到仓库）
+# 内部文档与本地截图（保存在本地，不推送到仓库）
 docs/
-apps/data/
 gui-test-screenshots/
 
 # 运行时状态（每台机器不同，不该进仓库）

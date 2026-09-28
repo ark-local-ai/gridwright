@@ -1,6 +1,6 @@
 # 参与贡献指南（Contributing）
 
-感谢你想参与 Ark · 方舟！本文档说明怎么跑起来、怎么提 PR、以及提交规范。
+感谢你想参与 gridwright！本文档说明怎么跑起来、怎么提 PR、以及提交规范。
 
 ## 一、快速开始
 
@@ -12,7 +12,7 @@ cd ark-ai
 # 前端
 cd apps/frontend
 npm install
-npm run dev          # http://localhost:5173  （/ 官网 · /app 工作台）
+npm run dev          # http://localhost:5173  （只有 / 官网）
 npm run build        # 生产构建
 npm run preview      # 预览构建产物
 ```
@@ -22,16 +22,15 @@ npm run preview      # 预览构建产物
 ## 二、目录结构
 
 ```
-apps/frontend/   # Web 前端（官网 + 工作台）· React+TS+Vite
-  src/
-    pages/       # 页面组件
-    components/  # 通用组件 / 图标
-    data/        # mock 数据与类型
-    layout/      # 应用壳（侧边栏/顶栏）
+apps/
+  frontend/      # 官网（纯静态落地页，React+TS+Vite，与桌面端无代码共享）
+  desktop/       # 桌面壳（Tauri 2）+ 工作台界面
+  agent/         # Go 引擎（唯一后端）
 docs/            # 内部文档（本地，不提交到仓库）
 ```
 
-> 桌面版前端（Tauri）与后端（Agent 编排）规划中，落地后各占 `apps/desktop/`、`apps/backend/`。
+> 三个 app 各自自持：`apps/frontend` 与 `apps/desktop` 是**两个独立发布的产品**，
+> 互相不 import；`apps/agent` 是引擎，桌面版与单文件版共用它。
 
 ## 三、分支规范
 
@@ -82,7 +81,7 @@ not home and workspace."
 ## 六、设计约定
 
 - 颜色只用 `src/index.css` 里的设计令牌，**不要新造颜色**
-- 基调：暖米白 / 米灰中性底（`--bg:#f6f5f1`），单一暖调主色茶褐/琥珀 `--brand:#b98b4e`
+- 基调：近白冷纸底（`--bg:#fbfcfd`），单一钢蓝主色 `--brand:#2f5d8a`
 - 大面积一律白/米灰，颜色只用于「可点击 / 选中 / 强调」；绿/橙/红仅表状态
 - 风格：扁平优先、柔和圆角、低频阴影、紧凑排版；尊重 `prefers-reduced-motion`
 - 详情见项目讨论文档（本地 `docs/`）

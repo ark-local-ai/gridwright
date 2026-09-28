@@ -46,7 +46,38 @@ func TestSheetPreviewEndpoint(t *testing.T) {
 	}
 }
 
-// TestSheetPreviewMissingSheet 不存在的表要明确报错，不能 500。
+// TestPreviewBlankRowIsEmptyArrayNotNull 空行必须是 []，不能是 null。
+//
+// 回归用例：真实台账里"隔一行空一行"很常见，而 excelize 把空行读成 nil 切片，
+// 序列化就是 null。前端渲染时取 row[0] 会抛 "Cannot read properties of null"，
+// 整个界面白屏（实测切到 实收日报表 就中招）。这里直接断言 JSON 里没有 null 行。
+func TestPreviewBlankRowIsEmptyArrayNotNull(t *testing.T) {
+	s := newTestServerWithBlankRow(t)
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
+		"/api/v1/sheets/preview?sheet=Sheet1&rows=20", nil))
+	if rec.Code != 200 {
+		t.Fatalf("preview 状态 %d：%s", rec.Code, rec.Body.String())
+	}
+	// 先看原始 JSON：null 行在这里就能抓到，不必依赖结构体解码
+	// （解码到 [][]string 时 null 会变成 nil 元素，两种都能断言，这里看原文更直接）
+	var raw struct {
+		Sample []json.RawMessage `json:"sample"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &raw); err != nil {
+		t.Fatal(err)
+	}
+	if len(raw.Sample) == 0 {
+		t.Fatal("应返回样例行")
+	}
+	for i, row := range raw.Sample {
+		if string(row) == "null" {
+			t.Fatalf("第 %d 行是 null——空行必须序列化成 []，否则前端会白屏", i)
+		}
+	}
+}
+
+
 func TestSheetPreviewMissingSheet(t *testing.T) {
 	s := newTestServer(t)
 	rec := httptest.NewRecorder()

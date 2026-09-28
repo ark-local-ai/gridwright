@@ -151,6 +151,7 @@ apps/
 │  ├─ cmd/gridwright/    # 入口：起引擎 + 内嵌界面
 │  └─ internal/
 │     ├─ graph/  locate/      # 表结构图、语义坐标定位
+│     ├─ xl/                  # 读写 xlsx（含新增行）
 │     ├─ scan/                # 只读体检（跨表一致性）
 │     ├─ rules/               # 规则引擎：命中即短路，不调用模型
 │     ├─ propose/ rollback/   # 确认制改表、回滚
@@ -158,10 +159,10 @@ apps/
 │     ├─ safety/              # 含宏的表拒绝写入
 │     ├─ impact/ selfcheck/   # 影响面推断、改动后自检
 │     ├─ memory/ weight/      # 长期记忆、表权重
-│     └─ api/                 # 本地 HTTP API（/api/v1）
-├─ frontend/     # Web 前端：官网（React 19 + TS + Vite）
-├─ desktop/      # 桌面壳（Tauri 2）：复用 frontend 界面 + 随包引擎
-└─ backend/      # 早期 Node 后端（已不参与桌面链路）
+│     ├─ logx/                # 日志：slog → stdout、级别可调
+│     └─ webui/dist/          # 单文件版内嵌界面（构建时同步，非手改）
+├─ frontend/     # 官网（纯静态落地页，与桌面端无代码共享）
+└─ desktop/      # 桌面壳（Tauri 2）+ 工作台界面，随包拉起 Go 引擎
 ```
 
 **引擎是唯一业务实现**，界面只是它的视图。桌面壳启动时探测 `127.0.0.1:7700`，
@@ -188,7 +189,7 @@ apps/
 ## 测试
 
 ```bash
-cd apps/agent && go test ./...     # 144 个用例，覆盖 19 个包
+cd apps/agent && go test ./...     # 187 个用例，覆盖 21 个包（共 30 个包）
 ```
 
 ## 参与贡献

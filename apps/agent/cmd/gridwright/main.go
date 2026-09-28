@@ -24,6 +24,7 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/config"
 	"github.com/ark-local-ai/ark/apps/agent/internal/ledger"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 	"github.com/ark-local-ai/ark/apps/agent/internal/proc"
 	"github.com/ark-local-ai/ark/apps/agent/internal/workspace"
 )
@@ -32,7 +33,12 @@ func main() {
 	cfgPath := flag.String("config", "config.yaml", "config.yaml 路径")
 	apiAddr := flag.String("api", "127.0.0.1:7700", "本地 API 监听地址（空字符串=不启动）")
 	parentPID := flag.Int("parent-pid", 0, "父进程 PID（桌面壳传入；父进程退出时本进程随之退出）")
+	logLevel := flag.String("log-level", "", "日志级别 debug|info|warn|error（默认 info；也可用 "+logx.EnvLevel+" 环境变量）")
 	flag.Parse()
+
+	// 必须最先做：它决定此后所有日志的落点（stdout，而非 stderr）与格式。
+	// 放在 flag.Parse 之后、任何 log.Fatalf 之前，配置错误的报错才用得上新格式。
+	logx.Setup(*logLevel)
 
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {
@@ -66,9 +72,14 @@ func main() {
 	// 本地 API（界面用的通用契约，见 docs/agent-architecture/13-接口契约.md）
 	if *apiAddr != "" {
 		srv := api.New(cfg, layout, led, *apiAddr)
-		// 工作区注册表放在引擎同目录（桌面壳会把它指向应用数据目录），
-		// 记住用过的工作区，供界面切换。
-		regPath := filepath.Join(filepath.Dir(layout.Root), "gridwright-workspaces.json")
+		// 工作区注册表放**应用数据目录**，记住用过的工作区供界面切换。
+		//
+		// 曾经放在 filepath.Dir(layout.Root)（工作区的**上一级**），以为"引擎旁边"
+		// 就是应用目录。那是错的：工作区由用户选，可以是任意文件夹——用户选了
+		// "...\2026-09\testwork"，注册表就写进他的 "...\2026-09\"；选了 "...\x\a"，
+		// 就写进 "...\x\"。实测把 gridwright-workspaces.json 撒进了用户的微信下载
+		// 文件夹和上一层目录。**绝不往用户的数据目录里写我们自己的文件。**
+		regPath := filepath.Join(config.UserConfigDir(), "gridwright-workspaces.json")
 		if reg, rerr := workspace.OpenRegistry(regPath); rerr == nil {
 			srv = srv.WithRegistry(reg)
 			log.Printf("工作区注册表: %s", regPath)

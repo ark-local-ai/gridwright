@@ -11,10 +11,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -151,8 +153,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/chat", s.handleChat)
 	mux.HandleFunc("/api/v1/conversations", s.handleConversations)
 	mux.HandleFunc("/api/v1/conversation", s.handleConversation)
+	// 从一段对话里提炼"记忆候选"：只提议、不落盘（落盘走 /memory 且需人批准）
+	mux.HandleFunc("/api/v1/conversation/distill", s.handleDistill)
 	mux.HandleFunc("/api/v1/memory", s.handleMemoryOrPut)
 	mux.HandleFunc("/api/v1/memory/stale", s.handleMemoryStale)
+	mux.HandleFunc("/api/v1/memory/stale/check", s.handleMemoryStaleCheck)
+	mux.HandleFunc("/api/v1/memory/delete", s.handleMemoryDelete)
 	mux.HandleFunc("/api/v1/weights", s.handleWeights)
 	mux.HandleFunc("/api/v1/impact", s.handleImpact)
 	mux.HandleFunc("/api/v1/impact/learn", s.handleImpactLearn)
@@ -202,17 +208,78 @@ func (s *Server) ListenAndServe() error {
 
 // ---------- 通用中间件 ----------
 
+// statusRecorder 记下真实写出的状态码，供请求日志使用。
+// ResponseWriter 本身不暴露状态码，不包一层就只能记出"200"。
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+	bytes  int
+}
+
+func (r *statusRecorder) WriteHeader(code int) {
+	r.status = code
+	r.ResponseWriter.WriteHeader(code)
+}
+
+func (r *statusRecorder) Write(b []byte) (int, error) {
+	if r.status == 0 {
+		r.status = http.StatusOK
+	}
+	n, err := r.ResponseWriter.Write(b)
+	r.bytes += n
+	return n, err
+}
+
 func withCommon(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 先包一层 rec：下面无论走哪条分支状态码都被记下，
+		// panic 恢复也才能判断"头有没有已经写出去"。
+		rec := &statusRecorder{ResponseWriter: w}
+
+		// panic 恢复。
+		//
+		// 一个没被恢复的 panic 会让**整个引擎进程**退出：用户看到的是"桌面端
+		// 突然连不上"，而 engine.log 里只有 Go 运行时那串栈，之后所有请求全失败，
+		// 只能重启应用。恢复成 500 并留下栈，至少界面还能继续用、线索还留着。
+		defer func() {
+			if v := recover(); v != nil {
+				slog.Error("请求 panic", "method", r.Method, "path", r.URL.Path,
+					"panic", v, "stack", string(debug.Stack()))
+				// 头可能已经写出去了（例如已开始写正文），此时再写 500 会触发
+				// "superfluous response.WriteHeader call"。只在还没写时补。
+				if rec.status == 0 {
+					writeErr(rec, http.StatusInternalServerError, "服务内部错误，详见 engine.log")
+				}
+			}
+		}()
+
 		// 简单 CORS：桌面壳 / 网页预览从不同 origin 访问本机服务
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
+			rec.WriteHeader(http.StatusNoContent)
 			return
 		}
-		next.ServeHTTP(w, r)
+		// 请求日志：引擎跑在 GUI 里，屏幕上看不到任何东西——只有落到文件才可能排障。
+		// 记 方法/路径/状态/耗时/字节数，够定位"哪里报了 500、哪次请求特别慢"。
+		// 健康检查每几秒一次，噪音大且无信息量，跳过。
+		if r.URL.Path == "/api/v1/health" {
+			next.ServeHTTP(rec, r)
+			return
+		}
+		start := time.Now()
+		next.ServeHTTP(rec, r)
+		if rec.status == 0 {
+			rec.status = http.StatusOK
+		}
+		// query 一并记（如 ?node=xx 影响返回内容），别只记路径
+		target := r.URL.Path
+		if q := r.URL.RawQuery; q != "" {
+			target += "?" + q
+		}
+		log.Printf("%s %s -> %d  %s  %dB", r.Method, target, rec.status,
+			time.Since(start).Round(time.Millisecond), rec.bytes)
 	})
 }
 

@@ -110,6 +110,10 @@ func Run(path string, opt Options) (*Report, error) {
 	if opt.CrossMonthCheck && len(opt.MonthSheets) > 1 {
 		scanCrossMonth(f, opt, rep)
 	}
+	// 跨表引用核对：汇总表引用明细表时，两边数是否一致。
+	// 这是"改完表之后数据对不上"最典型的一种（用户原话：日收表记 5 万、
+	// 汇总表却写成 5 千）。
+	scanLinkedValues(f, rep)
 	for i := range rep.Issues {
 		if rep.Issues[i].File == "" {
 			rep.Issues[i].File = base

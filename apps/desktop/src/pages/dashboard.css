@@ -104,15 +104,18 @@
 .sk-stat { height: 116px; }
 
 /* 空工作区引导 */
-.dash-body-empty { display: block; }
-.empty-ways { display: flex; gap: var(--sp-3); flex-wrap: wrap; justify-content: center; margin: var(--sp-2) 0 var(--sp-1); }
-.empty-way {
-  flex: 1 1 220px; max-width: 280px; text-align: left; padding: var(--sp-3) var(--sp-4);
-  border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--surface);
+/* 首次运行 / 空工作区：整屏只有这一块，所以让它**占满并居中**，
+   而不是缩在顶部角落里。窗口越高、框越大——留白是这块屏唯一的装饰。 */
+.dash-body-empty {
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--sp-6);
 }
-.empty-way b { display: block; font-size: var(--fs-sm); color: var(--text-1); margin-bottom: var(--sp-1); }
-.empty-way span { font-size: var(--fs-xs); color: var(--text-2); line-height: 1.6; }
-.empty-actions { display: flex; gap: var(--sp-3); }
+.dash-body-empty .dash-col { max-width: 760px; padding: 0; }
+/* 空工作区（已选过、里面没表）的说明行：跟着 DropZone 一起居中 */
+.empty-lead { text-align: center; margin-bottom: var(--sp-4); }
+.empty-lead h2 { font-size: var(--fs-title); font-weight: var(--fw-title); color: var(--text-1); margin: 0 0 var(--sp-2); }
+.empty-lead p { font-size: var(--fs-sm); color: var(--text-2); margin: 0 0 var(--sp-1); }
+.empty-lead .dash-hint { font-size: var(--fs-xs); color: var(--text-3); }
 
 /* ---------- 主体：**单列** ----------
    原来是左右两栏（左=理解，右=行动）。拆掉的理由不是"不好看"，是**重复**：
@@ -234,26 +237,6 @@
 .cg-sec-rest .cg-sec-h::after { background: var(--line); opacity: .6; }
 .cg-sec-rest .cr-name { color: var(--text-2); font-size: var(--fs-2xs); }
 .cg-sec-rest .chain-row { padding-top: 4px; padding-bottom: 4px; }
-.cg-sec-rest .sh-thumb { opacity: .5; }
-.cg-sec-rest .chain-row:hover .sh-thumb,
-.cg-sec-rest .chain-row.on .sh-thumb { opacity: 1; }
-
-/* ===== 微缩缩略图（SheetThumb）=====
-   表本来就"有形状"：304×15 和 64×8 的轮廓完全不同。用形状认表比读名字快——
-   "2026年9月租金"和"2026年8月租金"读起来几乎一样，但格子密度一眼可辨。 */
-.sh-thumb {
-  flex: none; display: grid; gap: 1px; width: 46px; height: 26px;
-  padding: 2px; border-radius: 3px;
-  background: var(--surface-2);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-.sh-thumb i { background: var(--text-3); opacity: .55; border-radius: 1px; min-height: 1px; }
-.sh-thumb i.off { background: transparent; opacity: 0; }
-/* 表头行更实：让人看出"这是一张有表头的表" */
-.sh-thumb i:not(.off):nth-child(-n+12) { opacity: .85; }
-.sh-thumb.master i { background: var(--brand); }
-.sh-thumb.on { box-shadow: inset 0 0 0 1px var(--brand), 0 0 0 3px var(--brand-soft); }
-.sh-thumb-empty i { background: var(--line-strong); opacity: .3; }
 
 /* ===== 权重条谱（WeightBar）=====
    每行**都画底槽**：真实台账里 24 张表有 22 张权重为 0，只画有值的会让
@@ -324,7 +307,6 @@
   width: 1px; background: var(--line);
 }
 .chain-row.sub { padding-left: 6px; }
-.chain-row.sub .sh-thumb { width: 38px; height: 22px; }
 /* 文件名头：它是一组的分隔，弱化到"标签"级别（不跟表名争） */
 .cg-file {
   display: flex; align-items: center; gap: var(--sp-2);
@@ -567,6 +549,15 @@
   /* 单栏时侧栏在下半屏，底部渐隐就没意义了（会遮住内容） */
   .dash-left { border-right: none; border-bottom: 1px solid var(--line); mask-image: none; -webkit-mask-image: none; }
 }
+
+/* 窄屏（手机 / 分屏）：对话抽屉铺满，不再给主界面留一条 40px 的缝。
+   460px 的抽屉在 720px 宽的窗口里只剩 240px 给主表，两边都不能用；
+   窄屏就该一次只做一件事：要么看表，要么对话。 */
+@media (max-width: 720px) {
+  .chat-drawer { width: 100%; }
+  /* 铺满后左缘把手没有可拖动的余地（再拖就小于屏幕了），隐藏掉免得误导 */
+  .cd-resize { display: none; }
+}
 /* 权重来源说明（如"还没积累使用数据，只按结构排序"） */
 .dash-weight-note { font-size: var(--fs-2xs); color: var(--text-2); margin: var(--sp-3) 0 0; line-height: 1.5; }
 
@@ -718,6 +709,20 @@
   box-shadow: var(--el-2);
   animation: drawer-in var(--d-base) var(--ease-out);
 }
+/* 左缘的拖动把手：一条窄的热区 + 中间一道发丝线。
+   热区要比线宽得多（线只有 1px，靠它自己几乎点不中）。 */
+.cd-resize {
+  position: absolute; left: -3px; top: 0; bottom: 0; width: 7px;
+  cursor: col-resize; z-index: 2; touch-action: none;
+}
+.cd-resize::after {
+  content: ""; position: absolute; left: 3px; top: 0; bottom: 0; width: 1px;
+  background: transparent; transition: background var(--d-fast) var(--ease-out);
+}
+.cd-resize:hover::after, .cd-resize:active::after { background: var(--brand); }
+/* 拖动时铺一层透明遮罩：指针划过聊天内容也不会触发悬停态、
+   更不会选中文字（拖拽常常"顺手"选中一大片，很烦）。 */
+.chat-resize-veil { position: fixed; inset: 0; z-index: 70; cursor: col-resize; }
 @keyframes drawer-in { from { transform: translateX(12px); opacity: .6; } to { transform: none; opacity: 1; } }
 .cd-head {
   display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4);
@@ -916,44 +921,88 @@
 .lm-st.iso i { border: 1.5px dashed var(--warn); }
 .lm-st b { color: var(--ink); font-family: var(--mono); }
 
-/* 族谱：一行一族，成员排成一条点阵 */
-.lm-fams { display: flex; flex-direction: column; gap: var(--sp-3); }
-.lm-fam { display: flex; flex-direction: column; gap: 5px; }
-.lm-fam-h { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
+/* 族谱：一行一族（同名系列，如 14 张月表），只说"这一族谁断了" */
+.lm-fams { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-3); }
+.lm-fam { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
 .lm-fam-n { font-size: var(--fs-2xs); color: var(--text-2); font-weight: var(--fw-h); }
 .lm-fam-c { font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
-.lm-dots { display: flex; flex-wrap: wrap; gap: 4px; }
-/* 实心方块 = 连着；空心虚线 = 断开。一眼扫过去就知道断了几格。
-   每族的色相在组件里注入（同一族同色）——族名、方块、统计同色，
-   所以"哪几格属于这一族"不必读文字就成立。 */
-.lm-dot {
-  width: 13px; height: 13px; padding: 0; cursor: pointer;
-  border-radius: 3px; border: 1.5px dashed currentColor; background: transparent;
-  transition: transform var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out);
-}
-.lm-dot.on { border: 1.5px solid transparent; }
-.lm-dot:hover { transform: scale(1.3); box-shadow: var(--el-1); }
 
 /* 断口清单：具体哪张表、多少处，点了跳到那一格 */
-.lm-breaks { display: flex; flex-direction: column; gap: var(--sp-2); }
+.lm-breaks { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-3); }
 .lm-breaks-h { display: flex; align-items: baseline; justify-content: space-between; }
 .lm-breaks-h > span:first-child {
   font-size: var(--fs-2xs); font-weight: var(--fw-h); color: var(--text-2); letter-spacing: var(--ls-label);
 }
 .lm-breaks-n { font-size: var(--fs-2xs); color: var(--danger); font-weight: var(--fw-h); font-variant-numeric: tabular-nums; }
-.lm-break-list { list-style: none; margin: 0; padding: 0; }
+.lm-break-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+/* 断口一行：色点（认表身份）+ 表名 + 坐标 + 处数 */
 .lm-break-row {
-  display: flex; align-items: baseline; gap: var(--sp-2); width: 100%;
-  padding: 6px var(--sp-2); border: none; background: none; cursor: pointer;
+  display: flex; align-items: center; gap: var(--sp-2); width: 100%;
+  padding: 5px var(--sp-2); border: none; background: none; cursor: pointer;
   border-radius: var(--r-ctl); text-align: left; font-family: var(--font);
   font-size: var(--fs-2xs); border-left: 2px solid var(--danger-line);
   transition: background var(--d-fast) var(--ease-out);
 }
 .lm-break-row:hover { background: var(--danger-bg); }
+.lm-break-dot { width: 8px; height: 8px; border-radius: 2px; flex: none; }
 .lm-break-sheet { flex: 1; min-width: 0; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lm-break-ref { flex: none; font-family: var(--mono); color: var(--brand); }
 .lm-break-n { flex: none; color: var(--danger); font-variant-numeric: tabular-nums; }
 .lm-break-hint { margin: 0; font-size: var(--fs-2xs); color: var(--text-3); line-height: 1.6; }
+
+/* ===== 工作区 → 工作簿 → 工作表（三层树）=====
+   数据本来的形状：一个工作区多个 xls，一个 xls 多个 sheet。
+   平铺会把这个信息抹掉，而跨表引用**大多发生在同一个工作簿内**，
+   所以"哪几张属于同一个文件"是这块图最该讲清的事。 */
+.lm-tree { display: flex; flex-direction: column; gap: var(--sp-3); margin-top: var(--sp-4); }
+.lm-tree-h { display: flex; align-items: baseline; gap: var(--sp-2); }
+.lm-tree-k {
+  font-size: var(--fs-2xs); font-weight: var(--fw-h); color: var(--text-2);
+  letter-spacing: var(--ls-label);
+}
+.lm-tree-n { margin-left: auto; font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+/* 一个工作簿一块：浅底 + 左侧一道竖线，暗示"这些属于同一个文件" */
+.lm-book {
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border-left: 2px solid var(--line-strong);
+  border-radius: 0 var(--r-panel) var(--r-panel) 0;
+  background: var(--surface-2);
+  display: flex; flex-direction: column; gap: var(--sp-2);
+}
+.lm-book-h { display: flex; align-items: center; gap: var(--sp-2); }
+.lm-book-ic { color: var(--ok); display: grid; place-items: center; flex: none; }
+.lm-book-name {
+  font-size: var(--fs-xs); font-weight: var(--fw-h); color: var(--text-1);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lm-book-n {
+  margin-left: auto; flex: none; display: flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums;
+}
+.lm-book-c { display: flex; align-items: center; gap: var(--sp-2); }
+.lm-book-c i { width: 7px; height: 7px; border-radius: 2px; display: inline-block; margin-right: 3px; }
+.lm-book-c i.ok { background: var(--brand); }
+.lm-book-c i.iso { border: 1.5px dashed var(--warn); }
+
+/* sheet chip：一排排开。实心=有跨表引用，空心描边=孤立。
+   每张表一个稳定色相（认色如认表），所以同一张表在哪儿都是同一个颜色。 */
+.lm-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.lm-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  max-width: 100%; padding: 4px 10px; cursor: pointer;
+  border-radius: var(--r-full); font-family: var(--font); font-size: var(--fs-2xs);
+  border: 1.5px solid transparent; background: var(--surface);
+  color: var(--text-2); border-color: var(--line-strong);
+  transition: transform var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out),
+              background var(--d-fast) var(--ease-out);
+}
+.lm-chip svg { flex: none; opacity: .9; }
+.lm-chip-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 连着：实心（颜色在组件里注入，同一张表恒定） */
+.lm-chip.on { color: #fff; border-color: transparent; }
+.lm-chip.on svg { opacity: 1; }
+.lm-chip:hover { transform: translateY(-1px); box-shadow: var(--el-1); }
 
 /* =====================================================================
    首屏空框（DropZone）—— 第一次打开时，屏上只有它。
@@ -962,13 +1011,14 @@
    ===================================================================== */
 .dz-wrap {
   display: flex; flex-direction: column; align-items: center;
-  gap: var(--sp-4); width: 100%; max-width: 560px; margin: 0 auto;
-  padding: var(--sp-8) 0;
+  gap: var(--sp-4); width: 100%; max-width: 680px; margin: 0 auto;
 }
 .dz {
-  width: 100%; min-height: 260px;
+  /* 这块空地是首屏的全部内容，所以给它**大**：高度跟着窗口走
+     （min 320px 保底，大屏可到 46vh），而不是缩在顶上留一大片空白。 */
+  width: 100%; min-height: max(320px, 46vh);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: var(--sp-3); padding: var(--sp-8) var(--sp-6);
+  gap: var(--sp-4); padding: var(--sp-8) var(--sp-6);
   border: 1.5px dashed var(--line-strong); border-radius: var(--r-overlay);
   background: var(--surface); cursor: pointer; font-family: var(--font);
   transition: border-color var(--d-base) var(--ease-out),
@@ -1005,3 +1055,27 @@
   background: var(--surface); color: var(--text-1); font-family: var(--font); font-size: var(--fs-xs);
 }
 .dz-new input:focus-visible { outline: none; border-color: var(--brand); box-shadow: var(--focus-ring); }
+
+/* ---------- 读取失败带 ----------
+   失败的请求与“真的没有数据”在界面上完全一样，所以必须单独显形。
+   用警示黄而不是红：这不是错误页，“部分没读到、其余照常看”是可继续的状态；
+   只有整个工作区都读不到时才是那面红色错误页。 */
+.dash-degraded {
+  display: flex; align-items: flex-start; gap: var(--sp-3);
+  margin: var(--sp-3) var(--sp-6) 0; padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--warn); border-radius: var(--r-ctl);
+  background: var(--warn-bg); color: var(--warn);
+  font-size: var(--fs-sm);
+  /* 不参与主区滚动：它是一句结论，滑走就白说了 */
+  flex: none;
+}
+.dash-degraded .dd-text {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: var(--sp-2) var(--sp-4); min-width: 0; flex: 1;
+}
+.dash-degraded .dd-item { font-weight: var(--fw-med); }
+.dash-degraded .dd-item em {
+  font-style: normal; font-weight: 400; opacity: .85; margin-left: var(--sp-1);
+}
+.dash-degraded .dd-warn { color: var(--text-3); }
+.dash-degraded > button { margin-left: auto; flex: none; }

@@ -93,6 +93,74 @@ func TestConversationsLifecycle(t *testing.T) {
 	}
 }
 
+// TestConvoRename 改标题：记录要能翻回来，就得能起个记得住的名字。
+func TestConvoRename(t *testing.T) {
+	s := newTestServer(t)
+	h := s.Handler()
+	store, _ := s.convoStore()
+	c, err := store.Ensure("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = store.Append(c.ID, convo.Message{Role: convo.RoleUser, Text: "帮我看下这个"})
+
+	// 默认标题取首句——常常是"帮我看下这个"这种没能耐的名字
+	body, _ := json.Marshal(map[string]string{"title": "御龙湾 9 月对账"})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/v1/conversation?id="+c.ID, bytes.NewReader(body)))
+	if rec.Code != 200 {
+		t.Fatalf("rename 状态 %d：%s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/conversation?id="+c.ID, nil))
+	var full convo.Conversation
+	_ = json.Unmarshal(rec.Body.Bytes(), &full)
+	if full.Title != "御龙湾 9 月对账" {
+		t.Errorf("标题没改成，得到 %q", full.Title)
+	}
+
+	// 空标题要拒：列表里不该出现无名记录
+	body, _ = json.Marshal(map[string]string{"title": "   "})
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/v1/conversation?id="+c.ID, bytes.NewReader(body)))
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("空标题应 400，得到 %d", rec.Code)
+	}
+}
+
+// TestDistillNeedsBrain 没配模型时 /conversation/distill 明确报错，不崩。
+//
+// 为什么单独测这条：提炼是"记录 → 记忆"的闸门，它出问题时不能表现得像
+// "这段对话没有可沉淀的东西"——那会让人以为提炼过了、只是没内容。
+// 必须明确说"要配模型"。
+func TestDistillNeedsBrain(t *testing.T) {
+	s := newTestServer(t)
+	h := s.Handler()
+	store, _ := s.convoStore()
+	c, _ := store.Ensure("", "")
+	_, _ = store.Append(c.ID, convo.Message{Role: convo.RoleUser, Text: "B31 收到 8 月租金 23540"})
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/conversation/distill?id="+c.ID, nil))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("未配模型应 400，得到 %d：%s", rec.Code, rec.Body.String())
+	}
+	if !bytes.Contains(rec.Body.Bytes(), []byte("模型")) {
+		t.Errorf("报错应说清是模型没配，得到 %s", rec.Body.String())
+	}
+}
+
+// TestDistillMissingConvo 记录不存在时报 404，而不是空候选。
+func TestDistillMissingConvo(t *testing.T) {
+	s := newTestServer(t)
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/conversation/distill?id=不存在", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("不存在的记录应 404（未配模型时也应先说模型），得到 %d：%s", rec.Code, rec.Body.String())
+	}
+}
+
 // TestChatWithoutBrain 没配模型时 /chat 明确提示，不崩。
 func TestChatWithoutBrain(t *testing.T) {
 	s := newTestServer(t)

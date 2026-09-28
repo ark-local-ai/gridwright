@@ -30,6 +30,29 @@
   flex: none; margin: 0; padding: 9px 26px; font-size: var(--fs-2xs); color: var(--warn);
   background: var(--warn-bg); border-bottom: 1px solid var(--line);
 }
+
+/* ---------- 工作表标签 ----------
+   一个工作簿常有好几张 sheet（实测那份销售报表有 4 张）。以前这里只显示
+   传进来的那一张，其余的在界面上不存在——用户会以为"表少读了"。
+   标签横排、可点切换；选中态用钢蓝（全站唯一"要你动"的颜色）。 */
+.sv-tabs {
+  display: flex; align-items: center; gap: var(--sp-1); flex: none;
+  padding: var(--sp-2) 26px; overflow-x: auto;
+  border-bottom: 1px solid var(--line); background: var(--surface-2);
+}
+.sv-tab {
+  flex: none; border: 1px solid transparent; background: none; cursor: pointer;
+  padding: 4px 11px; border-radius: var(--r-ctl);
+  font-family: var(--font); font-size: var(--fs-2xs); color: var(--text-2);
+  white-space: nowrap;
+  transition: color var(--d-fast) var(--ease-out), background var(--d-fast) var(--ease-out);
+}
+.sv-tab:hover { background: var(--surface); color: var(--text-1); }
+.sv-tab.on {
+  background: var(--brand-soft); color: var(--brand);
+  border-color: var(--brand-line); font-weight: var(--fw-h);
+}
+.sv-tabs-n { flex: none; margin-left: auto; font-size: var(--fs-2xs); color: var(--text-3); white-space: nowrap; }
 .sv-msg { padding: 48px; text-align: center; color: var(--text-2); font-size: var(--fs-sm); }
 
 .sv-scroll { flex: 1; min-height: 0; overflow: auto; padding: 22px 26px 40px; }

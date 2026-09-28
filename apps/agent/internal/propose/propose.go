@@ -21,6 +21,14 @@ import (
 )
 
 // Item 是清单里的一条改动。
+//
+// 三种 op：
+//   - set    改写某个已存在的格（覆盖）
+//   - add    在某个已存在的格上累加
+//   - append 往表尾新增一行（Values 给列名→值）
+//
+// append 的 Ref 只是**估算**的行号（用来让人看见“要加在哪一行附近”），
+// 真正写到第几行由 Apply 时现算——确认期间表可能已经长长了。
 type Item struct {
 	// 定位结果（由 locate 算出）
 	File  string `json:"file"`  // 文件名
@@ -34,10 +42,18 @@ type Item struct {
 	Month string            `json:"month,omitempty"`
 	Field string            `json:"field"` // 字段列名
 
-	Op     string `json:"op"`  // set | add
+	Op     string `json:"op"`  // set | add | append
+	// HeaderRow 是表头所在行（1 基），op=append 时必须。
+	// 真实台账的表头常在第 2–4 行（前面是标题），传 1 会把表头认成标题行。
+	HeaderRow int    `json:"header_row,omitempty"`
 	Old    any    `json:"old"` // 旧值（算出来的）
 	New    any    `json:"new"` // 新值（将写入）
-	Reason string `json:"reason,omitempty"`
+	// Values 是新增行时要写入的「列名 → 值」（op=append 时用）。
+	//
+	// 为什么不能挤进 New：新增一行是多列，而 New 是单个值。硬塞进去
+	// 就只能存成一张 map 的字符串，界面既显示不了也回不了滚。
+	Values map[string]any `json:"values,omitempty"`
+	Reason string         `json:"reason,omitempty"`
 	Source string `json:"source,omitempty"` // 这条来自哪份新数据 / 哪句指令
 
 	// 联动：改这一格会牵动哪些 文件!工作表（来自联动图）

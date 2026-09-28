@@ -11,7 +11,7 @@ import { IconXls, IconFolder, IconNote } from "./icons";
  *   这时候给他一屏 0 会显得像坏了。空框是**邀请**，不是报告。
  *
  * 两条路径都支持，因为两种外壳能力不同：
- *   · 桌面壳（Tauri）：拿到真实路径 → 走 import（服务端复制文件）
+ *   · 桌面壳（Tauri）：拿到真实路径 → 走 import（服务端复制文件/切工作区）
  *   · 浏览器/单文件版：只有 File 对象，没有路径 → 提示用"选择文件夹"
  *     （浏览器不允许网页读任意本机路径，这是安全边界，不是偷懒）
  */
@@ -23,9 +23,27 @@ function isExcel(name: string) {
   return EXTS.some((e) => n.endsWith(e));
 }
 
-export default function DropZone({ onDone, pickFolder }: {
+/** 原生拖拽回调。结构与 desktop/src/native.ts 的 DropHandlers 一致。 */
+type DropHandlers = {
+  enter: () => void;
+  leave: () => void;
+  drop: (paths: string[]) => void;
+};
+
+export default function DropZone({ onDone, pickFolder, watchDrop }: {
   onDone: () => void;
+  /** 弹系统文件夹选择框（桌面壳注入；浏览器里没有，退回服务端列目录） */
   pickFolder?: () => Promise<string | null>;
+  /**
+   * 监听原生拖拽（桌面壳注入）。
+   *
+   * 为什么要注入而不是组件自己 import：Tauri 的 API 只有桌面包装了，
+   * 这个组件同时被前端包（浏览器/单文件版）复用。之前组件里用变量路径
+   * 动态 import Tauri，Vite 解析不了，产物里留了个 webview 认不得的裸模块名，
+   * 运行时静默失败——表现就是"拖文件夹进去毫无反应"。现在改由桌面壳注入，
+   * 那里的 import 是静态的、能正常打包。
+   */
+  watchDrop?: (h: DropHandlers) => Promise<() => void>;
 }) {
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -33,42 +51,32 @@ export default function DropZone({ onDone, pickFolder }: {
   const [err, setErr] = useState("");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
-  // 浏览器兜底用的隐藏 input（桌面壳走 Tauri 拖拽事件，不用它）
+  // 浏览器兜底用的隐藏 input（桌面壳走原生拖拽，不用它）
   const fileRef = useRef<HTMLInputElement>(null);
-
-  // 桌面壳：Tauri 的原生拖拽事件带**真实路径**，浏览器的 DataTransfer 没有。
-  // 这是桌面版能"拖进来就直接用"的原因。
+  // 原生回调里要调最新的 importPaths，但订阅只该发生一次（onDone 每次渲染都是新函数，
+  // 放进依赖会让监听反复重订阅）。所以用 ref 转一道：每次渲染后把 ref 指向最新的实现。
+  const importRef = useRef<(paths: string[]) => void>(() => {});
   useEffect(() => {
-    const w = window as unknown as { __TAURI_INTERNALS__?: unknown };
-    if (!w.__TAURI_INTERNALS__) return;
+    importRef.current = (paths) => void importPaths(paths);
+  });
+
+  // 桌面壳：订阅 Tauri 的原生拖拽事件。它带**真实路径**（浏览器 DataTransfer 没有），
+  // 这是桌面版能"拖进来就直接用"的原因。回调未注入（浏览器）时什么都不做。
+  useEffect(() => {
+    if (!watchDrop) return;
     let un: (() => void) | undefined;
-    void (async () => {
-      try {
-        // 动态 import + 变量路径：这个组件同时被前端包（没有 @tauri-apps/api
-        // 依赖）和桌面壳使用。写成静态 import 会让前端构建直接失败，
-        // 所以用运行时才解析的写法，浏览器里走 catch 分支即可。
-        const mod = "@tauri-apps/api/webview";
-        const webview = (await import(/* @vite-ignore */ mod)) as {
-          getCurrentWebview: () => {
-            onDragDropEvent: (cb: (ev: { payload: { type: string; paths?: string[] } }) => void) => Promise<() => void>;
-          };
-        };
-        un = await webview.getCurrentWebview().onDragDropEvent((ev) => {
-          const p = ev.payload;
-          if (p.type === "enter") setOver(true);
-          else if (p.type === "leave") setOver(false);
-          else if (p.type === "drop" && p.paths) {
-            setOver(false);
-            void importPaths(p.paths);
-          }
-        });
-      } catch {
-        /* 不是 Tauri 宿主（浏览器/免安装版），忽略：拖拽走浏览器兜底 */
-      }
-    })();
-    return () => un?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let alive = true;
+    void watchDrop({
+      enter: () => setOver(true),
+      leave: () => setOver(false),
+      drop: (paths) => { setOver(false); importRef.current(paths); },
+    }).then((u) => {
+      // 订阅可能在等待期间就被卸载了，别留下悬空的监听
+      if (alive) un = u;
+      else u();
+    });
+    return () => { alive = false; un?.(); };
+  }, [watchDrop]);
 
   const importPaths = async (paths: string[]) => {
     // 不在前端筛：拖进来的可能是文件夹（=打开为工作区）也可能是表（=复制进来），
@@ -144,7 +152,7 @@ export default function DropZone({ onDone, pickFolder }: {
         onDrop={(e) => { e.preventDefault(); setOver(false); onBrowserFiles(e.dataTransfer.files); }}
         disabled={busy}
       >
-        <span className="dz-ic"><IconXls size={30} /></span>
+        <span className="dz-ic"><IconXls size={44} /></span>
         <b className="dz-title">{busy ? "正在读取…" : over ? "松开鼠标即可放入" : "把表格或文件夹拖到这里"}</b>
         <span className="dz-sub">
           拖表格 → 复制进当前工作区；拖文件夹 → 直接把它当作工作区

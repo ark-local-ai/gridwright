@@ -1401,8 +1401,9 @@ dependencies = [
 
 [[package]]
 name = "gridwright-desktop"
-version = "0.1.5"
+version = "0.1.16"
 dependencies = [
+ "chrono",
  "serde",
  "serde_json",
  "tauri",

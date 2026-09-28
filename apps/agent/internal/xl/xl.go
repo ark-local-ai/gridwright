@@ -113,42 +113,60 @@ func applySet(f *excelize.File, e plan.Edit) plan.Result {
 }
 
 // applyAppend 按表头列名把 row 写入下一空行；任何列不在表头中 → 整条拒绝（不猜列）。
+// 表头默认在第 1 行——inbox 那条老路径的数据表都是干净的。
 func applyAppend(f *excelize.File, e plan.Edit) plan.Result {
-	sheet, ok := sheetOK(f, e.Sheet)
+	if _, err := AppendRow(f, e.Sheet, 1, e.Row); err != nil {
+		return plan.Result{Status: "rejected", Note: err.Error()}
+	}
+	return plan.Result{Status: "ok"}
+}
+
+// AppendRow 按表头列名把 row 写入下一空行，返回写入的行号（1 基）。
+//
+// headerRow 由调用方给，不能写死：真实台账的表头常常不在第 1 行
+// （前面有 1–3 行标题/日期），写死第 1 行会把表头认成标题行，于是
+// “列不在表头中”把每一条都拒掉。
+//
+// 任何列不在表头中 → 直接报错，**不猜列**（宁可拒绝，也不要把日期写进房号列）。
+func AppendRow(f *excelize.File, sheet string, headerRow int, row map[string]any) (int, error) {
+	name, ok := sheetOK(f, sheet)
 	if !ok {
-		return plan.Result{Status: "rejected", Note: fmt.Sprintf("工作表 %s 不存在", e.Sheet)}
+		return 0, fmt.Errorf("工作表 %s 不存在", sheet)
 	}
-	rows, err := f.GetRows(sheet)
+	if headerRow < 1 {
+		headerRow = 1
+	}
+	rows, err := f.GetRows(name)
 	if err != nil {
-		return plan.Result{Status: "rejected", Note: "读取失败: " + err.Error()}
+		return 0, fmt.Errorf("读取失败: %w", err)
 	}
-	header := []string{}
-	if len(rows) > 0 {
-		header = rows[0]
+	var header []string
+	if headerRow-1 < len(rows) {
+		header = rows[headerRow-1]
 	}
 	// 先校验所有列都在表头里，再写（避免写一半）
-	colIdx := make(map[string]int, len(e.Row))
-	for name := range e.Row {
+	colIdx := make(map[string]int, len(row))
+	for colName := range row {
 		idx := -1
 		for i, h := range header {
-			if strings.TrimSpace(h) == strings.TrimSpace(name) {
+			if strings.TrimSpace(h) == strings.TrimSpace(colName) {
 				idx = i
 				break
 			}
 		}
 		if idx < 0 {
-			return plan.Result{Status: "rejected", Note: fmt.Sprintf("列「%s」不在表头中", name)}
+			return 0, fmt.Errorf("列「%s」不在表头中", colName)
 		}
-		colIdx[name] = idx
+		colIdx[colName] = idx
 	}
 	newRow := len(rows) + 1
-	for name, v := range e.Row {
-		cellName, _ := excelize.CoordinatesToCellName(colIdx[name]+1, newRow)
-		if err := f.SetCellValue(sheet, cellName, coerce(v)); err != nil {
-			return plan.Result{Status: "rejected", Note: "写入 " + name + " 失败: " + err.Error()}
+	for colName, v := range row {
+		cellName, _ := excelize.CoordinatesToCellName(colIdx[colName]+1, newRow)
+		if err := f.SetCellValue(name, cellName, coerce(v)); err != nil {
+			return 0, fmt.Errorf("写入 %s 失败: %w", colName, err)
 		}
 	}
-	return plan.Result{Status: "ok"}
+	return newRow, nil
 }
 
 // Coerce 把纯数字字符串转成 number，其余原样（excelize 对数字/文本更友好）。

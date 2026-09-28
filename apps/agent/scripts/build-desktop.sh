@@ -5,10 +5,13 @@
 #       —— 双击安装、有窗口、像正常软件的安装包。
 #
 # 它做什么：
-#   1) 编译 Go 引擎，放到 Tauri 的 sidecar 目录（应用启动时随包拉起）
-#   2) 重画安装界面品牌图（颜色跟着品牌令牌走，避免手工图悄悄过期）
-#   3) 编译前端（工作台界面）
-#   4) cargo tauri build → NSIS 安装包（把上面的引擎一起装进去）
+#   1) 编译前端（工作台界面）
+#   2) 把前端产物同步进 Go 源码树（sidecar 用 go:embed 把界面编进二进制）
+#   3) 编译 Go 引擎，放到 Tauri 的 sidecar 目录（应用启动时随包拉起）
+#   4) 重画安装界面品牌图（颜色跟着品牌令牌走，避免手工图悄悄过期）
+#   5) cargo tauri build → NSIS 安装包（把上面的引擎一起装进去）
+#
+# 顺序要紧：界面必须在**编 Go 之前**就位。倒过来的话 sidecar 内嵌的是上一轮的界面。
 #
 # 用法：
 #   bash apps/agent/scripts/build-desktop.sh
@@ -26,7 +29,32 @@ SIDECAR_DIR="$DESKTOP/src-tauri/binaries"
 # externalBin: ["binaries/gridwright"] 对应。
 TARGET_TRIPLE="x86_64-pc-windows-msvc"
 
-echo "==> 1/4 编译 Go 引擎 → sidecar"
+echo "==> 1/5 编译前端（界面）"
+cd "$DESKTOP"
+if [ ! -d node_modules ]; then
+  echo "    npm install ..."
+  npm install --silent
+fi
+npm run build
+if [ ! -f "$DESKTOP/dist/index.html" ]; then
+  echo "!! 前端没有产出 dist/index.html，中止（再往下就会把旧界面编进 sidecar）" >&2
+  exit 1
+fi
+
+echo "==> 2/5 同步前端产物到 Go 源码树（sidecar 内嵌界面走这里）"
+# 为什么必须有这一步：sidecar 用 go:embed 把界面**编进二进制**（internal/webui/dist）。
+# 不刷这一步，桌面版自己看不出来（它的界面走 Tauri 前端协议，读 apps/desktop/dist），
+# 但 sidecar 内嵌的是上一次刷过的界面 —— 用户直接用浏览器开 127.0.0.1:7700 时，
+# 看到的是一个与当前版本不符的旧界面。build-single.sh 一直在刷，桌面脚本漏了，
+# 于是同一份 Go 代码存在两个界面版本。
+rm -rf "$AGENT/internal/webui/dist"
+mkdir -p "$AGENT/internal/webui/dist"
+cp -r "$DESKTOP/dist/." "$AGENT/internal/webui/dist/"
+# go:embed 要求目录非空；.gitkeep 保证“清空后忘了重编”也不会编译失败。
+touch "$AGENT/internal/webui/dist/.gitkeep"
+ls -1 "$AGENT/internal/webui/dist/assets" | head -5
+
+echo "==> 3/5 编译 Go 引擎 → sidecar"
 cd "$AGENT"
 mkdir -p "$SIDECAR_DIR"
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
@@ -34,7 +62,7 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
   -o "$SIDECAR_DIR/gridwright-$TARGET_TRIPLE.exe" ./cmd/gridwright
 ls -lh "$SIDECAR_DIR/gridwright-$TARGET_TRIPLE.exe"
 
-echo "==> 2/4 重画应用图标与安装界面品牌图"
+echo "==> 4/5 重画应用图标与安装界面品牌图"
 # 由脚本产出而非手工放图：颜色是品牌令牌的副本，重画才跟得上调色。
 # 缺 Python/Pillow 时跳过（已提交的图仍在，安装包照出）。
 if command -v python >/dev/null 2>&1 && python -c "import PIL" >/dev/null 2>&1; then
@@ -44,15 +72,7 @@ else
   echo "    跳过（需要 python + Pillow）；沿用仓库里已提交的图"
 fi
 
-echo "==> 3/4 编译前端（界面）"
-cd "$DESKTOP"
-if [ ! -d node_modules ]; then
-  echo "    npm install ..."
-  npm install --silent
-fi
-npm run build
-
-echo "==> 4/4 cargo tauri build（NSIS 安装包）"
+echo "==> 5/5 cargo tauri build（NSIS 安装包）"
 cd "$DESKTOP"
 npx tauri build --bundles nsis
 

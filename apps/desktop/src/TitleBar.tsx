@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getCurrentWindow, type Window } from '@tauri-apps/api/window'
-import { GridwrightLogo } from '../../frontend/src/components/icons'
-import { APP_VERSION } from '../../frontend/src/lib/version'
+import { GridwrightLogo } from './components/icons'
+import { APP_VERSION } from './lib/version'
 
 // 仅在 Tauri 宿主内可用 getCurrentWindow；纯浏览器预览（无 Tauri IPC）时返回 null，
 // 使同一套前端也能在浏览器里预览工作台（窗口控制自动 no-op，Tauri 内行为不变）。

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/ark-local-ai/ark/apps/agent/internal/agent"
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory2"
 )
 
@@ -126,6 +127,68 @@ func (s *Server) handleMemoryStale(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// handleMemoryDelete POST /api/v1/memory/delete {kind, id} —— 删掉一条记忆。
+//
+// 为什么删除是必要能力：记忆会写错（提炼偏了、人后来改主意）。错的记忆会污染
+// 以后所有判断，而用户很难事后查出是哪条带偏的——不能删，那个错就永久留下。
+// 所以"能删"与"能写"同等重要，都走这个界面。
+func (s *Server) handleMemoryDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeErr(w, http.StatusMethodNotAllowed, "只支持 POST")
+		return
+	}
+	var req struct {
+		Kind string `json:"kind"` // fact | decision
+		ID   string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ID == "" {
+		writeErr(w, http.StatusBadRequest, "缺少 id")
+		return
+	}
+	st, err := s.memStore()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	switch req.Kind {
+	case "fact":
+		err = st.RemoveFact(req.ID)
+	case "decision":
+		err = st.RemoveDecision(req.ID)
+	default:
+		writeErr(w, http.StatusBadRequest, "kind 只能是 fact 或 decision")
+		return
+	}
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// handleMemoryStaleCheck POST /api/v1/memory/stale/check
+//
+// 自动扫一遍：哪些记忆"点名的标识在当前表里已经找不到了"→ 标记为可能过时。
+//
+// 只做这一件可证明的事（引用消失），**不比数字、不判语义**——理由见
+// agent/staleness.go 的包注释：一条误标会让整套过时提示失去信任。
+// 只标记、从不删除：标记是提示，人看一眼能清掉；误删不可逆。
+func (s *Server) handleMemoryStaleCheck(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeErr(w, http.StatusMethodNotAllowed, "只支持 POST")
+		return
+	}
+	cfg, layout, led, _ := s.cur()
+	ag := agent.New(cfg, layout, led, s.brainClient())
+	marks, err := ag.CheckMemoryStaleness()
+	if err != nil {
+		// 例如"有表读不到"——这是**拒绝下结论**，不是失败，据实说明
+		writeErr(w, http.StatusConflict, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "marked": marks, "count": len(marks)})
 }
 
 // memStore 取当前工作区的记忆存储。

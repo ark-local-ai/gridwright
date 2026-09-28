@@ -223,15 +223,14 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// defaultWorkspacesDir 新建工作区的默认落点（应用数据目录下 workspaces/）。
+// defaultWorkspacesDir 新建工作区的默认落点：**应用数据目录**下的 workspaces/。
+//
+// 以前用"当前工作区的父目录"当兄弟目录，图省事不探 appdata。那会把新工作区
+// 建到用户自己的工作区旁边——用户的工作区在 "...\微信\...\2026-09\testwork"，
+// 新建的就落到他的 "...\2026-09\workspaces\"。那是他的文件夹，不是我们的。
+// 我们自己的东西一律只写 UserConfigDir()。
 func (s *Server) defaultWorkspacesDir() string {
-	// 用当前工作区的父目录作为兄弟目录，避免引入平台相关的 appdata 探测
-	_, layout, _, _ := s.cur()
-	if layout != nil && layout.Root != "" {
-		return filepath.Join(filepath.Dir(layout.Root), "workspaces")
-	}
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, "gridwright", "workspaces")
+	return filepath.Join(config.UserConfigDir(), "workspaces")
 }
 
 func samePath(a, b string) bool {

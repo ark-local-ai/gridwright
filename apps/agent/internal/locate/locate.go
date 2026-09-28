@@ -69,7 +69,48 @@ func (s *Sheet) FindHeader(probe int) (int, []string) {
 	if best >= len(s.Rows) {
 		return 0, nil
 	}
-	return best, s.Rows[best]
+	return best, mergeHeader(s, best)
+}
+
+// mergeHeader 把**紧邻的上一行**并进表头行。
+//
+// 为什么必须做：真实台账的表头常常是两行——上一行是分组（"销售基本情况"
+// "销售总价""实收金额"），下一行是各列的名字；而且**往往不是每列都有两行**
+// （那份销售明细表里，"出证日期""按揭银行"**只在上一行**，楼栋/房号/客户名称
+// 只在下一行）。只认一行就会漏掉一半列：实测中模型说得出"按揭银行"，
+// 程序却报"找不到字段列"，把一件能做的事卡成了澄清。
+//
+// 合成规则（保守，宁少合不错合）：
+//   - 只在上一行**也像表头**时才合（非空单元格 ≥2 个）。标题行通常只有一格
+//     （"御城二期销售明细表"），不会被并进来。
+//   - 每列取两行里的非空值；两行都有值时**保留下一行**——那是列名本身，
+//     比分组名更具体（"销售基本情况/楼栋"→"楼栋"）。
+//   - 只往上看一行：再往上通常是标题/日期，不是表头。
+func mergeHeader(s *Sheet, idx int) []string {
+	cur := s.Rows[idx]
+	merged := append([]string(nil), cur...)
+	if idx == 0 {
+		return merged
+	}
+	prev := s.Rows[idx-1]
+	nonEmpty := 0
+	for _, v := range prev {
+		if Normalize(v) != "" {
+			nonEmpty++
+		}
+	}
+	if nonEmpty < 2 {
+		return merged
+	}
+	if len(prev) > len(merged) {
+		merged = append(merged, make([]string, len(prev)-len(merged))...)
+	}
+	for i := 0; i < len(prev); i++ {
+		if Normalize(merged[i]) == "" && Normalize(prev[i]) != "" {
+			merged[i] = prev[i]
+		}
+	}
+	return merged
 }
 
 // ColByHeader 在表头里找列号（0 基），按归一化后的精确 → 包含 依次匹配。
@@ -98,18 +139,30 @@ func ColByHeader(header []string, names ...string) int {
 	return -1
 }
 
-// RowByKeys 从 dataStart 行起找匹配的铺位/租户行，返回行号（0 基），找不到 -1。
+// MatchRows 从 dataStart 行起，返回**所有**匹配 keyCols 的行号（0 基，升序）。
+//
+// 为什么返回全部而不是第一个：只返回第一个会把"这个键匹配到多行"这件事实
+// 悄悄藏起来。真实台账里客户名重复很常见（实测一表里同一客户占 3 行），
+// 照着第一个改就会**改错行**——钱上的错，必须由调用方看见并挡下。
 //
 // 处理合并单元格：某铺位占多行时值只在首行，故对每个键列做"向下填充"，
 // 空单元格沿用上一次见到的非空值。要求给出的所有键都命中（AND）。
 // 键的值用归一化比较（去空格、忽略大小写）。
-func (s *Sheet) RowByKeys(dataStart int, keyCols map[int]string) int {
+//
+// **整行都是空格子的行会被跳过**：它是分隔行，不是数据行。不跳的话，
+// 向下填充会把上一行的铺位一路“带”过空行，让一个键凭空匹配到多行
+// （实测：A03 后面隔一空行，就变成两行匹配，正常的写入被当成歧义挡下）。
+func (s *Sheet) MatchRows(dataStart int, keyCols map[int]string) []int {
 	if len(keyCols) == 0 || dataStart >= len(s.Rows) {
-		return -1
+		return nil
 	}
+	var out []int
 	last := map[int]string{} // 列 → 最近一次非空值（向下填充）
 	for r := dataStart; r < len(s.Rows); r++ {
 		row := s.Rows[r]
+		if isBlankRow(row) {
+			continue
+		}
 		for col := range keyCols {
 			if col < len(row) && Normalize(row[col]) != "" {
 				last[col] = Normalize(row[col])
@@ -127,10 +180,32 @@ func (s *Sheet) RowByKeys(dataStart int, keyCols map[int]string) int {
 			}
 		}
 		if ok {
-			return r
+			out = append(out, r)
 		}
 	}
-	return -1
+	return out
+}
+
+// isBlankRow 判断一行是不是“整行空格子”（分隔行）。
+func isBlankRow(row []string) bool {
+	for _, v := range row {
+		if Normalize(v) != "" {
+			return false
+		}
+	}
+	return true
+}
+
+// RowByKeys 返回第一个匹配行（0 基），找不到 -1。
+//
+// 定位写回时**不要**用它——它会把"匹配到多行"的事实吞掉。
+// 写路径请用 Locate* 系列（它们会因歧义而报错）。
+func (s *Sheet) RowByKeys(dataStart int, keyCols map[int]string) int {
+	rows := s.MatchRows(dataStart, keyCols)
+	if len(rows) == 0 {
+		return -1
+	}
+	return rows[0]
 }
 
 // ColByMonth 在表头里找某年某月对应的列号（0 基），找不到 -1。
@@ -189,6 +264,13 @@ type Cell struct {
 
 // LocateRowField 定位"某铺位某行的某字段"（用于各月租金表这类：行=铺位，列=字段）。
 // anchorNames 给铺位列的候选名；keys 是要匹配的 列名→值（如 物业位置=A03）。
+//
+// 写回路径。两道结构防线（不认任何具体列名，只看结构）：
+//  1. **自指**：要找行的键列，不能与要写的字段列是同一列。
+//     拿"我准备写进去的值"去找行，逻辑上自相矛盾——找到的行正是靠这个值匹配的。
+//     实测场景：模型把"按揭银行"既当要写的字段、又拿去当键，就会改到错的格。
+//  2. **歧义**：一个键匹配到多行时报错，**不静默取第一行**。
+//     客户名重复在真实台账里很常见（实测同一客户占 3 行），取第一行就是改错行。
 func (s *Sheet) LocateRowField(anchorNames, fieldNames []string, keys map[string]string) (*Cell, error) {
 	hdrIdx, header := s.FindHeader(10)
 	// 把 keys 的列名解析成列号
@@ -201,16 +283,46 @@ func (s *Sheet) LocateRowField(anchorNames, fieldNames []string, keys map[string
 		keyCols[col] = val
 	}
 	_ = anchorNames
-	row := s.RowByKeys(hdrIdx+1, keyCols)
-	if row < 0 {
-		return nil, fmt.Errorf("表「%s」找不到匹配行 %v", s.Name, keys)
-	}
+
 	fieldCol := ColByHeader(header, fieldNames...)
 	if fieldCol < 0 {
 		return nil, fmt.Errorf("表「%s」找不到字段列 %v", s.Name, fieldNames)
 	}
+	// 防线 1：自指。键列与字段列不能是一列。
+	if _, selfRef := keyCols[fieldCol]; selfRef {
+		return nil, fmt.Errorf("表「%s」：用来找行的键「%s」与要写入的字段是同一列，"+
+			"这会把“准备写进去的值”当成搜索条件，可能改到错的格；请改用一个真正标识行的列作为键",
+			s.Name, header[fieldCol])
+	}
+
+	rows := s.MatchRows(hdrIdx+1, keyCols)
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("表「%s」找不到匹配行 %v", s.Name, keys)
+	}
+	// 防线 2：歧义。匹配到多行时必须让人选择，不能替人决定改哪一行。
+	if len(rows) > 1 {
+		return nil, fmt.Errorf("表「%s」：键 %v 匹配到 %d 行（第 %s），无法确定改哪一行；"+
+			"请补一个能区分它们的键（如房号/收据号）",
+			s.Name, keys, len(rows), joinRows(rows, 3))
+	}
+	row := rows[0]
+
 	ref, _ := excelize.CoordinatesToCellName(fieldCol+1, row+1)
 	return &Cell{Sheet: s.Name, Ref: ref, Row: row + 1, Col: fieldCol + 1}, nil
+}
+
+// joinRows 把行号列表变成给人看的一小段（最多 n 个，多余的省略）。
+// 行号在报错里用 1 基（与 Excel 行号一致），避免与人对着表数行号时差一行。
+func joinRows(rows []int, n int) string {
+	parts := make([]string, 0, n+1)
+	for i, r := range rows {
+		if i >= n {
+			parts = append(parts, fmt.Sprintf("…共 %d 行", len(rows)))
+			break
+		}
+		parts = append(parts, fmt.Sprintf("%d", r+1))
+	}
+	return strings.Join(parts, "、")
 }
 
 // LocateMonthCell 定位"某铺位在某年某月的格"（用于汇总表这类：行=铺位，列=月份）。

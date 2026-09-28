@@ -1,6 +1,9 @@
 [package]
 name = "gridwright-desktop"
-version = "0.1.5"
+# 版本号以 apps/desktop/package.json 为准；这里跟着改只是为了不让两处对不上
+# （Tauri 打包时按 tauri.conf.json 的 "../package.json" 覆盖 exe 的版本元数据，
+# 所以这里写旧了不会影响用户看到的版本，但会在构建日志里冒充一个假版本）。
+version = "0.1.16"
 description = "gridwright 桌面版 — 本地数据管家：盯表、按规矩改表、每格改动留账"
 edition = "2021"
 
@@ -18,3 +21,9 @@ tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-dialog = "2.7.3"
+
+# 只为把日志时间戳转成本地时间。
+# 注意：这不是“新引入一个依赖”——chrono 早就在本仓的依赖树里（tauri 自己带着它，
+# Cargo.lock 里已有 chrono 0.4.45）。真正的成本是“自己算时区”，而不是用它。
+# default-features = false + clock/std：只要本地时间，不要 wasmbind 之类。
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }

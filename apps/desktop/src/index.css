@@ -1,0 +1,497 @@
+/* =====================================================================
+   gridwright 设计令牌与基准
+   透亮 · 权重 · 交付优先：一整片冷纸白 + 石墨近黑 + 单一低饱和钢蓝强调。
+
+   这一版的核心改动不是"换颜色"，是**换分层方式**：
+   以前是「灰画布衬托白方块」——白块靠边框和灰底才立得住，一屏十几个方块，
+   每个都在争，整体就"土"。
+   现在是「一整片纸白 + 光」——画布与面板同色，层级由柔光/发丝线/留白产生。
+   于是没有边框也不散，加边框也极淡。这就是"透亮"的来源。
+   ===================================================================== */
+
+:root {
+  /* ---------- 中性色（纸白 · 透亮） ---------- */
+  --bg: #fbfcfd;            /* 画布底：近白冷纸（不再是灰） */
+  --surface: #ffffff;       /* 面板白（与画布同族，靠光分层） */
+  --surface-2: #f5f7fa;     /* 次级面 / 悬停底（极淡冷蓝） */
+  /* 侧栏材质：比画布略沉、带一点冷灰，让"导航区"与"内容区"是两个地方。
+     参考 macOS 侧栏与内容区不同材质这一点（Apple HIG 正文本机抓不到，
+     这里是依据该设计语言的已知特征取值，非抓取数据）。 */
+  --sidebar-bg: #f4f6f9;
+  /* 侧栏宽度：抽成令牌供两处共用——看板左栏，以及桌面壳标题栏左侧
+     那块要"连成一体"的区域。两边若各写一次数字，改一处就会错位。 */
+  --sidebar-w: 340px;
+  --sidebar-sel: #dfe7f0;   /* 选中胶囊：比品牌色浅得多，安静 */
+  --sidebar-sel-ink: #1d3350;
+  --surface-3: #eceff4;     /* 更深一档 / 按下态 */
+  --line: #e9edf2;          /* 发丝分隔线（极淡，只做提示） */
+  --line-strong: #d3dae4;   /* 需要明确边界时（输入框/可点边） */
+  --text-1: #141821;        /* 主文字：石墨近黑 */
+  --text-2: #5a6472;        /* 次要文字 */
+  /* 弱化 / 占位。**注意**：这一档曾用 #8d96a5，在白底上只有 2.98:1，
+     低于 WCAG AA 的 4.5:1——"字看不清"就是这个造成的。现压到 4.9:1（白底）
+     / 4.6:1（--surface-2 灰底），两处都过 AA。 */
+  --text-3: #5f6a7a;
+
+  --wm: #dfe5ed;            /* 水印线条色 */
+
+  /* ---------- 品牌：钢蓝（低饱和 · 冷而清） ---------- */
+  --brand: #2f5d8a;
+  --brand-strong: #264d74;
+  --brand-soft: #eef4fa;    /* 钢蓝浅底（选中 / 悬停） */
+  --brand-line: #d2e0ee;    /* 钢蓝描边 */
+  --brand-gradient: linear-gradient(135deg, #2f5d8a 0%, #40739f 100%);
+
+  /* ---------- 运行中 / 流动（比品牌蓝亮一档，只给"活的"状态） ---------- */
+  --live: #2f78c0;
+  --live-soft: #eaf2fb;
+
+  /* ---------- 语义色 ----------
+     参考 Radix Colors 的真实色阶取值（amber/jade/red 的 9~11 阶），
+     它们是为 UI 调过的：在浅底上做文字/描边都过 AA。
+     以前全站近乎无彩，读起来"单调"——颜色在这里**承载信息**：
+     收租率高低、欠租多少，靠色相就能分类，不必逐个读数字。 */
+  --ok: #21805f;        /* 玉绿（Radix jade 11 调暗） */
+  --ok-bg: #e9f5f0;
+  --ok-line: #a8d9c7;
+  --warn: #9a5f0d;      /* 琥珀（Radix amber 11） */
+  --warn-bg: #fbf2e2;
+  --warn-line: #ecd39a;
+  --danger: #b73f39;    /* 红（Radix red 11） */
+  --danger-bg: #fceeed;
+  --danger-line: #f0bdb9;
+  --info: #0d74ce;      /* 蓝（Radix blue 11）——只给"信息"，不抢"要你动" */
+  --info-bg: #eaf3fd;
+
+  /* 数据可视化：一张连续的冷→暖刻度，给走势/进度条用。
+     单调的根因是"所有条一个颜色"，有了刻度才能一眼分出高低。 */
+  --viz-1: #cfe3f5;
+  --viz-2: #9dc4e6;
+  --viz-3: #6ba0d4;
+  --viz-4: #4a7cb0;
+  --viz-5: #2f5d8a;
+
+  /* ---------- 分类色相（categorical）----------
+     "配色丰富点"有两层，这两套同时满足，但**都必须承载信息**，不为好看而上色：
+       · 分类色相 → 回答"这是哪一族"。每一族表（月租金/每日实收/滞纳金…）
+         分到一个固定色相，左栏列表、族谱图、表视图里同族同色，一眼归类。
+       · 严重度刻度 → 回答"多急"。冷(没事)→钢蓝(留意)→琥珀(要查)→红(坏了)。
+     8 个色相都过 WCAG AA（白底实测 4.7–7.3:1），不做纯装饰的浅色。
+     顺序即"默认分配序"：先给最常出现的族冷蓝，再玉绿、陶土……相邻不撞色。 */
+  --hue-1: #2f5d8a;   /* 钢蓝 */
+  --hue-2: #21805f;   /* 玉绿 */
+  --hue-3: #a55a2b;   /* 陶土 */
+  --hue-4: #6b4a7a;   /* 紫藤 */
+  --hue-5: #0d7f8b;   /* 青 */
+  --hue-6: #64748b;   /* 石板 */
+  --hue-7: #6b7a2b;   /* 橄榄 */
+  --hue-8: #a34d63;   /* 玫 */
+
+  /* ---------- 严重度刻度（severity）----------
+     与分类色相正交：**色相说"属谁"，暖度+明暗说"多急"**。
+     平静档不用灰——灰行多了整页就死；用最冷的一档蓝灰，安静但仍活着。 */
+  --sev-calm: #5a6472;
+  --sev-note: #3f6d99;
+  --sev-warn: #9a5f0d;
+  --sev-bad: #b73f39;
+
+  /* ---------- 文件类型徽标（交付向：数据绿 / 文档钢蓝 / 演示陶土） ---------- */
+  --ft-ppt: #a55a2b;
+  --ft-xls: #21805f;
+  --ft-doc: #2f5d8a;
+  --ft-png: #64748b;
+  --ft-html: #0d7f8b;
+  --ft-pdf: #b73f39;
+
+  /* ---------- 字重阶（权重来源之一） ---------- */
+  --fw-med: 500;     /* 按钮 / 标签 */
+  --fw-h: 600;       /* 卡片 / 区块标题 */
+  --fw-title: 700;   /* 页头 / 大数字 */
+
+  /* ---------- 文字阶 ----------
+     要点：**拉开对比**。以前 13px 标题配 12.5px 正文，层级几乎看不出，
+     整页就显得"平"。现在显示级与标注级差一倍，层级一眼可辨。 */
+  --fs-hero: 26px;     /* 首页主标题 */
+  --fs-display: 21px;  /* 页面大标题（看板工作区名） */
+  --fs-title: 19px;    /* 区块标题 */
+  --fs-h: 15px;        /* 卡片标题 */
+  --fs-body: 14px;     /* 正文 */
+  --fs-sm: 13px;       /* 次要正文 */
+  --fs-xs: 12px;       /* 辅助 / 元信息 */
+  --fs-2xs: 11px;      /* 标注 / 标签 */
+
+  /* 字距：中文没有大小写，高级感来自"小字拉距 + 大字收紧" */
+  --ls-display: -0.025em;   /* 大标题收紧 */
+  --ls-tight: -0.01em;
+  --ls-label: 0.08em;       /* 小标注拉开 → 仪器感 */
+
+  --lh-tight: 1.2;
+  --lh-body: 1.55;
+
+  /* ---------- 尺寸 ---------- */
+  --sb-w: 236px;
+  --top-h: 48px;
+  --canvas-r: 14px;     /* 画布圆角 */
+
+  /* 比主文字更沉一档，给大标题 */
+  --ink: #0e1219;
+  --focus-ring: 0 0 0 3px var(--brand-soft);
+
+  /* =====================================================================
+     设计体系（C+A 杂糅：成体系的尺度 + 精密仪器的冷调克制）
+     为什么要这套：此前间距用了 4/5/6/7/8/9/10/12/14/16/18 十一种值，
+     圆角 7/6/4/3/2 混用——**没有体系的界面，怎么调色都不会高级**。
+     现在收成 4 的整数倍 + 有限档位，全站只用这些。
+     ===================================================================== */
+
+  /* 间距：4px 基准，7 档（够用，且强制一致） */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+
+  /* 圆角：只留 3 档 + 全圆。小=控件，中=面板，大=浮层
+     透亮调里圆角可以稍大——直角配极淡线会显"硬"，8/12 更松弛。 */
+  --r-ctl: 6px;     /* 控件：按钮/输入/标签 */
+  --r-panel: 10px;  /* 面板：卡片/分区 */
+  --r-overlay: 14px;/* 浮层：弹窗/抽屉 */
+  --r-full: 999px;
+  /* 行选中胶囊：macOS 侧栏的选中是"圆角填充块"，不是竖色条。
+     8px 而非全圆——全圆在密集列表里太软，8px 既像 macOS 又不失精度。 */
+  --r-pill: 8px;
+
+  /* 层级：3 级。**光是唯一的层级语言**（画布与面板同色，所以只能靠光）。
+     阴影调低透明度、放大扩散——"浮起"而非"贴上去一块灰"。 */
+  --el-0: none;
+  --el-1: 0 1px 2px rgba(20,30,45,.04), 0 4px 12px -4px rgba(20,30,45,.06);
+  --el-2: 0 1px 2px rgba(20,30,45,.05), 0 12px 32px -8px rgba(20,30,45,.12);
+  --el-3: 0 2px 6px rgba(20,30,45,.06), 0 28px 64px -16px rgba(20,30,45,.20);
+  /* 白面顶高光：让面板有"厚度"，不用加边框 */
+  --hi: inset 0 1px 0 rgba(255,255,255,.9);
+  /* 发丝描边：透亮调里，边界只作提示，不作分隔 */
+  --hair: 1px solid var(--line);
+
+  /* 浮层遮罩：透亮调里遮罩要"轻"——重黑遮罩会把整页压回去变暗，
+     与"透亮"自相矛盾。用低透明 + 模糊，前景浮起来即可。 */
+  --scrim: rgba(24, 34, 48, .28);
+  --scrim-blur: blur(2px);
+
+  /* 控件高度：小控件统一 26，常规 32，大 38 —— 一排控件必须等高 */
+  --h-sm: 26px;
+  --h-md: 32px;
+  --h-lg: 38px;
+
+  /* =====================================================================
+     动效体系（本版重点：动效的权重高于文字）
+     以前只有一条 --ease-out，时长全是散值（0.15/0.16/0.18/var(--d-fast)）——
+     散值就是"每个组件各动各的"的根源，看起来会杂。
+     现在三档缓动 × 三档时长，语义明确，全站只用这些。
+     ===================================================================== */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);      /* 快起慢收：进入/浮起/按钮（最常用） */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);   /* 对称：展开/收起/尺寸变化 */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);/* 轻微回弹：只给"值得庆祝"的动作（如改完生效） */
+
+  --d-fast: 150ms;   /* 悬停/按下等微反馈 */
+  --d-base: 250ms;   /* 常规过渡、弹层入场 */
+  --d-slow: 400ms;   /* 面板级/编排入场 */
+
+  --font: -apple-system, "Segoe UI Variable Text", "Segoe UI", "PingFang SC",
+    "MiSans", "HarmonyOS Sans SC", "Microsoft YaHei UI", "Microsoft YaHei",
+    "Noto Sans SC", sans-serif;
+  --mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+a { color: var(--brand); text-decoration: none; }
+button { font-family: inherit; cursor: pointer; }
+
+/* 等宽数字：表格 / 指标 / 计量值，冷调精密感 */
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* 可见键盘焦点 */
+:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 4px; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #cdd5df; border-radius: 6px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: #b3bec9; background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* 运行中：冷蓝呼吸 */
+@keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.live-pulse { animation: live-pulse 1.6s var(--ease-in-out) infinite; }
+/* 管道流动：虚线位移。**必须 linear**——这是"匀速前进"的物理隐喻，
+   用 ease 会让流动一顿一顿的（唯一允许 linear 的地方）。 */
+@keyframes flow-dash { to { stroke-dashoffset: -16; } }
+.flow-line { stroke-dasharray: 4 4; animation: flow-dash 0.9s linear infinite; }
+
+/* =====================================================================
+   动效工具箱（animation > text：能"演"的就不要只"写"）
+
+   三条取舍：
+   1. 骨架屏 > "读取中…"文字——文字要读，骨架一眼就懂，且不跳版
+   2. 数值变化要"闪一下"——账目数字变了，动画比一句"已更新"更直接
+   3. 入场克制——只做一次错开淡入，不做每块各自飞入（那是 AI 味）
+   ===================================================================== */
+
+/* ---------- ① 骨架屏：替代纯文字占位 ---------- */
+@keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+.sk {
+  border-radius: var(--r-ctl);
+  background: linear-gradient(90deg,
+    var(--surface-2) 25%, var(--surface-3) 37%, var(--surface-2) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s var(--ease-in-out) infinite;
+}
+.sk-line { height: 11px; margin: 7px 0; }
+.sk-line.w-40 { width: 40%; }
+.sk-line.w-60 { width: 60%; }
+.sk-line.w-80 { width: 80%; }
+.sk-block { height: 100%; }
+/* 骨架组：一屏占位，尺寸贴近真实内容（否则加载完会跳版） */
+.sk-group { display: flex; flex-direction: column; gap: var(--sp-2); }
+
+/* 表骨架：格子对格子（表是网格，占位也该是网格，读起来才是"表在加载"） */
+.sk-table { display: flex; flex-direction: column; gap: 1px; }
+.sk-table-head, .sk-table-row { display: flex; gap: 1px; }
+.sk-cell { height: 30px; flex: 1; border-radius: 3px; }
+.sk-cell-narrow { flex: 0 0 46px; }
+.sk-table-head .sk-cell { height: 32px; }
+
+/* ---------- ② 入场编排：淡入 + 轻微上移，错开递进 ----------
+   ⚠️ 大容器（占满视口高度的栏）**只做透明度、不做位移**。
+   踩过的坑：给两栏（各 790px 高、几乎铺满屏幕）加 translateY + fill-mode both，
+   在真实渲染里会让整块内容不进合成帧——截图量到墨迹从 3.57% 掉到 0.30%，
+   也就是"整页空白"。位移只留给小块内容，大块用纯淡入（这也是极简克制风
+   本身的要求：极柔的淡入，尽量少的位移）。 */
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+/* .rise = 大容器/整栏：纯淡入（安全） */
+.rise { animation: fade-in var(--d-slow) var(--ease-out) both; }
+/* .rise-sm = 小块内容（卡片、分组、列表）：可以有轻微位移 */
+.rise-sm { animation: rise-in var(--d-slow) var(--ease-out) both; }
+/* 错开：只递进 4 档（再多就等得久，反而显慢），每档 40ms */
+.rise-1 { animation-delay: 40ms; }
+.rise-2 { animation-delay: 80ms; }
+.rise-3 { animation-delay: 120ms; }
+.rise-4 { animation-delay: 160ms; }
+
+/* ---------- ③ 数值变化：闪一下 + 轻微放大（账目数字变的瞬间） ---------- */
+@keyframes value-changed {
+  0% { background: var(--brand-soft); box-shadow: 0 0 0 3px var(--brand-soft); }
+  100% { background: transparent; box-shadow: 0 0 0 0 transparent; }
+}
+.value-changed {
+  animation: value-changed 1.1s var(--ease-out);
+  border-radius: var(--r-ctl);
+}
+/* 生效瞬间：轻微回弹（唯一用 spring 的地方——"做完了"值得一点庆祝感） */
+@keyframes pop-in-spring {
+  0% { transform: scale(.96); opacity: 0; }
+  60% { transform: scale(1.012); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.pop-spring { animation: pop-in-spring var(--d-base) var(--ease-spring) both; }
+
+/* ---------- ④ 计数/进度：不确定态的一条流动条 ---------- */
+@keyframes bar-flow { 0% { transform: translateX(-100%); } 100% { transform: translateX(220%); } }
+.bar-live {
+  position: relative; height: 2px; overflow: hidden;
+  background: var(--brand-soft); border-radius: var(--r-full);
+}
+.bar-live::after {
+  content: ""; position: absolute; inset: 0; width: 45%;
+  background: linear-gradient(90deg, transparent, var(--brand), transparent);
+  animation: bar-flow 1.25s var(--ease-in-out) infinite;
+}
+/* 呼吸：用于"正在跑"的圆点 */
+@keyframes breathe {
+  0%, 100% { box-shadow: 0 0 0 0 var(--live-soft); opacity: 1; }
+  50% { box-shadow: 0 0 0 5px var(--live-soft); opacity: .75; }
+}
+.breathe { animation: breathe 1.8s var(--ease-in-out) infinite; }
+
+/* ---------- ⑤ 浮层入场：弹层一律"从下方 8px 淡入 + 微缩放" ----------
+   以前账目/任务/设置/规则四个面板都是"啪"地出现——一屏内容瞬间替换，
+   眼睛来不及建立"我刚打开了什么"的因果。统一入场后，动作有了"发生"的感觉。
+   用 scale(.98) 而非更夸张的缩放：浮层是工具的延伸，不该像手机 App 那样弹跳。 */
+@keyframes overlay-in {
+  from { opacity: 0; transform: translateY(8px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+.overlay-in { animation: overlay-in var(--d-base) var(--ease-out) both; }
+
+/* 浮层面板：统一入场（四个面板共用，改一处即全站一致） */
+.lg-panel, .tk-panel, .set-panel, .rl-panel, .gv-panel, .fp-panel {
+  animation: overlay-in var(--d-base) var(--ease-out) both;
+}
+
+
+/* =====================================================================
+   组件基元（统一视觉语言 · 锐利 · 权重）
+   ===================================================================== */
+
+/* 按钮：统一高度体系（--h-*），一排里必须等高；圆角走 --r-ctl */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  height: var(--h-md); padding: 0 var(--sp-3); border-radius: var(--r-ctl); cursor: pointer;
+  font-size: var(--fs-xs); font-weight: var(--fw-med);
+  transition: background var(--d-fast) var(--ease-out), border-color var(--d-fast) var(--ease-out),
+    color var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out), transform .1s var(--ease-out);
+  border: 1px solid transparent; white-space: nowrap; line-height: 1;
+}
+.btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.primary {
+  background: var(--brand); color: #fff;
+  box-shadow: 0 1px 2px rgba(20,30,45,.14), var(--hi);
+}
+.btn.primary:hover:not(:disabled) { background: var(--brand-strong); }
+.btn.ghost {
+  background: var(--surface); border-color: var(--line); color: var(--text-1);
+  box-shadow: 0 1px 2px rgba(20,30,45,.04);
+}
+.btn.ghost:hover:not(:disabled) { background: var(--surface); border-color: var(--line-strong); box-shadow: 0 2px 6px rgba(20,30,45,.07); }
+.btn.soft { background: var(--brand-soft); color: var(--brand); }
+.btn.soft:hover:not(:disabled) { background: #e4eef8; }
+.btn.danger { background: var(--surface); border-color: var(--line); color: var(--danger); }
+.btn.danger:hover:not(:disabled) { background: var(--danger-bg); border-color: transparent; }
+/* 三档高度：sm 与输入框等高，md 常规，lg 主行动 */
+.btn.sm { height: var(--h-sm); padding: 0 var(--sp-2); font-size: var(--fs-2xs); }
+.btn.lg { height: var(--h-lg); padding: 0 var(--sp-4); font-size: var(--fs-sm); }
+
+/* 图标（圆头 · 细线条 · 精确） */
+.ic {
+  width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.75;
+  stroke-linecap: round; stroke-linejoin: round; flex: none; vertical-align: -2px;
+}
+
+/* 胶囊 */
+.pill {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3.5px 10px;
+  border-radius: 999px; font-size: 11.5px; color: var(--text-2);
+  background: var(--surface-2); border: 1px solid transparent; cursor: pointer;
+  white-space: nowrap; transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out),
+    border-color var(--d-fast) var(--ease-out);
+}
+.pill:hover { background: var(--surface-3); }
+.pill.blue { background: var(--brand-soft); color: var(--brand); }
+.pill.blue:hover { background: #e3eaf3; }
+.pill.ghost { background: var(--surface); border-color: var(--line); }
+.pill.ghost:hover { background: var(--surface-2); }
+
+/* 卡片：**靠光浮起，不靠边框框住**。
+   透亮调的关键：画布与卡片同色，如果每张卡都描一圈边，一屏若干块就都是"灰格子"。
+   所以默认只给柔光 + 顶高光；需要明确分区时才用 .bordered。 */
+.card {
+  background: var(--surface);
+  border: 1px solid transparent;
+  border-radius: var(--r-panel); box-shadow: var(--el-1);
+  transition: box-shadow var(--d-base) var(--ease-out), border-color var(--d-base) var(--ease-out);
+}
+.card.flat { box-shadow: none; border-color: var(--line); }
+.card.raised { box-shadow: var(--el-2); }
+/* 需要边界的分区/表格容器（发丝线，极淡） */
+.card.bordered { border-color: var(--line); box-shadow: var(--el-1); }
+
+/* 状态徽标 */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2.5px 9px;
+  border-radius: 999px; font-size: 11.5px; font-weight: var(--fw-med); white-space: nowrap;
+}
+.badge.run { background: var(--live-soft); color: var(--live); }
+.badge.done { background: var(--ok-bg); color: var(--ok); }
+.badge.warn { background: var(--warn-bg); color: var(--warn); }
+.badge.queue { background: var(--surface-3); color: var(--text-2); }
+
+/* 文件类型徽标 */
+.ftext {
+  width: 30px; height: 30px; border-radius: var(--r-ctl); flex: none;
+  display: grid; place-items: center; font-size: 10px; font-weight: var(--fw-title); color: #fff;
+}
+
+/* 开关 */
+.switch {
+  position: relative; width: 32px; height: 18px; border-radius: 999px;
+  background: var(--line-strong); cursor: pointer; transition: background var(--d-fast) var(--ease-out); flex: none;
+}
+.switch.on { background: var(--ok); }
+.switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
+  border-radius: 50%; background: #fff; transition: transform var(--d-fast) var(--ease-out);
+  box-shadow: 0 1px 2px rgba(20, 24, 30, 0.2);
+}
+.switch.on::after { transform: translateX(14px); }
+
+/* 文本输入台 —— 全站统一的"下达任务"入口 */
+.inputbar {
+  width: 100%; background: var(--surface); border: 1px solid var(--line-strong);
+  border-radius: var(--r-panel); box-shadow: var(--el-2); padding: 12px 14px;
+  transition: border-color var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out);
+}
+.inputbar:focus-within { border-color: var(--brand-line); box-shadow: 0 0 0 3px var(--brand-soft), var(--el-2); }
+.inputbar textarea {
+  width: 100%; border: none; outline: none; resize: none; font-size: 13.5px;
+  font-family: inherit; color: var(--text-1); background: transparent; line-height: var(--lh-body);
+}
+.inputbar textarea::placeholder { color: var(--text-3); }
+.inputbar .row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+.inputbar .row .send {
+  margin-left: auto; width: 28px; height: 28px; border-radius: var(--r-ctl); background: var(--brand);
+  color: #fff; display: grid; place-items: center; border: none; cursor: pointer;
+  transition: background var(--d-fast) var(--ease-out), transform var(--d-fast) var(--ease-out);
+}
+.inputbar .row .send:hover { background: var(--brand-strong); }
+.inputbar .row .send:active { transform: translateY(1px); }
+
+/* 输入台内的圆形小图标按钮（＋ 等） */
+.ic-btn {
+  width: 26px; height: 26px; border-radius: var(--r-ctl); display: grid; place-items: center;
+  background: transparent; border: none; color: var(--text-2);
+  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
+}
+.ic-btn:hover { background: var(--surface-2); color: var(--text-1); }
+.ic-btn:active { background: var(--surface-3); }
+
+/* 占位 / 空态 */
+.empty { display: grid; place-items: center; height: 100%; color: var(--text-3); font-size: var(--fs-body); }
+.hint-wrap { display: grid; place-items: center; height: 100%; color: var(--text-3); }
+
+/* Tab 切换 */
+.tabs { display: flex; gap: 5px; margin-bottom: 16px; }
+.tab {
+  padding: 5.5px 14px; border-radius: 999px; font-size: 12.5px; cursor: pointer;
+  border: 1px solid transparent; background: transparent; color: var(--text-2);
+  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
+}
+.tab.on { background: var(--brand); color: #fff; font-weight: var(--fw-med); }
+.tab:not(.on):hover { background: var(--surface-2); }
+
+/* 尊重减少动态偏好 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  /* 编排动效在降级时**必须清掉 delay 和初始位移**——否则元素会先卡在
+     "透明且下移 8px"的状态等完 delay 才出现，比不动更糟。 */
+  .rise, .rise-sm, .rise-1, .rise-2, .rise-3, .rise-4, .pop-spring {
+    animation-delay: 0ms !important; opacity: 1 !important; transform: none !important;
+  }
+  /* 骨架屏是"加载状态"的语义，不能变成一块静止的灰——降级时改为静态底色 */
+  .sk { background: var(--surface-2) !important; }
+}

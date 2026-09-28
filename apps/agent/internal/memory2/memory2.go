@@ -21,6 +21,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 )
 
 // Fact 是"事实记忆"：从表/账目算出来的、相对稳定的事实。
@@ -267,6 +268,51 @@ func (s *Store) RemoveStale(id string) error {
 	return s.saveLocked()
 }
 
+// RemoveFact / RemoveDecision 删掉一条记忆。
+//
+// 为什么必须有删除：记忆会写错（模型提炼偏了、人当时说错了后改主意）。
+// 一条错的记忆会**污染以后所有判断**，而用户很难事后查出是哪条带偏的；
+// 不能删的话，那个错就永久留在库里了。所以"能删"和"能写"同等重要。
+// 删除同时清掉它的过时标记——留着一条指向不存在记忆的 stale 是垃圾。
+func (s *Store) RemoveFact(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	kept := s.f.Facts[:0]
+	for _, f := range s.f.Facts {
+		if f.ID != id {
+			kept = append(kept, f)
+		}
+	}
+	s.f.Facts = kept
+	s.dropStaleLocked(id)
+	return s.saveLocked()
+}
+
+func (s *Store) RemoveDecision(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	kept := s.f.Decisions[:0]
+	for _, d := range s.f.Decisions {
+		if d.ID != id {
+			kept = append(kept, d)
+		}
+	}
+	s.f.Decisions = kept
+	s.dropStaleLocked(id)
+	return s.saveLocked()
+}
+
+// dropStaleLocked 清掉某条记忆的过时标记（调用方须已持锁）。
+func (s *Store) dropStaleLocked(id string) {
+	kept := s.f.Stale[:0]
+	for _, st := range s.f.Stale {
+		if st.ID != id {
+			kept = append(kept, st)
+		}
+	}
+	s.f.Stale = kept
+}
+
 func (s *Store) saveLocked() error {
 	b, err := json.MarshalIndent(s.f, "", "  ")
 	if err != nil {
@@ -393,28 +439,51 @@ func (s *Store) RetrieveByText(text string) File {
 	if strings.TrimSpace(text) == "" {
 		return out
 	}
-	hit := func(kv map[string]string, blob string) bool {
-		// 键值命中（如 铺位=B31 出现在文本里）
+	// 查询侧检索单元：字符 bigram（见 bigrams 的注释）
+	qgrams := bigrams(text)
+	hit := func(kv map[string]string, blob string, minOverlap int) bool {
+		// ① 键值命中（如 铺位=B31 出现在查询里）——最可靠的信号，直接算命中
 		for _, v := range kv {
 			if v != "" && strings.Contains(text, v) {
 				return true
 			}
 		}
-		// 内容命中：把记忆文字拆成词，看是否出现在文本里（长度>=2 才判，避免误命中）
-		for _, w := range splitWords(blob) {
-			if len([]rune(w)) >= 2 && strings.Contains(text, w) {
-				return true
+		// ② 内容命中：按 bigram 重叠度判相关。
+		//
+		// 为什么不用"空格分词 + 子串包含"（原来那套）：中文没有空格，
+		// splitWords 会把整句"含运费的金额以后都算进去"当成一个词，
+		// 再拿它去 strings.Contains 查询——**永远不可能命中**。
+		// 实测："记一笔：A03 收了运费 500" 对那条决策召回为 0，
+		// 于是用户拍板过的规矩在改表时根本没生效。
+		//
+		// bigram 重叠对中文有效、且不依赖词典：两句话只要共享足够多的
+		// 相邻字对就算相关。"运费" 会让查询与记忆共享 bigram「运费」。
+		if minOverlap <= 0 {
+			return false
+		}
+		gb := bigrams(blob)
+		n := 0
+		for g := range qgrams {
+			if gb[g] {
+				n++
+				if n >= minOverlap {
+					return true
+				}
 			}
 		}
 		return false
 	}
 	for _, f := range s.f.Facts {
-		if hit(f.Key, f.Value+" "+f.Kind) {
+		// 事实要更高的重叠（2 组）：事实是精确断言，宁可少带。
+		if hit(f.Key, f.Value+" "+f.Kind, 2) {
 			out.Facts = append(out.Facts, f)
 		}
 	}
 	for _, d := range s.f.Decisions {
-		if hit(d.Key, d.Text) {
+		// 决策只要 1 组重叠：**宁多带不少带**。
+		// 理由不对称：漏掉决策的代价是照旧错着办（用户定的规矩没生效），
+		// 多带的代价只是 prompt 里多一行，模型自己能判断适不适用。
+		if hit(d.Key, d.Text, 1) {
 			out.Decisions = append(out.Decisions, d)
 		}
 	}
@@ -423,12 +492,35 @@ func (s *Store) RetrieveByText(text string) File {
 	return out
 }
 
-func splitWords(s string) []string {
-	return strings.FieldsFunc(s, func(r rune) bool {
-		if r == ' ' || r == '\t' || r == '\n' {
-			return true
+// bigrams 把一段文本拆成字符 bigram 集合（相邻两字为一组）。
+//
+// 为什么是 bigram 而不是分词：中文没有词间空格，按空格切等于没切
+// （原先就是这么坏的）。字符 bigram 不需要分词词典，对中英混排同样成立，
+// 且天然抗顺序差异——"含运费"与"运费包含"共享「运费」这一组。
+//
+// 标点与空白是**切分点**而不是删除对象：删掉会让分句两端的字黏在一起，
+// 凭空造出跨句的假字对（"含运费，不含税" 删了逗号会得到 "费不"），
+// 那种字对不是词，只会带来误命中。所以遇到标点就断开，字对不跨句。
+func bigrams(s string) map[string]bool {
+	out := map[string]bool{}
+	var run []rune
+	flush := func() {
+		for i := 0; i+1 < len(run); i++ {
+			out[string(run[i:i+2])] = true
 		}
-		// 中英文常见分隔符
-		return strings.ContainsRune("，,。.；;：:（）()/、|", r)
-	})
+		// 单字段（没有任何字对，如"租"）：退回单字本身，否则永远不命中
+		if len(run) == 1 {
+			out[string(run)] = true
+		}
+		run = run[:0]
+	}
+	for _, r := range s {
+		if unicode.IsSpace(r) || unicode.IsPunct(r) || unicode.IsSymbol(r) {
+			flush()
+			continue
+		}
+		run = append(run, unicode.ToLower(r))
+	}
+	flush()
+	return out
 }

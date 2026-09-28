@@ -5,6 +5,60 @@ import (
 	"testing"
 )
 
+// TestRetrieveByTextChineseRecall 检索必须能召回**中文**记忆。
+//
+// 这是回归用例，钉住一个真实缺陷：原来按空格分词 + 子串包含，
+// 而中文没有空格，整句被当成一个"词"，永远匹配不到——
+// 表现就是"用户拍板过的规矩在改表时根本没生效"。
+func TestRetrieveByTextChineseRecall(t *testing.T) {
+	s, _ := Open(t.TempDir())
+	_ = s.PutFact(Fact{ID: "f1", Value: "B31 铺位租户是早餐店，月租金 23540 元",
+		Key: map[string]string{"铺位": "B31"}})
+	_ = s.PutDecision(Decision{ID: "d1", Text: "含运费的金额以后都算进去，不再单独确认"})
+	_ = s.PutDecision(Decision{ID: "d2", Text: "滞纳金那张表不要动，那是财务自己算的"})
+
+	cases := []struct {
+		query string
+		facts int
+		decs  int
+	}{
+		// 业务键命中：最可靠的一类
+		{"B31 收到 8 月租金 23540", 1, 0},
+		// ★ 就是这条以前召回为 0：查询里出现"运费"，该带出那条决策
+		{"记一笔：A03 收了运费 500", 0, 1},
+		// "滞纳金"命中另一条决策
+		{"更新一下滞纳金", 0, 1},
+		// 完全无关的话：什么都不该带（否则记忆就是噪音）
+		{"今天天气怎么样", 0, 0},
+	}
+	for _, c := range cases {
+		got := s.RetrieveByText(c.query)
+		if len(got.Facts) != c.facts || len(got.Decisions) != c.decs {
+			t.Errorf("查询 %q：facts=%d(期望%d) decisions=%d(期望%d)",
+				c.query, len(got.Facts), c.facts, len(got.Decisions), c.decs)
+		}
+	}
+}
+
+// TestBigramsChinese 拆字对：中文按相邻字对切，标点空白剔除。
+func TestBigramsChinese(t *testing.T) {
+	g := bigrams("含运费，不含税")
+	for _, want := range []string{"含运", "运费", "不含", "含税"} {
+		if !g[want] {
+			t.Errorf("应含 bigram %q，得到 %v", want, g)
+		}
+	}
+	if g["费不"] {
+		t.Error("标点两侧不该连成一个 bigram（逗号应被剔除）")
+	}
+	if len(bigrams("")) != 0 {
+		t.Error("空文本应得到空集合")
+	}
+	if !bigrams("租")["租"] {
+		t.Error("单字应退回该字本身，否则单字查询永远不命中")
+	}
+}
+
 func TestPutRetrieveDecision(t *testing.T) {
 	dir := t.TempDir()
 	s, err := Open(dir)
@@ -109,4 +163,45 @@ func contains(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+// TestRemoveMemory 删掉一条记忆，并连带清掉它的过时标记。
+//
+// 为什么这条值得测：记忆会写错（提炼偏了、人后来改主意），而错的记忆会
+// 污染以后所有判断。不能删就等于永久留着那个错。同时注意：**留下的 stale
+// 标记必须一起清**——否则会有一条指向不存在记忆的过时提示，纯属垃圾。
+func TestRemoveMemory(t *testing.T) {
+	s, _ := Open(t.TempDir())
+	_ = s.PutFact(Fact{ID: "f1", Value: "B31 月租金 23540"})
+	_ = s.PutFact(Fact{ID: "f2", Value: "A03 月租金 19354.02"})
+	_ = s.PutDecision(Decision{ID: "d1", Text: "含运费都算进去"})
+	_ = s.PutDecision(Decision{ID: "d2", Text: "滞纳金表不要动"})
+	_ = s.MarkStale(Stale{ID: "d1", Note: "口径可能变了"})
+
+	if err := s.RemoveDecision("d1"); err != nil {
+		t.Fatal(err)
+	}
+	f := s.All()
+	if len(f.Decisions) != 1 || f.Decisions[0].ID != "d2" {
+		t.Errorf("应只剩 d2，得到 %+v", f.Decisions)
+	}
+	if len(f.Stale) != 0 {
+		t.Errorf("删掉记忆后它的过时标记也该清掉，却还剩 %+v", f.Stale)
+	}
+
+	if err := s.RemoveFact("f1"); err != nil {
+		t.Fatal(err)
+	}
+	f = s.All()
+	if len(f.Facts) != 1 || f.Facts[0].ID != "f2" {
+		t.Errorf("应只剩 f2，得到 %+v", f.Facts)
+	}
+
+	// 删不存在的 id：不该报错，也不该影响其他条目
+	if err := s.RemoveFact("不存在"); err != nil {
+		t.Errorf("删不存在的 id 不该报错：%v", err)
+	}
+	if len(s.All().Facts) != 1 {
+		t.Error("删不存在的 id 不该动到其他条目")
+	}
 }
