@@ -1,0 +1,43 @@
+/* 生成面板（见 docs/agent-architecture/29-UI升级与剩余功能.md 第 4 项、27-生成类任务.md）
+   从对话里搬出来的独立入口：产出落到工作区 生成/，绝不碰原表。
+   面板骨架与自动化任务（tasks.css）保持一致，避免又多一套观感。 */
+
+.gp-overlay {
+  position: fixed; inset: 0; z-index: 140; background: var(--scrim); backdrop-filter: var(--scrim-blur);
+  display: grid; place-items: center; padding: var(--sp-6);
+}
+.gp-panel {
+  background: var(--surface);
+  border-radius: var(--r-overlay); box-shadow: var(--el-3);
+  width: min(640px, 100%); max-height: 84vh;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.gp-head {
+  display: flex; align-items: baseline; gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--line); flex: none;
+}
+.gp-head > svg { color: var(--brand); align-self: center; }
+.gp-head b { font-size: var(--fs-h); font-weight: var(--fw-title); letter-spacing: var(--ls-tight); color: var(--ink); }
+.gp-sub { font-size: var(--fs-2xs); color: var(--text-3); }
+.gp-sub b { font-size: inherit; font-weight: var(--fw-med); color: var(--text-2); letter-spacing: normal; }
+.gp-x { margin-left: auto; border: none; background: none; cursor: pointer; padding: var(--sp-1); border-radius: var(--r-ctl); color: var(--text-3); }
+.gp-x:hover { background: var(--surface-2); color: var(--text-1); }
+
+.gp-body { padding: var(--sp-4) var(--sp-5); overflow: auto; flex: 1; min-height: 0; }
+.gp-input {
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 56px;
+  padding: var(--sp-3); border: 1px solid var(--line-strong); border-radius: var(--r-ctl);
+  background: var(--surface); color: var(--text-1);
+  font-family: var(--font); font-size: var(--fs-xs); line-height: 1.6;
+}
+.gp-input:focus { outline: none; border-color: var(--brand); box-shadow: var(--focus-ring); }
+.gp-ops { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-2); }
+.gp-hint { font-size: var(--fs-2xs); color: var(--text-3); display: inline-flex; align-items: center; gap: 4px; }
+.gp-hint code { font-family: var(--mono); background: var(--surface-2); padding: 0 var(--sp-1); border-radius: var(--r-ctl); }
+.gp-err {
+  margin: var(--sp-3) 0 0; padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-2xs); color: var(--danger); background: var(--danger-bg);
+  border-radius: var(--r-ctl); line-height: 1.6;
+}
+/* 结果卡（.gen-card 等）样式沿用 confirm.css 里已有的定义，不再复制一份。 */
+.gp-body .gen-card { margin-top: var(--sp-4); }

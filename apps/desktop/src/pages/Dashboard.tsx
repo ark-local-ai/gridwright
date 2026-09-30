@@ -12,6 +12,7 @@ import Settings from "./Settings2";
 import LedgerPanel from "./LedgerPanel";
 import TasksPanel from "./TasksPanel";
 import RulesPanel from "./RulesPanel";
+import GeneratePanel from "./GeneratePanel";
 import { PendingList, ChatPane } from "./Pending";
 import { hotspots } from "../lib/issues";
 import { linkHealth } from "../lib/linkage";
@@ -49,6 +50,7 @@ export default function Dashboard({ pickFolder, watchDrop }: {
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [generateOpen, setGenerateOpen] = useState(false);
   const [zoomed, setZoomed] = useState(false);
   // 打开表格：{sheet, file, highlight} —— 表预览整屏覆盖（表数据要看全）
   const [opened, setOpened] = useState<{ sheet: string; file?: string; ref?: string } | null>(null);
@@ -228,6 +230,7 @@ export default function Dashboard({ pickFolder, watchDrop }: {
             <WorkspaceSwitcher
               onPick={() => { setSwitcherOpen(false); void refresh(); }}
               onOpenSettings={() => { setSwitcherOpen(false); setSettingsOpen(true); }}
+              onClose={() => setSwitcherOpen(false)}
             />
           )}
         </div>
@@ -256,6 +259,11 @@ export default function Dashboard({ pickFolder, watchDrop }: {
             {!isFirstRun && (
               <button className="mini-btn" onClick={() => setRulesOpen(true)} title="规则（rules.yaml）" aria-label="规则">
                 <IconNote size={15} />
+              </button>
+            )}
+            {!isFirstRun && (
+              <button className="mini-btn" onClick={() => setGenerateOpen(true)} title="生成清单 / 文件（不动原表）" aria-label="生成">
+                <IconXls size={15} />
               </button>
             )}
             <button className="mini-btn" onClick={() => setChatOpen((v) => !v)} title="对话" aria-label="对话">
@@ -454,6 +462,7 @@ export default function Dashboard({ pickFolder, watchDrop }: {
       )}
       {tasksOpen && <TasksPanel onClose={() => setTasksOpen(false)} />}
       {rulesOpen && <RulesPanel onClose={() => setRulesOpen(false)} />}
+      {generateOpen && <GeneratePanel onClose={() => setGenerateOpen(false)} />}
         </>
       )}
 
@@ -566,7 +575,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 /* ---------- 工作区切换器 ---------- */
 
-function WorkspaceSwitcher({ onPick, onOpenSettings }: { onPick: () => void; onOpenSettings: () => void }) {
+function WorkspaceSwitcher({ onPick, onOpenSettings, onClose }: { onPick: () => void; onOpenSettings: () => void; onClose: () => void }) {
   const [items, setItems] = useState<WorkspaceListItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -581,12 +590,25 @@ function WorkspaceSwitcher({ onPick, onOpenSettings }: { onPick: () => void; onO
 
   const pick = async (dir: string) => {
     setBusy(true);
-    try { await agentApi.openWorkspace(dir); onPick(); } finally { setBusy(false); }
+    setErr("");
+    try {
+      await agentApi.openWorkspace(dir);
+      onPick();
+    } catch (e) {
+      // 切换失败必须显形并让菜单留着：以前异常被吞掉，菜单不关、也没提示，
+      // 用户只看到"点了没反应"。
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <>
-      <div className="ws-backdrop" onClick={onOpenSettings} />
+      {/* 点菜单外面 = 关掉菜单。以前这里接的是 onOpenSettings：
+          菜单定位错（见 dashboard.css 的 .dash-ident）时它盖住全屏，
+          于是用户一点工作区名就弹出设置页——这是那次 bug 的另一半。 */}
+      <div className="ws-backdrop" onClick={onClose} />
       <div className="ws-menu" onClick={(e) => e.stopPropagation()}>
         {err && <div className="ws-empty">读不到工作区列表：{err}</div>}
         {!err && items.length === 0 && <div className="ws-empty">还没有其他工作区</div>}

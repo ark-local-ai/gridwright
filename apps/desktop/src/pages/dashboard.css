@@ -23,7 +23,10 @@
   background: var(--surface);
   border-bottom: 1px solid var(--line);
 }
-.dash-ident { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+/* position: relative 是**必须的**：.ws-menu 是它的子元素、用 position:absolute 定位。
+   少了这一条，菜单会去找最近的定位祖先（.dash，见下方 741 行），于是 top:100% 落在
+   整块看板的**下沿之外**——菜单永远在屏幕外，用户点了什么都看不见。 */
+.dash-ident { position: relative; display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
 .ws-name {
   font-size: var(--fs-display); font-weight: var(--fw-title);
   letter-spacing: -0.03em; color: var(--ink);

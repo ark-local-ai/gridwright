@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import "./confirm.css";
 import { agentApi } from "../api-agent";
-import type { Proposal, ApplyResult, ImpactResult, SafetyReport, SelfCheckReport, GenerateResult, ConvoSummary, DistillCandidate } from "../api-agent";
+import type { Proposal, ApplyResult, ImpactResult, SafetyReport, SelfCheckReport, ConvoSummary, DistillCandidate } from "../api-agent";
 import { IconCheck, IconSpark, IconSend, IconNote, IconLink, IconShield, IconRefresh, IconX, IconClock, IconPlus, IconTrash, IconRename, IconAssistant } from "../components/icons";
 
 /* 待确认（A）+ 会话（B）（见 docs/agent-architecture/19-界面设计.md 阶段 3-4）
@@ -556,23 +556,18 @@ export function ChatPane({ onPlanReady, wsKey }: {
     }
   };
 
-  // 生成：把这句话交给后端产出草稿（落在工作区 生成/，绝不改原表）
-  const [gen, setGen] = useState<GenerateResult | null>(null);
-  const [genBusy, setGenBusy] = useState(false);
-  const makeDraft = async (instruction: string) => {
-    setGenBusy(true);
-    setErr("");
-    try {
-      setGen(await agentApi.generate(instruction));
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setGenBusy(false);
-    }
-  };
-
   // 澄清问询：点选项 = 把它当作用户的回答发出去（直接传文字，不走 input state）
   const answer = (opt: string) => { void send(opt); };
+
+  // 动作按钮只挂在**最后一条** plan 提议上：历史消息再挂按钮既是噪音，
+  // 也已经过期（待确认清单一次只可能有一份）。生成类入口已移出对话，
+  // 见看板顶栏的「生成」面板。
+  const lastPlanIdx = (() => {
+    for (let k = msgs.length - 1; k >= 0; k--) {
+      if (msgs[k].proposal?.kind === "plan") return k;
+    }
+    return -1;
+  })();
 
   return (
     <div className={`chat${dragOver ? " dropping" : ""}`}
@@ -747,7 +742,7 @@ export function ChatPane({ onPlanReady, wsKey }: {
                     ))}
                   </div>
                 )}
-                {m.proposal.kind === "plan" && (() => {
+                {m.proposal.kind === "plan" && i === lastPlanIdx && (() => {
                   // 这条回答要办的是**用户那句话**（以及他那张图），不是模型写的 detail。
                   // 用 detail 会丢掉“图里就是数据”这件事（detail 只是文字描述），
                   // 结果出清单时模型看不到数据 → 生成空清单。
@@ -762,13 +757,6 @@ export function ChatPane({ onPlanReady, wsKey }: {
                     </div>
                   );
                 })()}
-                {/* 生成类：产出新文件到 生成/，不碰原表 */}
-                <div className="mp-opts">
-                  <button className="btn ghost sm" disabled={genBusy}
-                    onClick={() => void makeDraft(precedingUser(msgs, i).text)}>
-                    {genBusy ? "正在生成…" : "出一份草稿"}
-                  </button>
-                </div>
               </div>
             )}
           </div>
@@ -835,31 +823,6 @@ export function ChatPane({ onPlanReady, wsKey }: {
           </button>
         </div>
       )}
-      {gen && (
-        <div className="gen-card">
-          <div className="gc-h">
-            <b>{gen.title || "已生成"}</b>
-            <span className="gc-kind">草稿</span>
-          </div>
-          <div className="gc-meta">
-            {gen.rows > 0 && <span>{gen.rows} 行</span>}
-            {gen.columns?.length > 0 && <span>列：{gen.columns.join(" / ")}</span>}
-          </div>
-          {gen.sum && Object.keys(gen.sum).length > 0 && (
-            <div className="gc-sum">
-              {Object.entries(gen.sum).map(([k, v]) => (
-                <span key={k} className="gc-sum-i"><em>{k}</em>{v.toLocaleString()}</span>
-              ))}
-            </div>
-          )}
-          {gen.content && <pre className="gc-content">{gen.content.slice(0, 600)}</pre>}
-          <div className="gc-file">
-            <code>{gen.file}</code>
-            <span className="gc-note">{gen.notes?.[0] ?? "生成不改动原表"}</span>
-          </div>
-        </div>
-      )}
-
       <p className="chat-foot">
         <IconNote size={12} /> 它只建议，不会自己改表；要改的会进「待确认」等你点头。
       </p>
