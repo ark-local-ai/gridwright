@@ -63,19 +63,16 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
 ls -lh "$SIDECAR_DIR/gridwright-$TARGET_TRIPLE.exe"
 
 echo "==> 4/5 应用图标与安装界面品牌图"
-# 应用图标：**只有缺失时才画**。
+# 应用图标以**仓库里已提交的为准**（当前设计），不再由脚本重画。
 #
-# 为什么不再无条件重画：仓库里已提交的图标是当前设计（人改过、经评审），
-# 而这个生成脚本的图源较旧——无条件重画会把它**静静覆盖回旧设计**（实测踩到，
-# 用户装完发现图标变回去了）。图标不是每次都该变的东西。
-if [ -f "$DESKTOP/src-tauri/icons/icon.ico" ]; then
-  echo "    图标已存在，沿用仓库里已提交的那份（不重画）"
-elif command -v python >/dev/null 2>&1 && python -c "import PIL" >/dev/null 2>&1; then
-  echo "    图标缺失，用脚本生成"
-  python "$DESKTOP/scripts/gen_app_icon.py"
-else
-  echo "    !! 图标缺失且没有 python + Pillow，构建可能失败" >&2
+# 以前每次构建都跑 gen_app_icon.py，而那个脚本画的是旧一格设计，
+# 于是无条件重画会把新图标**静静覆盖回旧的**——用户重装后发现图标变回去了（实测踩到）。
+# 那个脚本已删除；图标是设计资产，改它应该是人的动作，不是构建的副作用。
+if [ ! -f "$DESKTOP/src-tauri/icons/icon.ico" ]; then
+  echo "    !! src-tauri/icons/icon.ico 缺失：请先补图标（构建不出无图标的包）" >&2
+  exit 1
 fi
+echo "    沿用仓库里已提交的图标"
 
 # 安装界面品牌图：颜色跟着品牌令牌走，重画才能跟上调色。
 if command -v python >/dev/null 2>&1 && python -c "import PIL" >/dev/null 2>&1; then
