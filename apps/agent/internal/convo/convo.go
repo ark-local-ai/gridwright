@@ -165,6 +165,33 @@ func (s *Store) Append(id string, m Message) (*Conversation, error) {
 	return nil, fmt.Errorf("会话不存在：%s", id)
 }
 
+// Accept 把某条消息上的提案标成"已采纳"并落盘。
+//
+// 为什么要落盘：采纳是一个决定，重启后要还在——否则界面上又会让人再点一次。
+// 返回被采纳的提案，调用方据此决定额外动作（task 要落成定时任务）。
+func (s *Store) Accept(id string, index int) (*Proposal, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.items {
+		if s.items[i].ID != id {
+			continue
+		}
+		if index < 0 || index >= len(s.items[i].Messages) {
+			return nil, fmt.Errorf("消息序号越界：%d", index)
+		}
+		p := s.items[i].Messages[index].Proposal
+		if p == nil {
+			return nil, fmt.Errorf("这条消息上没有可采纳的提案")
+		}
+		p.Accepted = true
+		if err := s.saveLocked(); err != nil {
+			return nil, err
+		}
+		return p, nil
+	}
+	return nil, fmt.Errorf("会话不存在：%s", id)
+}
+
 // Delete 删除一条会话。
 func (s *Store) Delete(id string) error {
 	s.mu.Lock()

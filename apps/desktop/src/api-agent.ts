@@ -507,6 +507,8 @@ export const agentApi = {
     post<{ conversationId: string; conversation: ConvoDto; trace?: TraceData }>("/api/v1/chat", { message, conversationId, images }),
   conversations: () => get<{ items: ConvoSummary[] }>("/api/v1/conversations"),
   conversation: (id: string) => get<ConvoDto>(`/api/v1/conversation?id=${encodeURIComponent(id)}`),
+  acceptProposal: (conversationId: string, index: number) =>
+    post<{ ok: boolean; kind: string; note?: string }>("/api/v1/conversation/accept", { conversationId, index }),
   renameConversation: (id: string, title: string) =>
     put<{ ok: boolean; title: string }>(`/api/v1/conversation?id=${encodeURIComponent(id)}`, { title }),
   deleteConversation: (id: string) =>

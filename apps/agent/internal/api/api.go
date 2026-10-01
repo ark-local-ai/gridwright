@@ -178,6 +178,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/chat", s.handleChat)
 	mux.HandleFunc("/api/v1/conversations", s.handleConversations)
 	mux.HandleFunc("/api/v1/conversation", s.handleConversation)
+	mux.HandleFunc("/api/v1/conversation/accept", s.handleConversationAccept)
 	// 从一段对话里提炼"记忆候选"：只提议、不落盘（落盘走 /memory 且需人批准）
 	mux.HandleFunc("/api/v1/conversation/distill", s.handleDistill)
 	mux.HandleFunc("/api/v1/memory", s.handleMemoryOrPut)

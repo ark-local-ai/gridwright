@@ -269,6 +269,8 @@ type ConvoMsg = {
   proposal?: {
     kind: string; title: string; detail: string; schedule?: string;
     action?: string; tools?: string[]; options?: string[];
+    /** 人点过"采纳"（task/rule/tool_request）。落盘了，重启后仍在。 */
+    accepted?: boolean;
   };
 };
 
@@ -602,6 +604,26 @@ export function ChatPane({ onPlanReady, wsKey }: {
   // 澄清问询：点选项 = 把它当作用户的回答发出去（直接传文字，不走 input state）
   const answer = (opt: string) => { void send(opt); };
 
+  // 采纳一条提案（task/rule/tool_request）：落成真的东西（task → 一条暂停的定时任务）。
+  // 以前这些提案只能看、点不了——模型说"每天下班前体检"，用户点头也没下文。
+  const [accepting, setAccepting] = useState(false);
+  const acceptProposal = async (at: number) => {
+    if (!convoId || accepting) return;
+    setAccepting(true);
+    setErr("");
+    try {
+      const r = await agentApi.acceptProposal(convoId, at);
+      const c = await agentApi.conversation(convoId);
+      setMsgs(c.messages as ConvoMsg[]);
+      setSavedNote(r.note || "已采纳");
+      setTimeout(() => setSavedNote(""), 5000);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAccepting(false);
+    }
+  };
+
   // 动作按钮只挂在**最后一条** plan 提议上：历史消息再挂按钮既是噪音，
   // 也已经过期（待确认清单一次只可能有一份）。生成类入口已移出对话，
   // 见看板顶栏的「生成」面板。
@@ -807,6 +829,15 @@ export function ChatPane({ onPlanReady, wsKey }: {
                     </div>
                   );
                 })()}
+                {/* 非 plan 类提案（定时任务 / 规则 / 工具申请）：给一个明确的「采纳」。 */}
+                {(m.proposal.kind === "task" || m.proposal.kind === "rule" || m.proposal.kind === "tool_request") && (
+                  <div className="mp-opts">
+                    {m.proposal.accepted
+                      ? <span className="mp-wait">已采纳</span>
+                      : <button className="btn primary sm" disabled={accepting}
+                          onClick={() => void acceptProposal(i)}>采纳</button>}
+                  </div>
+                )}
               </div>
             )}
             {runTrace && runTrace.at === i && <RunTrace trace={runTrace.trace} />}
