@@ -13,19 +13,51 @@ export function inTauri(): boolean {
 }
 
 /**
- * 弹系统文件夹选择框，返回所选目录绝对路径；取消或不可用时返回 null。
- * 在浏览器里（非 Tauri）直接返回 null，调用方应降级为手输。
+ * 弹系统目录选择框（可自定义标题）。工作区目录与日志目录都用它，只是标题不同。
+ * 在浏览器里（非 Tauri）直接返回 null，调用方应降级。
  */
-export async function pickFolder(): Promise<string | null> {
+export async function pickDirectory(title: string): Promise<string | null> {
   if (!inTauri()) return null;
   try {
     const { open } = await import("@tauri-apps/plugin-dialog");
-    const picked = await open({ directory: true, multiple: false, title: "选择工作区文件夹" });
-    if (typeof picked === "string") return picked;
-    return null;
+    const picked = await open({ directory: true, multiple: false, title });
+    return typeof picked === "string" ? picked : null;
   } catch {
     return null;
   }
+}
+
+/** 弹系统文件夹选择框，返回所选目录绝对路径；取消或不可用时返回 null。 */
+export async function pickFolder(): Promise<string | null> {
+  return pickDirectory("选择工作区文件夹");
+}
+
+/**
+ * 日志目录（桌面壳命令）。日志是**壳**在写（引擎只打 stdout），所以“日志放哪”
+ * 由壳控制；这三个命令对应壳里的 get_log_dir / set_log_dir / open_log_dir。
+ * 非 Tauri（浏览器/单文件版）下没有日志文件，读回 null、写抛错。
+ */
+export async function getLogDir(): Promise<string | null> {
+  if (!inTauri()) return null;
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<string>("get_log_dir");
+  } catch {
+    return null;
+  }
+}
+
+/** 改日志目录并落盘（立即生效）；返回规范化后的路径。 */
+export async function setLogDir(dir: string): Promise<string> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return await invoke<string>("set_log_dir", { dir });
+}
+
+/** 用资源管理器打开日志目录。 */
+export async function openLogDir(): Promise<void> {
+  if (!inTauri()) return;
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("open_log_dir");
 }
 
 /** 拖拽文件/文件夹进窗口时，Tauri 报给我们的三种时刻。 */

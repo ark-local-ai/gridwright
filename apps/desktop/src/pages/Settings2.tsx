@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import "./settings.css";
 import { agentApi } from "../api-agent";
 import type { SettingsDto } from "../api-agent";
-import { IconCheck, IconGear, IconX, IconSpark } from "../components/icons";
+import { IconCheck, IconGear, IconX, IconSpark, IconDoc } from "../components/icons";
+import { inTauri, pickDirectory, getLogDir, setLogDir, openLogDir } from "../native";
 import MemoryPanel from "./MemoryPanel";
 
 /* 设置（见 docs/agent-architecture/19-界面设计.md、20-离线可用与桌面交付.md）
@@ -13,7 +14,7 @@ import MemoryPanel from "./MemoryPanel";
    工作区不在这里管了：它是"进哪份台账"这件事，属于主界面
    （拖文件夹进来 / 首屏选择），放在设置里反而让人以为是配置项。 */
 
-type Tab = "model" | "memory";
+type Tab = "model" | "memory" | "logs";
 
 export default function Settings({ onClose }: {
   onClose: () => void;
@@ -68,6 +69,10 @@ export default function Settings({ onClose }: {
               aria-selected={tab === "memory"} onClick={() => setTab("memory")}>
               <IconSpark size={12} />记忆
             </button>
+            <button className={`set-tab${tab === "logs" ? " on" : ""}`} role="tab"
+              aria-selected={tab === "logs"} onClick={() => setTab("logs")}>
+              <IconDoc size={12} />日志
+            </button>
           </nav>
           <button className="set-x" onClick={onClose} aria-label="关闭"><IconX size={14} /></button>
         </header>
@@ -115,9 +120,67 @@ export default function Settings({ onClose }: {
           )}
 
           {tab === "memory" && <MemoryPanel />}
+          {tab === "logs" && <LogSettings />}
         </div>
       </div>
     </div>
+  );
+}
+
+/* 日志（设置里的第三栏）
+   为什么要有它：日志是排障的唯一通道，但它默认赖在安装目录里、用户不知道在哪、
+   更不知道能改。这一栏把「日志放哪」变成可见、可改、可一键打开。 */
+function LogSettings() {
+  const tauri = inTauri();
+  const [dir, setDir] = useState("");
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!tauri) return;
+    void getLogDir().then((d) => { if (d) setDir(d); }).catch(() => {});
+  }, [tauri]);
+
+  const choose = async () => {
+    const picked = await pickDirectory("选择日志存放文件夹");
+    if (!picked) return;
+    setBusy(true);
+    setMsg("");
+    try {
+      const saved = await setLogDir(picked);
+      setDir(saved);
+      setMsg("已保存，立即生效");
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="set-sec">
+      <h3>日志</h3>
+      <p className="set-hint">
+        引擎与外壳的运行日志。默认在<b>安装目录下的 logs/</b>；可以改到别处。
+        日志只增不减，单个文件超过 8 MB 自动轮转，保留最近 3 份。
+      </p>
+      <label className="set-field">
+        <span>日志目录</span>
+        <input value={dir} readOnly placeholder={tauri ? "（读取中…）" : "仅桌面版有日志文件"} />
+      </label>
+      {tauri ? (
+        <div className="set-row">
+          <button className="btn ghost" onClick={() => void choose()} disabled={busy}>选择文件夹</button>
+          <button className="btn ghost" onClick={() => void openLogDir()}>打开日志文件夹</button>
+          {msg && <span className="set-msg">{msg}</span>}
+        </div>
+      ) : (
+        <p className="set-hint set-hint-sm">浏览器里不写日志文件；日志设置仅在桌面版可用。</p>
+      )}
+      <p className="set-hint set-hint-sm">
+        改完立即生效：新写入的行会去新目录，不搬旧文件。
+      </p>
+    </section>
   );
 }
 

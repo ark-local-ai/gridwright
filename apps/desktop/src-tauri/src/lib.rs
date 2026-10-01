@@ -15,7 +15,8 @@
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::sync::Mutex;
+use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
 use chrono::{FixedOffset, Local, TimeZone};
@@ -26,6 +27,104 @@ use tauri_plugin_single_instance::init as single_instance;
 
 /// 引擎监听的端口（与 internal/api 默认一致）
 const ENGINE_PORT: u16 = 7700;
+
+// =====================================================================
+// 日志目录
+//
+// 日志是**壳**在写（引擎只往 stdout 打，壳把子进程输出落盘），所以“日志放哪”
+// 是壳的事。默认放在 **exe 所在的安装目录下 `logs/`**，不再塞进漫游的 %APPDATA%——
+// 用户能在安装目录一眼找到它；还可在「设置 → 日志」里改到别处（存在 shell.json）。
+// =====================================================================
+
+/// 当前日志目录（进程内缓存；改设置时直接更新）。
+static LOG_DIR: OnceLock<Mutex<PathBuf>> = OnceLock::new();
+
+/// 壳自己的设置文件：%APPDATA%\gridwright\shell.json（与 config.yaml 同目录）。
+fn shell_cfg_path() -> PathBuf {
+    let base = std::env::var("APPDATA").unwrap_or_else(|_| ".".into());
+    std::path::Path::new(&base).join("gridwright").join("shell.json")
+}
+
+/// 默认日志目录：exe 所在的安装目录下的 `logs/`。
+fn default_log_dir() -> PathBuf {
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.join("logs")))
+        .unwrap_or_else(|| PathBuf::from("logs"))
+}
+
+/// 解析日志目录：优先 shell.json 里的 logDir，否则用安装目录下的 logs/。
+fn read_log_dir() -> PathBuf {
+    if let Ok(txt) = std::fs::read_to_string(shell_cfg_path()) {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&txt) {
+            if let Some(s) = v.get("logDir").and_then(|x| x.as_str()) {
+                if !s.trim().is_empty() {
+                    return PathBuf::from(s.trim());
+                }
+            }
+        }
+    }
+    default_log_dir()
+}
+
+/// 当前日志目录（带锁，写日志那一刻才读，所以改设置可**立即生效**）。
+fn log_dir_handle() -> &'static Mutex<PathBuf> {
+    LOG_DIR.get_or_init(|| Mutex::new(read_log_dir()))
+}
+
+fn current_log_dir() -> PathBuf {
+    log_dir_handle()
+        .lock()
+        .map(|d| d.clone())
+        .unwrap_or_else(|_| default_log_dir())
+}
+
+/// 设置 → 日志：读当前日志目录。
+#[tauri::command]
+fn get_log_dir() -> String {
+    current_log_dir().to_string_lossy().to_string()
+}
+
+/// 设置 → 日志：改日志目录。立即生效（logger 在写那一刻才读路径），并落盘到 shell.json。
+#[tauri::command]
+fn set_log_dir(dir: String) -> Result<String, String> {
+    let dir = dir.trim();
+    if dir.is_empty() {
+        return Err("日志目录不能为空".into());
+    }
+    let p = PathBuf::from(dir);
+    if let Err(e) = std::fs::create_dir_all(&p) {
+        return Err(format!("无法创建该目录：{e}"));
+    }
+    let path = shell_cfg_path();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let cfg = serde_json::json!({ "logDir": p.to_string_lossy() });
+    if let Err(e) = std::fs::write(&path, serde_json::to_string_pretty(&cfg).unwrap_or_default()) {
+        return Err(format!("保存设置失败：{e}"));
+    }
+    if let Ok(mut g) = log_dir_handle().lock() {
+        *g = p.clone();
+    }
+    log_to("shell.log", &format!("日志目录已改为 {}", p.to_string_lossy()));
+    Ok(p.to_string_lossy().to_string())
+}
+
+/// 设置 → 日志：用资源管理器打开日志所在文件夹。
+#[tauri::command]
+fn open_log_dir() -> Result<(), String> {
+    let dir = current_log_dir();
+    let _ = std::fs::create_dir_all(&dir);
+    #[cfg(target_os = "windows")]
+    let mut cmd = std::process::Command::new("explorer");
+    #[cfg(not(target_os = "windows"))]
+    let mut cmd = std::process::Command::new("open");
+    cmd.arg(dir.as_os_str())
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("打开失败：{e}"))
+}
 
 // tauri-plugin-shell 的 Command::spawn() 返回 (事件接收器, 子进程句柄)。
 // 接收器一经 spawn 就交给 logs 任务接管（见 pipe_engine_log），
@@ -84,11 +183,10 @@ fn log_raw(file: &str, msg: &str) {
 const LOG_MAX_BYTES: u64 = 8 << 20; // 8 MiB
 const LOG_KEEP: u32 = 3;
 
-/// 打开（必要时创建）%APPDATA%\gridwright\<file> 并追加一行。
+/// 追加一行到当前日志目录下的 <file>。
 fn append_line(file: &str, text: &str) {
     use std::io::Write;
-    let dir = std::env::var("APPDATA").unwrap_or_else(|_| ".".into());
-    let dir = std::path::Path::new(&dir).join("gridwright");
+    let dir = current_log_dir();
     let _ = std::fs::create_dir_all(&dir);
     let path = dir.join(file);
     if let Ok(m) = std::fs::metadata(&path) {
@@ -239,6 +337,7 @@ pub fn run() {
                 let _ = w.set_focus();
             }
         }))
+        .invoke_handler(tauri::generate_handler![get_log_dir, set_log_dir, open_log_dir])
         .manage(EngineProcess(Mutex::new(None)))
         .setup(|app| {
             log_line("=== 应用启动 ===");
