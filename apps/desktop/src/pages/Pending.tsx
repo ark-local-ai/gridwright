@@ -542,16 +542,43 @@ export function ChatPane({ onPlanReady, wsKey }: {
   // 为什么要带上这条消息里的图：数据常常**就在截图里**（"按 D 列名字把 E、F 列
   // 填进销售明细表"）。不把图传下去，出清单这一步只能反问"数据来自哪张表"，
   // 把一件能做的事停成澄清——实测发生过。
+  // 出清单要等模型（实测 7–60 秒不等，最坏是通道超时）。等待期间必须让人看见
+  // “还在跑、跑了多久、能不能停”——否则一个 30 秒没反应的按钮在用户眼里就是卡死。
+  const planAbort = useRef<AbortController | null>(null);
+  const [planElapsed, setPlanElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!planning) { setPlanElapsed(0); return; }
+    const t0 = Date.now();
+    setPlanElapsed(0);
+    const id = setInterval(() => setPlanElapsed(Math.round((Date.now() - t0) / 1000)), 500);
+    return () => clearInterval(id);
+  }, [planning]);
+
+  const cancelPlan = () => { planAbort.current?.abort(); };
+
   const makePlan = async (instruction: string, images: string[] | undefined, at: number) => {
     setPlanning(true);
     setErr("");
+    const ac = new AbortController();
+    planAbort.current = ac;
     try {
-      const r = await agentApi.plan(instruction, undefined, images);
+      const r = await agentApi.plan(instruction, undefined, images, ac.signal);
       onPlanReady(r.proposal);
       setPlanned((p) => ({ ...p, [at]: true }));
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      if (ac.signal.aborted) {
+        setErr("已取消这次出清单（没有任何改动被写入）。");
+      } else {
+        const m = e instanceof Error ? e.message : String(e);
+        // 通道超时是最常见的失败，给一句能照着做的解释，
+        // 而不是把 "context deadline exceeded" 原样甩给用户。
+        setErr(/deadline exceeded|timeout|timed out|超时/i.test(m)
+          ? `模型通道超时：引擎等满 60 秒也没收到响应（上游接口慢或挂了）。\n可以直接再点一次；若反复如此，去设置里换一个更稳的接口/模型。\n原始错误：${m}`
+          : m);
+      }
     } finally {
+      planAbort.current = null;
       setPlanning(false);
     }
   };
@@ -752,8 +779,14 @@ export function ChatPane({ onPlanReady, wsKey }: {
                     <div className="mp-opts">
                       <button className="btn primary sm" disabled={planning || done}
                         onClick={() => void makePlan(src.text, src.images, i)}>
-                        {done ? "清单已生成" : planning ? "正在算清单…" : "算出要改哪些格"}
+                        {done ? "清单已生成" : planning ? `正在算清单… ${planElapsed}s` : "算出要改哪些格"}
                       </button>
+                      {planning && (
+                        <>
+                          <span className="mp-wait">模型在出清单，通常 10–40 秒</span>
+                          <button className="btn ghost sm" onClick={cancelPlan}>取消</button>
+                        </>
+                      )}
                     </div>
                   );
                 })()}
@@ -762,7 +795,7 @@ export function ChatPane({ onPlanReady, wsKey }: {
           </div>
         ))}
         {busy && <div className="msg agent"><div className="msg-text typing">正在想…</div></div>}
-        {err && <div className="chat-err">{err}</div>}
+        {err && <div className="chat-err" role="alert">{err}</div>}
         <div ref={endRef} />
       </div>
 

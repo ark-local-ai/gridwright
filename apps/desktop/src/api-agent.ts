@@ -15,11 +15,12 @@ async function get<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-async function post<T>(path: string, body?: unknown): Promise<T> {
+async function post<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
+    signal,
   });
   if (!res.ok) {
     const b = await res.json().catch(() => ({}));
@@ -478,8 +479,8 @@ export const agentApi = {
   // 所以在 API 边界把 items/blocked/affects 一律收敛成数组。
   // images：随指令附的图。数据常常就在截图里（"按 D 列名字填 E、F 列"），
   // 不带图的话模型只能反问数据来源，把能做的事停成澄清。
-  plan: async (instruction: string, file?: string, images?: string[]) => {
-    const r = await post<{ id: string; proposal: Proposal }>("/api/v1/plan", { instruction, file, images });
+  plan: async (instruction: string, file?: string, images?: string[], signal?: AbortSignal) => {
+    const r = await post<{ id: string; proposal: Proposal }>("/api/v1/plan", { instruction, file, images }, signal);
     if (r?.proposal) r.proposal = normalizeProposal(r.proposal);
     return r;
   },

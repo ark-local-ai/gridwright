@@ -288,7 +288,18 @@
   max-width: 100%; min-width: 0; height: auto; line-height: 1.5;
 }
 
-.chat-err { font-size: 12px; color: var(--danger); }
+/* 动作按钮旁的等待提示：把“还在跑”说清楚（秒数由按钮上的 planElapsed 提供）。 */
+.mp-wait { font-size: 11.5px; color: var(--text-3); align-self: center; }
+
+/* 出错要看得见：以前只有一行细红字，30 秒等待后弹出来很容易被当成卡死。
+   改成有底色的告警块，并保留换行（超时提示是多行的）。 */
+.chat-err {
+  font-size: 12px; color: var(--danger);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  padding: var(--sp-2) var(--sp-3); margin-top: var(--sp-2);
+  background: var(--danger-bg); border-left: 3px solid var(--danger);
+  border-radius: var(--r-ctl); line-height: 1.6;
+}
 
 /* 输入区：让输入框**占满、且能写多行**。指令常常不止一句
    （"B31 收 8 月租金 23540，另外把 9 月滞纳金一起算上"），单行框写起来憋屈。 */
