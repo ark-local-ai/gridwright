@@ -2,7 +2,7 @@ import { useEffect, useCallback, useState } from "react";
 import "./dashboard.css";
 import "./dashboard-shell.css";
 import { agentApi, nodeId } from "../api-agent";
-import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, WorkspaceListItem, Proposal, SafetyReport, SelfCheckReport } from "../api-agent";
+import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, WorkspaceListItem, Proposal, SafetyReport, SelfCheckReport } from "../api-agent";
 import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark, IconClock } from "../components/icons";
 import AttentionList from "../components/AttentionList";
 import DropZone from "../components/DropZone";
@@ -430,9 +430,17 @@ export default function Dashboard({ pickFolder, watchDrop }: {
             </section>
           )}
 
-          {/* ⑤ 选中的工作表：标题就是 sheet 名，明说这是哪一张 */}
+          {/* ⑤ 选中的工作表：标题是 sheet 名；内容只留“大概描述 / 上次改动 / 改动日期”。
+              原来堆的行/列/公式与列清单是“看一眼 Excel 就知道”的东西，占地方不说话。
+
+              BACKEND-TODO（描述与改动信息）：现在读不到数据，先用占位。
+              后端要提供：GET /api/v1/sheets/detail?file=&sheet=
+                → { description?: string,     // 体检时模型读一遍表写出的“这张表是做什么的”
+                    lastChange?: string,      // 上次改动（如 "E12 100 → 23540"）
+                    lastChangeAt?: string }   // 改动日期
+              拿到后把下面的占位换成真实值即可。 */}
           {active && graph && (
-            <section className="dcard">
+            <section className="dcard dcard-sheet">
               <div className="dcard-h">
                 <h3 title={active.sheet}>{active.sheet}</h3>
                 <span className="dcard-n">工作表</span>
@@ -442,7 +450,22 @@ export default function Dashboard({ pickFolder, watchDrop }: {
                 </button>
               </div>
               <p className="nd-file"><IconXls size={12} />{active.file || "外部文件"}</p>
-              <NodeStats node={active} />
+
+              <div className="sd-block">
+                <span className="sd-k">大概描述</span>
+                <p className="sd-todo">还没有描述。体检时模型会读一遍这张表，写出它是做什么的、有哪些关键列。</p>
+              </div>
+
+              <div className="sd-grid">
+                <div className="sd-cell">
+                  <span className="sd-k">上次改动</span>
+                  <span className="sd-v sd-empty">—</span>
+                </div>
+                <div className="sd-cell">
+                  <span className="sd-k">改动日期</span>
+                  <span className="sd-v sd-empty">—</span>
+                </div>
+              </div>
             </section>
           )}
 
@@ -492,63 +515,9 @@ export default function Dashboard({ pickFolder, watchDrop }: {
 /* ---------- 联动链（按文件分组 → 同系列折叠） ---------- */
 
 
-/* ---------- 节点汇总（用户要的"点模块展示大概汇总数据"） ---------- */
-
-function NodeStats({ node }: { node: GraphNode }) {
-  const [pv, setPv] = useState<SheetPreview | null>(null);
-  const [pvErr, setPvErr] = useState("");
-  useEffect(() => {
-    let alive = true;
-    setPvErr("");
-    agentApi.preview(node.sheet, node.file, 1)
-      .then((d) => { if (alive) setPv(d); })
-      .catch((e: unknown) => {
-        if (!alive) return;
-        setPv(null);
-        setPvErr(e instanceof Error ? e.message : String(e));
-      });
-    return () => { alive = false; };
-  }, [node.sheet, node.file]);
-
-  // 读不到就明说。此前失败与“还在加载”共用同一个骨架屏，于是骨架会永远转下去：
-  // 用户既不知道出了错，也不知道在等什么——比报错还难查。
-  if (pvErr) return <div className="nd-note">预览读不到：{pvErr}</div>;
-  if (!pv) return <div className="sk-group nd-stats-sk"><SkPanel rows={3} /></div>;
-
-  // 空表（无数据行）时 summaries/sample/header 可能是 null，必须兜底
-  const sums = pv.summaries ?? [];
-  const header = pv.header ?? [];
-  const overview = sums.find((s) => s.label && s.values.length > 2) ?? sums[0];
-  const ovValues = (overview?.values ?? []).filter((v) => v !== overview?.label);
-  return (
-    <div className="nd-stats">
-      {/* 规模：三个等宽读数横排——仪器铭牌的语汇（小标注 + 大数字） */}
-      <div className="nd-metrics">
-        <Metric label="行" value={pv.rows.toLocaleString()} />
-        <Metric label="列" value={String(pv.cols)} />
-        <Metric label="公式" value={pv.formulas.toLocaleString()} />
-      </div>
-      {header.filter(Boolean).length > 0 && (
-        <p className="nd-cols">
-          <span className="nd-k">列</span>
-          {header.filter(Boolean).slice(0, 6).join(" / ")}
-          {header.filter(Boolean).length > 6 ? " …" : ""}
-        </p>
-      )}
-      {ovValues.length > 0 && (
-        <div className="nd-sum">
-          <span className="nd-k">{overview?.label || "概览"}</span>
-          <div className="ns-sum">
-            {ovValues.slice(0, 8).map((v, i) => (
-              <span key={i} className="ns-chip">{v}</span>
-            ))}
-          </div>
-        </div>
-      )}
-      {pv.note && <div className="nd-note">{pv.note}</div>}
-    </div>
-  );
-}
+/* 节点汇总已移除：行/列/公式与列清单属于“看一眼 Excel 就知道”的东西，占地方不说话。
+   取而代之的是「工作表详情」卡里的三件事（大概描述 / 上次改动 / 改动日期）——
+   描述由体检时模型生成，待后端接入（见 Dashboard.tsx 里的 BACKEND-TODO）。 */
 
 /** 一个仪器读数：小标注在上，等宽大数字在下。 */
 function Metric({ label, value }: { label: string; value: string }) {
