@@ -579,7 +579,7 @@ export function ChatPane({ onPlanReady, wsKey }: {
     const ac = new AbortController();
     planAbort.current = ac;
     try {
-      const r = await agentApi.plan(instruction, undefined, images, ac.signal);
+      const r = await agentApi.plan(instruction, undefined, images, ac.signal, convoId || undefined);
       onPlanReady(r.proposal, r.trace);
     } catch (e) {
       setPlanFailed((p) => ({ ...p, [at]: true }));
