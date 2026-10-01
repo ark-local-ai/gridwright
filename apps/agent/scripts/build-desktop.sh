@@ -62,11 +62,23 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
   -o "$SIDECAR_DIR/gridwright-$TARGET_TRIPLE.exe" ./cmd/gridwright
 ls -lh "$SIDECAR_DIR/gridwright-$TARGET_TRIPLE.exe"
 
-echo "==> 4/5 重画应用图标与安装界面品牌图"
-# 由脚本产出而非手工放图：颜色是品牌令牌的副本，重画才跟得上调色。
-# 缺 Python/Pillow 时跳过（已提交的图仍在，安装包照出）。
-if command -v python >/dev/null 2>&1 && python -c "import PIL" >/dev/null 2>&1; then
+echo "==> 4/5 应用图标与安装界面品牌图"
+# 应用图标：**只有缺失时才画**。
+#
+# 为什么不再无条件重画：仓库里已提交的图标是当前设计（人改过、经评审），
+# 而这个生成脚本的图源较旧——无条件重画会把它**静静覆盖回旧设计**（实测踩到，
+# 用户装完发现图标变回去了）。图标不是每次都该变的东西。
+if [ -f "$DESKTOP/src-tauri/icons/icon.ico" ]; then
+  echo "    图标已存在，沿用仓库里已提交的那份（不重画）"
+elif command -v python >/dev/null 2>&1 && python -c "import PIL" >/dev/null 2>&1; then
+  echo "    图标缺失，用脚本生成"
   python "$DESKTOP/scripts/gen_app_icon.py"
+else
+  echo "    !! 图标缺失且没有 python + Pillow，构建可能失败" >&2
+fi
+
+# 安装界面品牌图：颜色跟着品牌令牌走，重画才能跟上调色。
+if command -v python >/dev/null 2>&1 && python -c "import PIL" >/dev/null 2>&1; then
   python "$DESKTOP/scripts/gen_installer_art.py"
 else
   echo "    跳过（需要 python + Pillow）；沿用仓库里已提交的图"
