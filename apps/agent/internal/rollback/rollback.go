@@ -36,6 +36,10 @@ type Item struct {
 	New    string `json:"new"`
 	Reason string `json:"reason"`
 	Status string `json:"status"`
+	// Source 是这笔改动的来源（"对话:<id>" / 规则 / inbox 文件）；
+	// SourceTitle 是 API 层把会话 id 译回的标题，供界面显示「哪次对话改的」。
+	Source      string `json:"source,omitempty"`
+	SourceTitle string `json:"sourceTitle,omitempty"`
 	// CanRollback / WhyNot 让界面能明确告诉用户"为什么这条不能倒"
 	CanRollback bool   `json:"canRollback"`
 	WhyNot      string `json:"whyNot,omitempty"`
@@ -68,7 +72,8 @@ func List(led *ledger.Ledger, limit int) ([]Item, error) {
 		it := Item{
 			ID: i, Ts: e.Ts, Table: e.Table, Sheet: e.Sheet, Cell: e.Cell,
 			Op: e.Op, Old: e.Old, New: e.New, Reason: e.Reason, Status: e.Status,
-			Group: e.Ts, // 同一时间戳视为一次操作
+			Source: e.Source,
+			Group:  e.Ts, // 同一时间戳视为一次操作
 		}
 		switch {
 		case e.Status != "ok":

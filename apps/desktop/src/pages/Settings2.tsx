@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import "./settings.css";
 import { agentApi } from "../api-agent";
 import type { SettingsDto } from "../api-agent";
-import { IconCheck, IconGear, IconX, IconSpark, IconDoc } from "../components/icons";
+import { IconCheck, IconGear, IconX, IconSpark, IconDoc, IconNote } from "../components/icons";
 import { inTauri, pickDirectory, getLogDir, setLogDir, openLogDir } from "../native";
 import MemoryPanel from "./MemoryPanel";
+import TermsPanel from "./TermsPanel";
 
 /* 设置（见 docs/agent-architecture/19-界面设计.md、20-离线可用与桌面交付.md）
    两栏：模型（脑）与记忆。分开的理由是**它们回答不同的问题**——
@@ -14,7 +15,7 @@ import MemoryPanel from "./MemoryPanel";
    工作区不在这里管了：它是"进哪份台账"这件事，属于主界面
    （拖文件夹进来 / 首屏选择），放在设置里反而让人以为是配置项。 */
 
-type Tab = "model" | "memory" | "logs";
+type Tab = "model" | "memory" | "terms" | "logs";
 
 export default function Settings({ onClose }: {
   onClose: () => void;
@@ -69,6 +70,10 @@ export default function Settings({ onClose }: {
               aria-selected={tab === "memory"} onClick={() => setTab("memory")}>
               <IconSpark size={12} />记忆
             </button>
+            <button className={`set-tab${tab === "terms" ? " on" : ""}`} role="tab"
+              aria-selected={tab === "terms"} onClick={() => setTab("terms")}>
+              <IconNote size={12} />术语
+            </button>
             <button className={`set-tab${tab === "logs" ? " on" : ""}`} role="tab"
               aria-selected={tab === "logs"} onClick={() => setTab("logs")}>
               <IconDoc size={12} />日志
@@ -120,6 +125,7 @@ export default function Settings({ onClose }: {
           )}
 
           {tab === "memory" && <MemoryPanel />}
+          {tab === "terms" && <TermsPanel />}
           {tab === "logs" && <LogSettings />}
         </div>
       </div>

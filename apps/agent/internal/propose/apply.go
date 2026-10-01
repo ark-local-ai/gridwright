@@ -141,6 +141,15 @@ func recordAll(led *ledger.Ledger, p *Proposal, results []ApplyResult, model str
 	if i := lastSlash(table); i >= 0 {
 		table = table[i+1:]
 	}
+	// source 回答「这次改动是谁让我做的」：带会话就写 "对话:<id>"（看板译回标题），
+	// 规则短路写规则来源，否则退回 confirmed-plan。
+	source := "confirmed-plan"
+	if p.Source != "" {
+		source = p.Source
+	}
+	if p.Conversation != "" {
+		source = "对话:" + p.Conversation
+	}
 	for _, r := range results {
 		status := r.Status
 		if status == "" {
@@ -161,7 +170,7 @@ func recordAll(led *ledger.Ledger, p *Proposal, results []ApplyResult, model str
 		}
 		_ = led.Append(now, table, r.Sheet, r.Ref, op,
 			fmt.Sprint(r.Old), fmt.Sprint(r.New),
-			reason, "confirmed-plan", "", model, status)
+			reason, source, "", model, status)
 	}
 }
 

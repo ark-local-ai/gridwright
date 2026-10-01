@@ -86,6 +86,17 @@
 }
 .set-field input[readonly]:focus { border-color: var(--line-strong); box-shadow: none; }
 
+/* 术语新增行：四个短输入 + 一个按钮横排（窄屏自动换行）。 */
+.term-row { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-3); }
+.term-in {
+  flex: 1; min-width: 130px; height: var(--h-md); padding: 0 var(--sp-3);
+  border: 1px solid var(--line-strong); border-radius: var(--r-ctl);
+  background: var(--surface); color: var(--text-1);
+  font-family: var(--font); font-size: var(--fs-xs);
+}
+.term-in:focus { outline: none; border-color: var(--brand); box-shadow: var(--focus-ring); }
+.term-in::placeholder { color: var(--text-3); }
+
 .set-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .set-row .btn.primary { height: var(--h-lg); padding: 0 var(--sp-5); }
 .set-state { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }

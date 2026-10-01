@@ -71,6 +71,11 @@ type Proposal struct {
 	// Source 这份清单是怎么来的："rule:<规则名>"（规则短路）或空（问模型）。
 	// 界面据此显示"这条是规则办的"——用户要能分清是规则还是模型在动他的表。
 	Source string `json:"source,omitempty"`
+	// Conversation 是产生这份清单的会话 id（/chat 那边来的）。
+	//
+	// 为什么要留：用户改完表回头看账目，要能回答"这是哪次对话让我改的"。
+	// 账目里的 source 列据此写成 "对话:<id>"，看板/账目再译回标题。
+	Conversation string `json:"conversation,omitempty"`
 	// 被挡下的条目（命中 forbid / 定位失败等），要让人看见，不静默
 	Blocked []Blocked `json:"blocked,omitempty"`
 	Created time.Time `json:"created"`

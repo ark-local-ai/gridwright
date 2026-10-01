@@ -136,6 +136,8 @@ export interface LedgerEntry {
   new: string;
   reason: string;
   source: string;
+  /** 会话标题：source 为 "对话:<id>" 时由后端译回；看板据此显示「哪次对话改的」。 */
+  sourceTitle?: string;
   rule: string;
   model: string;
   status: string;
@@ -237,6 +239,8 @@ export interface Proposal {
   summary: string;
   items: ProposalItem[];
   blocked?: ProposalBlocked[];
+  /** 产生这份清单的会话 id（apply 时写进账目）。 */
+  conversation?: string;
 }
 
 /** 把引擎回传的清单收敛成界面可直接用的形状：null → []，并给每条补上 affects。 */
@@ -354,6 +358,9 @@ export interface RollbackItem {
   new: string;
   reason: string;
   status: string;
+  /** 来源（"对话:<id>" / 规则 / inbox 文件）与译回后的会话标题。 */
+  source?: string;
+  sourceTitle?: string;
   canRollback: boolean;
   whyNot?: string;
   group: string;
@@ -483,8 +490,8 @@ export const agentApi = {
   // 所以在 API 边界把 items/blocked/affects 一律收敛成数组。
   // images：随指令附的图。数据常常就在截图里（"按 D 列名字填 E、F 列"），
   // 不带图的话模型只能反问数据来源，把能做的事停成澄清。
-  plan: async (instruction: string, file?: string, images?: string[], signal?: AbortSignal) => {
-    const r = await post<{ id: string; proposal: Proposal; trace?: TraceData }>("/api/v1/plan", { instruction, file, images }, signal);
+  plan: async (instruction: string, file?: string, images?: string[], signal?: AbortSignal, conversationId?: string) => {
+    const r = await post<{ id: string; proposal: Proposal; trace?: TraceData }>("/api/v1/plan", { instruction, file, images, conversationId }, signal);
     if (r?.proposal) r.proposal = normalizeProposal(r.proposal);
     return r;
   },
@@ -536,6 +543,7 @@ export const agentApi = {
   terms: () => get<{ terms: TermDto[]; prompts: Record<string, string>; path: string }>("/api/v1/terms"),
   saveTerm: (p: { word: string; sheet?: string; field?: string; kind?: string; key?: Record<string,string>; note?: string; manual?: boolean }) =>
     post<{ ok: boolean }>("/api/v1/terms", p),
+  termsDelete: (word: string) => post<{ ok: boolean }>("/api/v1/terms/delete", { word }),
   // 权重（结构重要性 + 活跃度 + 风险 → 注意力）
   weights: () => get<{ scores: WeightScore[]; hasUsage: boolean; note: string }>("/api/v1/weights"),
 };

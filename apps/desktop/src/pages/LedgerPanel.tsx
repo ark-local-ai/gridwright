@@ -116,6 +116,7 @@ export default function LedgerPanel({ onClose, onChanged }: {
                   <th>位置</th>
                   <th>改动</th>
                   <th>原因</th>
+                  <th>来源</th>
                 </tr>
               </thead>
               <tbody>
@@ -151,6 +152,9 @@ export default function LedgerPanel({ onClose, onChanged }: {
                     <td className="lg-why">
                       {it.op === "rollback" ? <em className="lg-tag-rb">回滚</em> : null}
                       {it.reason || "—"}
+                    </td>
+                    <td className="lg-src" title={it.source || ""}>
+                      {it.sourceTitle ? `对话·${it.sourceTitle}` : (it.source?.startsWith("对话:") ? "来自对话" : (it.source || "—"))}
                     </td>
                   </tr>
                 ))}

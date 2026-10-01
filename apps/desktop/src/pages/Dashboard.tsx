@@ -466,6 +466,8 @@ export default function Dashboard({ pickFolder, watchDrop }: {
                 : ledger.map((e, i) => (
                   <span key={`${e.ts}-${e.cell}-${e.old}-${e.new}`} className={`dl-row${i === 0 ? " fresh" : ""}`}>
                     <em>{e.ts}</em> {e.table} {e.cell} {e.old}→{e.new}
+                    {/* 「哪次对话让我改的」：标题由后端从 source="对话:<id>" 译回。 */}
+                    {e.sourceTitle && <span className="dl-src" title={`来自对话：${e.sourceTitle}`}>来自对话·{e.sourceTitle}</span>}
                     <span className={e.status === "ok" ? "ok" : "rj"}>{e.status}</span>
                   </span>
                 ))}

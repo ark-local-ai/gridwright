@@ -82,6 +82,12 @@
 .lg-old { color: var(--text-1); font-weight: var(--fw-med); }
 
 .lg-why { color: var(--text-2); }
+
+/* 「哪次对话改的」列：标题可能很长，截断显示，完整值走 title。 */
+.lg-src {
+  font-size: var(--fs-2xs); color: var(--text-3);
+  max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .lg-tag-rb {
   font-style: normal; font-size: var(--fs-2xs); color: var(--ok);
   background: var(--ok-bg); padding: 0 var(--sp-1); border-radius: var(--r-ctl);

@@ -561,6 +561,14 @@
    而不是安静地排在最左边等人自己发现。 */
 .dash-ledger .dl-row.fresh { animation: pop-in-spring var(--d-base) var(--ease-spring) both; background: var(--brand-soft); }
 .dash-ledger .dl-row em { font-style: normal; color: var(--text-3); font-family: var(--mono); }
+
+/* 「哪次对话改的」小标签（后端把 source="对话:<id>" 译回标题后显示）。 */
+.dl-src {
+  margin-left: 6px; padding: 0 var(--sp-1);
+  font-size: var(--fs-2xs); color: var(--brand);
+  background: var(--brand-soft); border-radius: var(--r-ctl);
+  white-space: nowrap;
+}
 .dash-ledger .ok { color: var(--ok); margin-left: var(--sp-2); }
 .dash-ledger .rj { color: var(--warn); margin-left: var(--sp-2); }
 

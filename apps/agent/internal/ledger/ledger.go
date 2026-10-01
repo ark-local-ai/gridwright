@@ -103,6 +103,9 @@ type Entry struct {
 	Rule   string `json:"rule"`
 	Model  string `json:"model"`
 	Status string `json:"status"`
+	// SourceTitle 是 source 里 "对话:<id>" 译回来的会话标题（由 API 层填，便于看板直接显示
+	// "哪次对话让我改的"）。账目文件里不存它：标题会改，id 不会。
+	SourceTitle string `json:"sourceTitle,omitempty"`
 }
 
 // Entries 读取账目并结构化返回，最近 n 条（n<=0 表示全部）。

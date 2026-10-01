@@ -27,6 +27,9 @@ import (
 type planReq struct {
 	Instruction string `json:"instruction"` // 一句话指令
 	File        string `json:"file"`        // 可选：目标文件
+	// ConversationID 产生这条指令的会话（可选）。带上它，账目就能回答
+	// "这次改动是哪次对话让我做的"。
+	ConversationID string `json:"conversationId,omitempty"`
 	// Images 是随指令附的图（data URL）。举例："按 D 列名字把 E、F 列填进销售明细表"——
 	// 数据本身就在截图里。不把图传到"出清单"这一步，模型只能反问"数据来自哪张表"，
 	// 把一件能做的事停成澄清（实测发生过）。
@@ -65,6 +68,8 @@ func (s *Server) handlePlan(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// 把会话标在清单上（Apply 时写进账目）。
+	prop.Conversation = req.ConversationID
 	id := s.proposals().Put(prop)
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "proposal": prop, "trace": tr})
 }

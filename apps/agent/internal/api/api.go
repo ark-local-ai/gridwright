@@ -649,6 +649,14 @@ func (s *Server) handleLedger(w http.ResponseWriter, r *http.Request) {
 	if entries == nil {
 		entries = []ledger.Entry{}
 	}
+	// 把账目里的 "对话:<id>" 译回会话标题：看板要能回答「这次改动是哪次对话让我做的」。
+	// 账目文件里只存 id（标题会改，id 不会），标题在读取时现查。
+	titles := s.sourceTitles()
+	for i := range entries {
+		if id, ok := strings.CutPrefix(entries[i].Source, "对话:"); ok {
+			entries[i].SourceTitle = titles[id]
+		}
+	}
 	if wantsText(r) {
 		var b strings.Builder
 		if len(entries) == 0 {
@@ -656,8 +664,14 @@ func (s *Server) handleLedger(w http.ResponseWriter, r *http.Request) {
 		} else {
 			b.WriteString(line("账目（最近 %d 条）：", len(entries)))
 			for _, e := range entries {
-				b.WriteString(line("%s  %s %s!%s  %s -> %s  [%s]",
-					e.Ts, e.Table, e.Sheet, e.Cell, e.Old, e.New, e.Status))
+				src := ""
+				if e.SourceTitle != "" {
+					src = "  ← 对话「" + e.SourceTitle + "」"
+				} else if strings.HasPrefix(e.Source, "对话:") {
+					src = "  ← 来自一次对话"
+				}
+				b.WriteString(line("%s  %s %s!%s  %s -> %s  [%s]%s",
+					e.Ts, e.Table, e.Sheet, e.Cell, e.Old, e.New, e.Status, src))
 			}
 		}
 		writeText(w, b.String())

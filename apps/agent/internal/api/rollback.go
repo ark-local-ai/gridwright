@@ -23,6 +23,13 @@ func (s *Server) handleRollbackList(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// 「哪次对话改的」：source 里是 "对话:<id>"，译回标题给界面。
+	titles := s.sourceTitles()
+	for i := range items {
+		if id, ok := strings.CutPrefix(items[i].Source, "对话:"); ok {
+			items[i].SourceTitle = titles[id]
+		}
+	}
 	if wantsText(r) {
 		var b strings.Builder
 		if len(items) == 0 {

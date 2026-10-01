@@ -167,6 +167,21 @@ func (s *Server) convoStore() (*convo.Store, error) {
 	return convo.Open(layout.Root)
 }
 
+// sourceTitles 会返回「会话 id → 标题」。账目里的 source 写的是 "对话:<id>"，
+// 展示时要译回标题——用户看的是「哪次对话让我改的」，不是一串 id。
+// 标题会改，id 不会，所以账目里只存 id，这里现查。
+func (s *Server) sourceTitles() map[string]string {
+	out := map[string]string{}
+	store, err := s.convoStore()
+	if err != nil {
+		return out
+	}
+	for _, c := range store.List() {
+		out[c.ID] = c.Title
+	}
+	return out
+}
+
 // handleDistill POST /api/v1/conversation/distill?id=
 //
 // 把一段**记录**提炼成**记忆候选**。这是两个概念之间的那道闸门：
