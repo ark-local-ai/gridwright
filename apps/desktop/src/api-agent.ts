@@ -159,6 +159,19 @@ export interface SheetPreview {
   note?: string;
 }
 
+/** 工作表详情卡：大概描述（体检时模型生成）+ 上次改动/改动日期（来自账目）。 */
+export interface SheetDetail {
+  file: string;
+  sheet: string;
+  /** 没有描述时为空串（不是 null） */
+  description: string;
+  descriptionAt: string;
+  descriptionModel: string;
+  /** 人类可读的一行，如 "E12 100 → 23540"；没有改动时为空串 */
+  lastChange: string;
+  lastChangeAt: string;
+}
+
 /** 一张表的"形状"（行/列/公式数）——画微缩缩略图用。 */
 export interface SheetShape {
   sheet: string;
@@ -393,6 +406,16 @@ export const agentApi = {
     if (file) q.set("file", file);
     return get<SheetPreview>(`/api/v1/sheets/preview?${q.toString()}`);
   },
+  // 工作表详情卡：大概描述（体检时模型生成并缓存）+ 上次改动/改动日期（账目）
+  sheetDetail: (file: string | undefined, sheet: string) => {
+    const q = new URLSearchParams({ sheet });
+    if (file) q.set("file", file);
+    return get<SheetDetail>(`/api/v1/sheets/detail?${q.toString()}`);
+  },
+  // 立即为该表生成/刷新描述（没配模型会 400，人话）
+  describeSheet: (file: string | undefined, sheet: string) =>
+    post<{ ok: boolean; description: string; at: string; model: string }>(
+      "/api/v1/sheets/describe", { file, sheet }),
   // 用本机 Excel / WPS 打开某张表（入口在表格预览页）。
   // 引擎与工作区在同一台机器上，由它调系统打开：桌面壳与单文件版行为一致。
   openTargets: (file?: string) =>

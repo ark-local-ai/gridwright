@@ -2,7 +2,7 @@ import { useEffect, useCallback, useState } from "react";
 import "./dashboard.css";
 import "./dashboard-shell.css";
 import { agentApi, nodeId } from "../api-agent";
-import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, WorkspaceListItem, Proposal, SafetyReport, SelfCheckReport } from "../api-agent";
+import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, WorkspaceListItem, Proposal, SafetyReport, SelfCheckReport, SheetDetail } from "../api-agent";
 import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark, IconClock } from "../components/icons";
 import AttentionList from "../components/AttentionList";
 import DropZone from "../components/DropZone";
@@ -432,13 +432,8 @@ export default function Dashboard({ pickFolder, watchDrop }: {
 
           {/* ⑤ 选中的工作表：标题是 sheet 名；内容只留“大概描述 / 上次改动 / 改动日期”。
               原来堆的行/列/公式与列清单是“看一眼 Excel 就知道”的东西，占地方不说话。
-
-              BACKEND-TODO（描述与改动信息）：现在读不到数据，先用占位。
-              后端要提供：GET /api/v1/sheets/detail?file=&sheet=
-                → { description?: string,     // 体检时模型读一遍表写出的“这张表是做什么的”
-                    lastChange?: string,      // 上次改动（如 "E12 100 → 23540"）
-                    lastChangeAt?: string }   // 改动日期
-              拿到后把下面的占位换成真实值即可。 */}
+              数据来自 GET /api/v1/sheets/detail（描述=体检时模型生成并缓存；
+              改动=账目里最近一条 ok）。*/}
           {active && graph && (
             <section className="dcard dcard-sheet">
               <div className="dcard-h">
@@ -451,21 +446,7 @@ export default function Dashboard({ pickFolder, watchDrop }: {
               </div>
               <p className="nd-file"><IconXls size={12} />{active.file || "外部文件"}</p>
 
-              <div className="sd-block">
-                <span className="sd-k">大概描述</span>
-                <p className="sd-todo">还没有描述。体检时模型会读一遍这张表，写出它是做什么的、有哪些关键列。</p>
-              </div>
-
-              <div className="sd-grid">
-                <div className="sd-cell">
-                  <span className="sd-k">上次改动</span>
-                  <span className="sd-v sd-empty">—</span>
-                </div>
-                <div className="sd-cell">
-                  <span className="sd-k">改动日期</span>
-                  <span className="sd-v sd-empty">—</span>
-                </div>
-              </div>
+              <SheetDetailBody file={active.file} sheet={active.sheet} />
             </section>
           )}
 
@@ -517,7 +498,68 @@ export default function Dashboard({ pickFolder, watchDrop }: {
 
 /* 节点汇总已移除：行/列/公式与列清单属于“看一眼 Excel 就知道”的东西，占地方不说话。
    取而代之的是「工作表详情」卡里的三件事（大概描述 / 上次改动 / 改动日期）——
-   描述由体检时模型生成，待后端接入（见 Dashboard.tsx 里的 BACKEND-TODO）。 */
+   描述由体检时模型生成（后端已接入，见 /api/v1/sheets/detail）。 */
+
+/* ---------- 工作表详情：大概描述 / 上次改动 / 改动日期 ---------- */
+
+function SheetDetailBody({ file, sheet }: { file?: string; sheet: string }) {
+  const [d, setD] = useState<SheetDetail | null>(null);
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setErr("");
+    setD(null);
+    agentApi.sheetDetail(file, sheet)
+      .then((r) => { if (alive) setD(r); })
+      .catch((e: unknown) => { if (alive) setErr(e instanceof Error ? e.message : String(e)); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [file, sheet, tick]);
+
+  // 读不到就明说，并给重试。失败与“没有”不能长得一样（产品铁律）。
+  if (err) {
+    return (
+      <div className="sd-block">
+        <span className="sd-k">大概描述</span>
+        <div className="sd-err">
+          <span className="sd-err-t">详情读不到：{err}</span>
+          <button className="btn sm" onClick={() => setTick((n) => n + 1)}>重试</button>
+        </div>
+      </div>
+    );
+  }
+
+  const desc = d?.description ?? "";
+  const tip = d && d.descriptionModel ? `由 ${d.descriptionModel} 生成于 ${d.descriptionAt}` : undefined;
+  return (
+    <>
+      <div className="sd-block">
+        <span className="sd-k">大概描述</span>
+        {loading ? (
+          <div className="sd-sk"><SkPanel rows={2} /></div>
+        ) : desc ? (
+          <p className="sd-desc" title={tip}>{desc}</p>
+        ) : (
+          <p className="sd-todo">还没有描述。体检时模型会读一遍这张表，写出它是做什么的、有哪些关键列。</p>
+        )}
+      </div>
+
+      <div className="sd-grid">
+        <div className="sd-cell">
+          <span className="sd-k">上次改动</span>
+          <span className={d?.lastChange ? "sd-v" : "sd-v sd-empty"}>{d?.lastChange || "—"}</span>
+        </div>
+        <div className="sd-cell">
+          <span className="sd-k">改动日期</span>
+          <span className={d?.lastChangeAt ? "sd-v" : "sd-v sd-empty"}>{d?.lastChangeAt || "—"}</span>
+        </div>
+      </div>
+    </>
+  );
+}
 
 /** 一个仪器读数：小标注在上，等宽大数字在下。 */
 function Metric({ label, value }: { label: string; value: string }) {

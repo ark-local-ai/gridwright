@@ -148,6 +148,18 @@
   border: 1px dashed var(--line-strong); border-radius: var(--r-ctl);
   padding: 10px 12px; background: var(--surface-2);
 }
+/* 模型生成的描述：正常正文，不是占位 */
+.sd-desc { margin: 0; font-size: 12px; line-height: 1.65; color: var(--text-2); }
+/* 加载态：占位与真实文本同尺寸，加载完不跳版 */
+.sd-sk { min-height: 58px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-ctl); background: var(--surface-2); }
+/* 读不到：显形 + 重试，不与“没有描述”长得一样 */
+.sd-err {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  font-size: 12px; line-height: 1.6; color: var(--warn, #9a6a00);
+  border: 1px solid var(--line-strong); border-radius: var(--r-ctl);
+  padding: 8px 10px; background: var(--surface-2);
+}
+.sd-err-t { min-width: 0; overflow-wrap: anywhere; }
 .sd-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
   background: var(--line); border: 1px solid var(--line);

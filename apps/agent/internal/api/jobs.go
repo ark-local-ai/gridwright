@@ -175,7 +175,7 @@ func (s *Server) ExecuteJob(ctx context.Context, st *jobs.Store, j jobs.Job) job
 
 	switch j.Kind {
 	case jobs.KindScan, "":
-		rep, err := s.runScan()
+		rep, err := s.runScan(ctx)
 		if err != nil {
 			run.OK = false
 			run.Summary = "体检失败：" + err.Error()

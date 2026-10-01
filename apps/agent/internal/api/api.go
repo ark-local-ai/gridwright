@@ -8,6 +8,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -32,6 +33,7 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory"
 	"github.com/ark-local-ai/ark/apps/agent/internal/propose"
 	"github.com/ark-local-ai/ark/apps/agent/internal/scan"
+	"github.com/ark-local-ai/ark/apps/agent/internal/sheetnotes"
 	"github.com/ark-local-ai/ark/apps/agent/internal/webui"
 	"github.com/ark-local-ai/ark/apps/agent/internal/workspace"
 )
@@ -48,6 +50,7 @@ type Server struct {
 	Addr   string
 	props  *propose.Store
 	brain  *llm.Client
+	notes  *sheetnotes.Store // 工作表描述缓存（sheet_notes.json），随工作区切换重建
 }
 
 // New 构造 server。Addr 形如 "127.0.0.1:7700"。
@@ -59,7 +62,28 @@ func New(cfg *config.Config, layout *workspace.Layout, led *ledger.Ledger, addr 
 		Cfg: cfg, Layout: layout, Ledger: led, Addr: addr,
 		props: propose.NewStore(30 * time.Minute),
 		brain: llm.New(cfg.LLM),
+		notes: openSheetNotes(layout),
 	}
+}
+
+// openSheetNotes 打开工作区根下的描述缓存；打不开就返回 nil（描述功能降级，不影响其它）。
+func openSheetNotes(layout *workspace.Layout) *sheetnotes.Store {
+	if layout == nil {
+		return nil
+	}
+	st, err := sheetnotes.Open(filepath.Join(layout.Root, sheetnotes.FileName))
+	if err != nil {
+		log.Printf("[sheetnotes] 打开描述缓存失败（描述功能降级）：%v", err)
+		return nil
+	}
+	return st
+}
+
+// notesStore 返回当前工作区的描述缓存（切换工作区时会换指针，所以加读锁）。
+func (s *Server) notesStore() *sheetnotes.Store {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.notes
 }
 
 // proposals 返回待确认清单暂存区。
@@ -112,6 +136,7 @@ func (s *Server) SwitchWorkspace(dir string) error {
 	s.mu.Lock()
 	s.Layout = layout
 	s.Ledger = led
+	s.notes = openSheetNotes(layout)
 	s.Cfg.Workspace = layout.Root
 	s.Cfg.MarkWorkspaceChosen() // 用户显式选了 → 不再是"首次运行"
 	cfg := s.Cfg
@@ -183,6 +208,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/ledger", s.handleLedger)
 	mux.HandleFunc("/api/v1/sheets", s.handleListSheets)
 	mux.HandleFunc("/api/v1/sheets/preview", s.handleSheetPreview)
+	mux.HandleFunc("/api/v1/sheets/detail", s.handleSheetDetail)
+	mux.HandleFunc("/api/v1/sheets/describe", s.handleSheetDescribe)
 	mux.HandleFunc("/api/v1/sheets/shapes", s.handleSheetShapes)
 	// 用本机 Excel / WPS 打开表（见 open.go）
 	mux.HandleFunc("/api/v1/open/targets", s.handleOpenTargets)
@@ -402,8 +429,8 @@ func describeFiles(paths []string) []fileInfo {
 	return out
 }
 
-// RunScan 供外部（如定时体检任务）复用：对工作区第一张表做只读体检。
-func (s *Server) RunScan() (*scan.Report, error) { return s.runScan() }
+// RunScan 供外部（如定时体检任务）复用：对工作区**所有**表做只读体检。
+func (s *Server) RunScan(ctx context.Context) (*scan.Report, error) { return s.runScan(ctx) }
 
 // ---------- 联动图 ----------
 
@@ -505,7 +532,7 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusMethodNotAllowed, "只支持 GET")
 		return
 	}
-	rep, err := s.runScan()
+	rep, err := s.runScan(r.Context())
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -542,7 +569,7 @@ func (s *Server) handleScanRun(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusMethodNotAllowed, "只支持 POST")
 		return
 	}
-	rep, err := s.runScan()
+	rep, err := s.runScan(r.Context())
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -557,7 +584,10 @@ func (s *Server) handleScanRun(w http.ResponseWriter, r *http.Request) {
 }
 
 // runScan 对工作区**所有**表做只读体检，合并成一份报告（报告按文件分组）。
-func (s *Server) runScan() (*scan.Report, error) {
+//
+// ctx 会传给描述生成（体检顺带补齐缺失的描述，见 backfillSheetNotes）。
+// 没配模型时 backfillSheetNotes 直接返回，体检照常离线可用。
+func (s *Server) runScan(ctx context.Context) (*scan.Report, error) {
 	_, layout, _, _ := s.cur()
 	tables, err := layout.DataFiles()
 	if err != nil {
@@ -592,6 +622,8 @@ func (s *Server) runScan() (*scan.Report, error) {
 		merged.Issues = append(merged.Issues, rep.Issues...)
 	}
 	merged.Elapsed = time.Since(start).String()
+	// 体检顺带补齐缺失/过期的“大概描述”。失败不影响体检结果（单张失败只记日志）。
+	s.backfillSheetNotes(ctx, tables)
 	return merged, nil
 }
 
