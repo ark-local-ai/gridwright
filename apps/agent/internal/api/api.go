@@ -184,6 +184,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/sheets", s.handleListSheets)
 	mux.HandleFunc("/api/v1/sheets/preview", s.handleSheetPreview)
 	mux.HandleFunc("/api/v1/sheets/shapes", s.handleSheetShapes)
+	// 用本机 Excel / WPS 打开表（见 open.go）
+	mux.HandleFunc("/api/v1/open/targets", s.handleOpenTargets)
+	mux.HandleFunc("/api/v1/open", s.handleOpenFile)
 	mux.HandleFunc("/api/v1/health", s.handleHealth)
 
 	// 界面：把前端产物嵌进二进制（Win7/8 单文件版靠它自带界面，无需 WebView2）。

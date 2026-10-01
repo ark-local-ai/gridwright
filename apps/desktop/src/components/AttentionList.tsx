@@ -46,6 +46,7 @@ export default function AttentionList({ issues, onOpen }: {
       <section className="att-sec">
         <div className="att-h">
           <span>账目对不上</span>
+          <span className="att-rule" aria-hidden />
           <span className="att-n warn">{mism.length} 处 · {spots.length} 个铺位</span>
         </div>
         {/* 哪个月集中出错：**一行**结论 + 深浅小方格，不再铺 6 个长 pill。 */}

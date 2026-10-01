@@ -19,9 +19,13 @@
 /* ---------- 顶栏 ---------- */
 .dash-top {
   display: flex; align-items: center; gap: var(--sp-5);
-  padding: 0 var(--sp-6); height: 58px; flex: none;
+  padding: 0 var(--sp-6); height: 60px; flex: none;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
+  /* 命令条：给一条极浅的投影，让它像一块压在纸面上的仪表条，
+     而不是"纸被划了一道线"。z-index 让投影落在下方滚动内容之上。 */
+  position: relative; z-index: 5;
+  box-shadow: 0 1px 0 rgba(20,30,45,.015), 0 10px 20px -18px rgba(20,30,45,.4);
 }
 /* position: relative 是**必须的**：.ws-menu 是它的子元素、用 position:absolute 定位。
    少了这一条，菜单会去找最近的定位祖先（.dash，见下方 741 行），于是 top:100% 落在
@@ -50,19 +54,29 @@
 .dash-actions { display: flex; align-items: center; gap: var(--sp-2); flex: none; }
 /* 次要入口收成小图标方块：1px 描边、34px 见方，一排像仪器的按钮组。
    视觉权重低于"联动图/体检"（那两个留文字标签），因为它们不是日常动作。 */
+/* 图标键：一排磨砂小键，每个一个语义色（颜色在这里是分类：
+   钟=定时、盾=规则、表=生成、星=对话、齿轮=设置）。 */
 .dash-mini {
-  display: flex; align-items: center; gap: 2px; padding: 2px;
-  border: 1px solid var(--line); border-radius: var(--r-ctl);
-  background: var(--surface-2);
+  display: flex; align-items: center; gap: 2px; padding: 3px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .55);
+  border: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  backdrop-filter: blur(10px) saturate(1.2);
 }
 .mini-btn {
-  display: grid; place-items: center; width: 30px; height: 30px;
-  border: none; border-radius: var(--r-ctl); background: transparent;
-  color: var(--text-2); cursor: pointer;
-  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
+  position: relative; display: grid; place-items: center; width: 30px; height: 30px;
+  border: none; border-radius: 9px; cursor: pointer; background: transparent;
+  transition: background var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out), transform var(--d-fast) var(--ease-out);
 }
-.mini-btn:hover { background: var(--surface); color: var(--brand); box-shadow: var(--el-1); }
-.mini-btn:active { transform: translateY(1px); }
+.mini-btn .ic { color: var(--mini-tone, var(--text-2)); transition: color var(--d-fast) var(--ease-out); }
+.mini-btn:hover { background: rgba(255, 255, 255, .95); }
+.mini-btn:active { background: var(--surface-3); }
+.mini-btn.tone-task  { --mini-tone: #1f2937; }
+.mini-btn.tone-rules { --mini-tone: #b7791f; }
+.mini-btn.tone-gen   { --mini-tone: #1f9d6b; }
+.mini-btn.tone-chat  { --mini-tone: #7c5cbf; }
+.mini-btn.tone-set   { --mini-tone: #5f6a7a; }
 
 /* 工作区切换器 */
 .ws-switch {
@@ -76,6 +90,13 @@
   font-size: var(--fs-2xs); font-weight: var(--fw-med); color: var(--warn);
   padding: 1px var(--sp-2); border-radius: 999px; background: var(--surface-2);
 }
+/* 状态灯：引擎/模型就绪与否，一个点说清——比一句"未配模型"更安静，
+   也和右栏读数、底部账目同属"仪表"语汇。 */
+.dash-live {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: var(--warn); box-shadow: 0 0 0 3px var(--warn-bg);
+}
+.dash-live.ok { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-bg); }
 .dash-applied {
   display: inline-flex; align-items: center; gap: var(--sp-1);
   font-size: var(--fs-2xs); color: var(--ok); padding: 1px var(--sp-2);
@@ -146,13 +167,22 @@
   display: flex; align-items: flex-end; gap: var(--sp-5);
   padding-bottom: var(--sp-5);
   border-bottom: 1px solid var(--line);
+  /* 刻度条：放在左侧留白里（不挤内容对齐），像仪表盘的主刻度——
+     颜色本身就是结论（黄=有待核对，绿=都对得上）。 */
+  position: relative;
 }
+.dh::before {
+  content: ""; position: absolute; left: -12px; top: 6px; bottom: var(--sp-5);
+  width: 3px; border-radius: var(--r-full); background: var(--line-strong);
+}
+.dh.warn::before { background: var(--warn); }
+.dh.calm::before { background: var(--ok); }
 .dh-num {
   font-size: 52px; line-height: 0.9; font-weight: var(--fw-title);
-  letter-spacing: -0.04em; color: var(--ink);
+  letter-spacing: -0.04em; color: var(--warn);
   font-variant-numeric: tabular-nums;
 }
-/* 无问题时不要那个巨大的 0 —— 大数字配 0 是"空喊"。改小、改静。 */
+/* 无问题时不要那个巨大的 0 —— 大数字配 0 是"空喊"。改小、改静，且转绿。 */
 .dh-num.calm { font-size: 26px; color: var(--ok); }
 .dh-copy { display: flex; flex-direction: column; gap: 3px; padding-bottom: 4px; }
 .dh-lead { font-size: var(--fs-body); color: var(--text-1); font-weight: var(--fw-h); }
@@ -704,12 +734,15 @@
 .blk-n.act { color: var(--brand); font-weight: var(--fw-h); }
 .blk-meta { margin-left: auto; font-size: var(--fs-2xs); color: var(--text-3); font-family: var(--mono); }
 
-/* 对话抽屉：从右侧滑入，不占主界面 */
+/* 对话抽屉：从右侧滑入，不占主界面。磨砂玻璃，与看板同材质。 */
 .chat-drawer {
-  position: absolute; top: 58px; right: 0; bottom: 0; width: min(460px, 92%);
+  position: absolute; top: 60px; right: 0; bottom: 0; width: min(460px, 92%);
   z-index: 60; display: flex; flex-direction: column;
-  background: var(--surface); border-left: 1px solid var(--line);
-  box-shadow: var(--el-2);
+  background: rgba(255, 255, 255, .92);
+  -webkit-backdrop-filter: blur(26px) saturate(1.3);
+  backdrop-filter: blur(26px) saturate(1.3);
+  border-left: 1px solid rgba(20, 30, 45, .07);
+  box-shadow: -24px 0 60px -44px rgba(20, 30, 45, .4);
   animation: drawer-in var(--d-base) var(--ease-out);
 }
 /* 左缘的拖动把手：一条窄的热区 + 中间一道发丝线。
@@ -826,12 +859,16 @@
    ===================================================================== */
 .att { display: flex; flex-direction: column; gap: var(--sp-4); }
 .att-sec { display: flex; flex-direction: column; gap: var(--sp-2); }
-.att-h { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
+.att-h { display: flex; align-items: center; gap: var(--sp-3); }
 .att-h > span:first-child {
-  font-size: var(--fs-2xs); font-weight: var(--fw-h); color: var(--text-2);
+  flex: none;
+  font-size: var(--fs-2xs); font-weight: var(--fw-h); color: var(--text-3);
   letter-spacing: var(--ls-label);
 }
-.att-n { font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+/* 标签与计数之间一道向右延伸的发丝线：把"分区标题"做成仪器刻度的样子，
+   和联动链、权重的分组标题同一套语汇。 */
+.att-rule { flex: 1; height: 1px; background: var(--line); }
+.att-n { flex: none; font-size: var(--fs-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
 .att-n.warn { color: var(--warn); font-weight: var(--fw-h); }
 
 /* 哪个月集中出错：**一行文字 + 小方格刻度**。
@@ -1002,8 +1039,12 @@
 }
 .lm-chip svg { flex: none; opacity: .9; }
 .lm-chip-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* 连着：实心（颜色在组件里注入，同一张表恒定） */
-.lm-chip.on { color: #fff; border-color: transparent; }
+/* 连着：浅底 + 深字（原来是深色实心 + 白字——暗沉；浅底既亮又能保住对比） */
+.lm-chip.on {
+  color: var(--h, var(--brand));
+  background: color-mix(in srgb, var(--h, var(--brand)) 13%, #fff);
+  border-color: color-mix(in srgb, var(--h, var(--brand)) 34%, #fff);
+}
 .lm-chip.on svg { opacity: 1; }
 .lm-chip:hover { transform: translateY(-1px); box-shadow: var(--el-1); }
 

@@ -26,6 +26,31 @@
   margin-left: auto; font-size: var(--fs-2xs); color: var(--text-2);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
+
+/* ---------- 用本机 Excel / WPS 打开 ----------
+   入口就放在表头右上：这是“离开内置预览、去真程序里改”的动作，
+   位置应当稳定且一眼可见。装了多个程序时弹一个小菜单让用户选。 */
+.sv-open { position: relative; flex: none; }
+.sv-open-btn { white-space: nowrap; }
+.sv-open-veil { position: fixed; inset: 0; z-index: 40; }
+.sv-open-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 41; min-width: 170px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-overlay);
+  box-shadow: var(--el-2); padding: 4px;
+  animation: overlay-in var(--d-fast) var(--ease-out) both;
+}
+.sv-open-item {
+  display: block; width: 100%; text-align: left; padding: 8px 11px; margin: 1px 0;
+  border: none; background: none; border-radius: var(--r-ctl); cursor: pointer;
+  font-family: var(--font); font-size: var(--fs-xs); color: var(--text-1);
+  transition: background var(--d-fast) var(--ease-out);
+}
+.sv-open-item:hover { background: var(--surface-2); }
+.sv-open-msg {
+  flex: none; margin: 0; padding: 8px 26px; font-size: var(--fs-2xs);
+  color: var(--text-2); background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+}
 .sv-note {
   flex: none; margin: 0; padding: 9px 26px; font-size: var(--fs-2xs); color: var(--warn);
   background: var(--warn-bg); border-bottom: 1px solid var(--line);

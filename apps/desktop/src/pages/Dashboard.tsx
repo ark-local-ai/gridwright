@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useState } from "react";
 import "./dashboard.css";
+import "./dashboard-shell.css";
 import { agentApi, nodeId } from "../api-agent";
 import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, SheetPreview, WorkspaceListItem, Proposal, SafetyReport, SelfCheckReport } from "../api-agent";
 import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark, IconClock } from "../components/icons";
@@ -221,6 +222,9 @@ export default function Dashboard({ pickFolder, watchDrop }: {
           高级感来自"读数排布"，不是装饰。 */}
       <header className="dash-top">
         <div className="dash-ident">
+          {/* 状态灯：引擎/模型是否就绪，一个点说清，省掉一句"未配模型"的噪声 */}
+          <span className={`dash-live${brainReady ? " ok" : ""}`}
+            title={brainReady ? "引擎就绪，可以改表" : "未配置模型：查看、体检、联动图可用"} />
           <button className="ws-switch" onClick={() => setSwitcherOpen((v) => !v)} title="切换工作区">
             <span className="ws-name">{wsName || "工作区"}</span>
             <IconChevD size={14} />
@@ -252,24 +256,24 @@ export default function Dashboard({ pickFolder, watchDrop }: {
               任务/规则/对话/设置是"偶尔去一趟"的地方，做成小方块即可。 */}
           <div className="dash-mini" role="group" aria-label="更多">
             {!isFirstRun && (
-              <button className="mini-btn" onClick={() => setTasksOpen(true)} title="定时任务" aria-label="定时任务">
+              <button className="mini-btn tone-task" onClick={() => setTasksOpen(true)} title="定时任务" aria-label="定时任务">
                 <IconClock size={15} />
               </button>
             )}
             {!isFirstRun && (
-              <button className="mini-btn" onClick={() => setRulesOpen(true)} title="规则（rules.yaml）" aria-label="规则">
+              <button className="mini-btn tone-rules" onClick={() => setRulesOpen(true)} title="规则（rules.yaml）" aria-label="规则">
                 <IconNote size={15} />
               </button>
             )}
             {!isFirstRun && (
-              <button className="mini-btn" onClick={() => setGenerateOpen(true)} title="生成清单 / 文件（不动原表）" aria-label="生成">
+              <button className="mini-btn tone-gen" onClick={() => setGenerateOpen(true)} title="生成清单 / 文件（不动原表）" aria-label="生成">
                 <IconXls size={15} />
               </button>
             )}
-            <button className="mini-btn" onClick={() => setChatOpen((v) => !v)} title="对话" aria-label="对话">
+            <button className="mini-btn tone-chat" onClick={() => setChatOpen((v) => !v)} title="对话" aria-label="对话">
               <IconSpark size={15} />
             </button>
-            <button className="mini-btn" onClick={() => setSettingsOpen(true)} title="设置" aria-label="设置">
+            <button className="mini-btn tone-set" onClick={() => setSettingsOpen(true)} title="设置" aria-label="设置">
               <IconGear size={15} />
             </button>
           </div>
@@ -349,46 +353,40 @@ export default function Dashboard({ pickFolder, watchDrop }: {
         <>
 
       <div className="dash-body">
-        <div className="dash-col">
-          {/* ① 主角：一句话说清"现在怎么样"。
-              这是整页唯一可以大的东西。以前顶栏三个并列读数（表/待办/问题）
-              + 左栏"该查什么" + 右栏"体检"各说一遍，读者不知道看哪。 */}
-          <section className="dh">
-            <span className={`dh-num${totalIssues === 0 ? " calm" : ""}`}>{totalIssues}</span>
-            <div className="dh-copy">
-              <span className="dh-lead">
-                {totalIssues === 0 ? "账目都对得上" : "处待核对"}
-              </span>
-              {/* 一行之内"表"只指一种东西：工作簿说"个"，工作表说"张"，
-                  两边不再打架（曾出现"1 张表 · 15 张表已断开"的自相矛盾）。 */}
-              <span className="dh-meta">
-                {tableCount > 0 && `${tableCount} 个工作簿${graph && graph.nodes.length > 0 ? ` · ${graph.nodes.length} 张工作表` : ""}`}
-                {spots.length > 0 && ` · ${spots.length} 个铺位对不上`}
-              </span>
+        <div className="dash-grid">
+          {/* ① 状态板：整页唯一的主角 —— 一个数字回答"现在怎么样"。
+              四个读数收进它的底边，读起来像仪表盘的主表盘 + 副刻度。 */}
+          <section className={`hero${totalIssues === 0 ? " calm" : " alert"}`}>
+            <div className="hero-main">
+              <span className="hero-num">{totalIssues}</span>
+              <div className="hero-copy">
+                {/* 无问题时不再显示“账目都对得上”这句话：安静时不自我表功，
+                    一个 0 + 工作簿读数就够了。有问题才给一句“处待核对”。 */}
+                {totalIssues > 0 && <span className="hero-lead">处待核对</span>}
+                {/* 一行之内"表"只指一种东西：工作簿说"个"，工作表说"张"。 */}
+                <span className="hero-meta">
+                  {tableCount > 0 && `${tableCount} 个工作簿${graph && graph.nodes.length > 0 ? ` · ${graph.nodes.length} 张工作表` : ""}`}
+                  {spots.length > 0 && ` · ${spots.length} 个铺位对不上`}
+                </span>
+              </div>
+              <button className="btn ghost sm hero-act" onClick={() => void refresh()}>
+                <IconRefresh size={13} />重新体检
+              </button>
             </div>
-            <div className="dh-act">
-              {!isEmpty && (
-                <button className="btn ghost sm" onClick={() => void refresh()}>
-                  <IconRefresh size={13} />重新体检
-                </button>
-              )}
+            <div className="hero-stats">
+              <Metric label="工作簿" value={String(tableCount)} />
+              <Metric label="工作表" value={String(graph?.nodes.length ?? 0)} />
+              <Metric label="表间关联" value={String(graph?.edges.length ?? 0)} />
+              <Metric label="最近改动" value={String(ledger.length)} />
             </div>
           </section>
 
-          {/* ② 明细：这就是页面主体。按铺位聚合——同一批 71 处账不平，
-              以前左栏聚一遍、右栏"体检"又原样列一遍，那才是"乱"的真因。 */}
-          {issues.length > 0 && (
-            <section className="dsec">
-              <AttentionList issues={issues} onOpen={(it) => setOpened({ sheet: it.sheet, file: it.file, ref: it.ref })} />
-            </section>
-          )}
-
-          {/* ③ 需要你处理：待确认的改动（要动手的只有这一处） */}
+          {/* ② 要你动手的只有这一处：待确认 */}
           {proposal && proposal.items.length > 0 && (
-            <section className="dsec act-block has-work">
-              <div className="blk-head">
-                <h4>需要你确认</h4>
-                <span className="blk-n act">{proposal.items.length} 处待确认</span>
+            <section className="dcard dcard-act span2">
+              <div className="dcard-h">
+                <h3>需要你确认</h3>
+                <span className="dcard-n act">{proposal.items.length} 处待确认</span>
               </div>
               <PendingList
                 proposal={proposal}
@@ -405,54 +403,65 @@ export default function Dashboard({ pickFolder, watchDrop }: {
             </section>
           )}
 
-          {/* ④ 收起来的：这些都是"偶尔去一趟"的，不该和主角抢屏。
-              表的连接压成一行摘要（原来是 7 层文字堆在左栏）。 */}
-          <section className="dsec dsec-quiet">
-            {graph && (
-              <Collapsed
-                label="表的连接"
-                summary={lh ? `${lh.connected} 连着 · ${lh.isolated} 断开` : "—"}
-                tone={lh && lh.isolated > 0 ? "warn" : "ok"}
-              >
-                <LinkMap
-                  graph={graph}
-                  issues={issues}
-                  onOpenSheet={(n) => void pickNode(n)}
-                  onOpenIssue={(it) => setOpened({ sheet: it.sheet, file: it.file, ref: it.ref })}
-                />
-              </Collapsed>
-            )}
-            {active && graph && (
-              <Collapsed label="当前这张表" summary={active.sheet}>
-                <div className="node-detail">
-                  <div className="nd-plate">
-                    <div className="nd-plate-h">
-                      <h2 className="nd-name">{active.sheet}</h2>
-                      <button className="btn primary sm nd-open"
-                        onClick={() => setOpened({ sheet: active.sheet, file: active.file })}>
-                        打开表格
-                      </button>
-                    </div>
-                    <p className="nd-file"><IconXls size={12} />{active.file || "外部文件"}</p>
-                  </div>
-                  <NodeStats node={active} />
-                </div>
-              </Collapsed>
-            )}
-            <Collapsed
-              label="账目"
-              summary={ledger.length === 0 ? "还没有改动记录" : `最近 ${ledger.length} 条`}
-            >
-              <div className="ledger-inline">
-                {ledger.length === 0 ? <p className="dash-muted">还没有改动记录</p> : ledger.map((e, i) => (
+          {/* ③ 明细：账目对不上，按铺位聚合。只在**真的有 mismatch** 时才起卡片——
+              否则会出一张只写着“没有发现”的空卡（空卡比没有卡更吵）。 */}
+          {mismatches.length > 0 && (
+            <section className="dcard span2">
+              <AttentionList issues={issues} onOpen={(it) => setOpened({ sheet: it.sheet, file: it.file, ref: it.ref })} />
+            </section>
+          )}
+
+          {/* ④ 工作区结构：工作区 → 工作簿 → 工作表 三层，以及谁引用谁 */}
+          {graph && (
+            <section className="dcard">
+              <div className="dcard-h">
+                <h3>工作区结构</h3>
+                <span className={`dcard-n${lh && lh.isolated > 0 ? " warn" : ""}`}>
+                  {tableCount} 个工作簿 · {graph.nodes.length} 张工作表
+                  {lh && lh.isolated > 0 ? ` · ${lh.isolated} 张无引用` : ""}
+                </span>
+              </div>
+              <LinkMap
+                graph={graph}
+                issues={issues}
+                onOpenSheet={(n) => void pickNode(n)}
+                onOpenIssue={(it) => setOpened({ sheet: it.sheet, file: it.file, ref: it.ref })}
+              />
+            </section>
+          )}
+
+          {/* ⑤ 选中的工作表：标题就是 sheet 名，明说这是哪一张 */}
+          {active && graph && (
+            <section className="dcard">
+              <div className="dcard-h">
+                <h3 title={active.sheet}>{active.sheet}</h3>
+                <span className="dcard-n">工作表</span>
+                <button className="btn primary sm"
+                  onClick={() => setOpened({ sheet: active.sheet, file: active.file })}>
+                  打开表格
+                </button>
+              </div>
+              <p className="nd-file"><IconXls size={12} />{active.file || "外部文件"}</p>
+              <NodeStats node={active} />
+            </section>
+          )}
+
+          {/* ⑥ 最近改动 */}
+          <section className="dcard span2">
+            <div className="dcard-h">
+              <h3>最近改动</h3>
+              <button className="btn ghost sm" onClick={() => setLedgerOpen(true)}>查看 / 回滚</button>
+            </div>
+            <div className="ledger-inline">
+              {ledger.length === 0
+                ? <p className="dash-muted">还没有改动记录。让它改一次表，这里就会留下每一格的旧值。</p>
+                : ledger.map((e, i) => (
                   <span key={`${e.ts}-${e.cell}-${e.old}-${e.new}`} className={`dl-row${i === 0 ? " fresh" : ""}`}>
                     <em>{e.ts}</em> {e.table} {e.cell} {e.old}→{e.new}
                     <span className={e.status === "ok" ? "ok" : "rj"}>{e.status}</span>
                   </span>
                 ))}
-              </div>
-              <button className="btn ghost sm" onClick={() => setLedgerOpen(true)}>查看 / 回滚</button>
-            </Collapsed>
+            </div>
           </section>
         </div>
       </div>
@@ -473,30 +482,8 @@ export default function Dashboard({ pickFolder, watchDrop }: {
   );
 }
 
-/**
- * Collapsed —— 一行摘要 + 点开才展开。
- *
- * 为什么要有它：这些内容（表连接、当前表、账目）都**不该和主角抢屏**。
- * 它们原来各自带标题、说明、统计，平铺在一屏里，读者找不到重点。
- * 收成一行后：想知道细节的人点开，不关心的人一眼扫过。
- *
- * 摘要必须在**收起状态**就说清结论（"5 连着 · 9 断开"），否则收起等于藏起来。
- */
-function Collapsed({ label, summary, tone, children }: {
-  label: string; summary: string; tone?: "ok" | "warn"; children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className={`col${open ? " open" : ""}`}>
-      <button className="col-h" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-        <span className={`cr-caret${open ? " open" : ""}`}>›</span>
-        <span className="col-label">{label}</span>
-        <span className={`col-sum${tone ? " " + tone : ""}`}>{summary}</span>
-      </button>
-      {open && <div className="col-body">{children}</div>}
-    </div>
-  );
-}
+/* 旧版的 Collapsed（一行摘要 + 展开）已随看板重设计删除：
+   新布局用玻璃卡片直接展示内容，不再需要“先收成一行再点开”。 */
 
 /* ---------- 体检结果（按种类分组，别让 196 条同类淹掉 45 条真问题） ---------- */
 

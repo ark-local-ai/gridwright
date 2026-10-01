@@ -11,9 +11,9 @@
 
 :root {
   /* ---------- 中性色（纸白 · 透亮） ---------- */
-  --bg: #fbfcfd;            /* 画布底：近白冷纸（不再是灰） */
-  --surface: #ffffff;       /* 面板白（与画布同族，靠光分层） */
-  --surface-2: #f5f7fa;     /* 次级面 / 悬停底（极淡冷蓝） */
+  --bg: #f9fbfe;            /* 画布底：更亮的冷白 */
+  --surface: #ffffff;       /* 面板白 */
+  --surface-2: #f5f8fc;     /* 次级面 / 悬停底（更亮的淡冷蓝） */
   /* 侧栏材质：比画布略沉、带一点冷灰，让"导航区"与"内容区"是两个地方。
      参考 macOS 侧栏与内容区不同材质这一点（Apple HIG 正文本机抓不到，
      这里是依据该设计语言的已知特征取值，非抓取数据）。 */
@@ -21,11 +21,11 @@
   /* 侧栏宽度：抽成令牌供两处共用——看板左栏，以及桌面壳标题栏左侧
      那块要"连成一体"的区域。两边若各写一次数字，改一处就会错位。 */
   --sidebar-w: 340px;
-  --sidebar-sel: #dfe7f0;   /* 选中胶囊：比品牌色浅得多，安静 */
-  --sidebar-sel-ink: #1d3350;
-  --surface-3: #eceff4;     /* 更深一档 / 按下态 */
-  --line: #e9edf2;          /* 发丝分隔线（极淡，只做提示） */
-  --line-strong: #d3dae4;   /* 需要明确边界时（输入框/可点边） */
+  --sidebar-sel: #e7eaf0;   /* 选中胶囊：中性浅灰 */
+  --sidebar-sel-ink: #1f2937;
+  --surface-3: #eaf0f8;     /* 更深一档 / 按下态 */
+  --line: #e9eef6;          /* 发丝分隔线（极淡，只做提示） */
+  --line-strong: #d5dfec;   /* 需要明确边界时（输入框/可点边） */
   --text-1: #141821;        /* 主文字：石墨近黑 */
   --text-2: #5a6472;        /* 次要文字 */
   /* 弱化 / 占位。**注意**：这一档曾用 #8d96a5，在白底上只有 2.98:1，
@@ -35,16 +35,16 @@
 
   --wm: #dfe5ed;            /* 水印线条色 */
 
-  /* ---------- 品牌：钢蓝（低饱和 · 冷而清） ---------- */
-  --brand: #2f5d8a;
-  --brand-strong: #264d74;
-  --brand-soft: #eef4fa;    /* 钢蓝浅底（选中 / 悬停） */
-  --brand-line: #d2e0ee;    /* 钢蓝描边 */
-  --brand-gradient: linear-gradient(135deg, #2f5d8a 0%, #40739f 100%);
+  /* ---------- 品牌：墨黑（无彩）—— 与按钮同族，白底 14:1，彻底无彩 ---------- */
+  --brand: #1f2937;
+  --brand-strong: #111827;
+  --brand-soft: #eef1f5;    /* 强调浅底（选中 / 悬停） */
+  --brand-line: #d7dce3;    /* 强调描边 */
+  --brand-gradient: linear-gradient(135deg, #374151 0%, #1f2937 100%);
 
-  /* ---------- 运行中 / 流动（比品牌蓝亮一档，只给"活的"状态） ---------- */
-  --live: #2f78c0;
-  --live-soft: #eaf2fb;
+  /* ---------- 运行中 / 流动 ---------- */
+  --live: #374151;
+  --live-soft: #eef1f5;
 
   /* ---------- 语义色 ----------
      参考 Radix Colors 的真实色阶取值（amber/jade/red 的 9~11 阶），
@@ -60,16 +60,16 @@
   --danger: #b73f39;    /* 红（Radix red 11） */
   --danger-bg: #fceeed;
   --danger-line: #f0bdb9;
-  --info: #0d74ce;      /* 蓝（Radix blue 11）——只给"信息"，不抢"要你动" */
-  --info-bg: #eaf3fd;
+  --info: #4b5563;      /* 中性——颜色只留给状态 */
+  --info-bg: #eef1f5;
 
   /* 数据可视化：一张连续的冷→暖刻度，给走势/进度条用。
      单调的根因是"所有条一个颜色"，有了刻度才能一眼分出高低。 */
-  --viz-1: #cfe3f5;
-  --viz-2: #9dc4e6;
-  --viz-3: #6ba0d4;
-  --viz-4: #4a7cb0;
-  --viz-5: #2f5d8a;
+  --viz-1: #e5e9ef;
+  --viz-2: #c2c9d4;
+  --viz-3: #98a2b3;
+  --viz-4: #68727f;
+  --viz-5: #374151;
 
   /* ---------- 分类色相（categorical）----------
      "配色丰富点"有两层，这两套同时满足，但**都必须承载信息**，不为好看而上色：
@@ -78,27 +78,27 @@
        · 严重度刻度 → 回答"多急"。冷(没事)→钢蓝(留意)→琥珀(要查)→红(坏了)。
      8 个色相都过 WCAG AA（白底实测 4.7–7.3:1），不做纯装饰的浅色。
      顺序即"默认分配序"：先给最常出现的族冷蓝，再玉绿、陶土……相邻不撞色。 */
-  --hue-1: #2f5d8a;   /* 钢蓝 */
-  --hue-2: #21805f;   /* 玉绿 */
-  --hue-3: #a55a2b;   /* 陶土 */
-  --hue-4: #6b4a7a;   /* 紫藤 */
-  --hue-5: #0d7f8b;   /* 青 */
-  --hue-6: #64748b;   /* 石板 */
-  --hue-7: #6b7a2b;   /* 橄榄 */
-  --hue-8: #a34d63;   /* 玫 */
+  --hue-1: #374151;   /* 墨黑（首类用中性，不再用蓝） */
+  --hue-2: #1f8a62;   /* 玉绿 */
+  --hue-3: #b2602f;   /* 陶土 */
+  --hue-4: #7a54a8;   /* 紫藤 */
+  --hue-5: #0f8a97;   /* 青 */
+  --hue-6: #6b8299;   /* 石板 */
+  --hue-7: #7c8a2e;   /* 橄榄 */
+  --hue-8: #b6556f;   /* 玫 */
 
   /* ---------- 严重度刻度（severity）----------
      与分类色相正交：**色相说"属谁"，暖度+明暗说"多急"**。
      平静档不用灰——灰行多了整页就死；用最冷的一档蓝灰，安静但仍活着。 */
   --sev-calm: #5a6472;
-  --sev-note: #3f6d99;
+  --sev-note: #4b5563;
   --sev-warn: #9a5f0d;
   --sev-bad: #b73f39;
 
   /* ---------- 文件类型徽标（交付向：数据绿 / 文档钢蓝 / 演示陶土） ---------- */
   --ft-ppt: #a55a2b;
   --ft-xls: #21805f;
-  --ft-doc: #2f5d8a;
+  --ft-doc: #4b5563;
   --ft-png: #64748b;
   --ft-html: #0d7f8b;
   --ft-pdf: #b73f39;
@@ -135,7 +135,7 @@
 
   /* 比主文字更沉一档，给大标题 */
   --ink: #0e1219;
-  --focus-ring: 0 0 0 3px var(--brand-soft);
+  --focus-ring: 0 0 0 3px rgba(31,41,55,.18);
 
   /* =====================================================================
      设计体系（C+A 杂糅：成体系的尺度 + 精密仪器的冷调克制）
@@ -166,9 +166,9 @@
   /* 层级：3 级。**光是唯一的层级语言**（画布与面板同色，所以只能靠光）。
      阴影调低透明度、放大扩散——"浮起"而非"贴上去一块灰"。 */
   --el-0: none;
-  --el-1: 0 1px 2px rgba(20,30,45,.04), 0 4px 12px -4px rgba(20,30,45,.06);
-  --el-2: 0 1px 2px rgba(20,30,45,.05), 0 12px 32px -8px rgba(20,30,45,.12);
-  --el-3: 0 2px 6px rgba(20,30,45,.06), 0 28px 64px -16px rgba(20,30,45,.20);
+  --el-1: 0 1px 2px rgba(20,30,45,.03), 0 4px 14px -6px rgba(20,30,45,.08);
+  --el-2: 0 1px 2px rgba(20,30,45,.04), 0 14px 34px -12px rgba(20,30,45,.14);
+  --el-3: 0 2px 6px rgba(20,30,45,.05), 0 30px 70px -20px rgba(20,30,45,.22);
   /* 白面顶高光：让面板有"厚度"，不用加边框 */
   --hi: inset 0 1px 0 rgba(255,255,255,.9);
   /* 发丝描边：透亮调里，边界只作提示，不作分隔 */
@@ -347,55 +347,77 @@ button { font-family: inherit; cursor: pointer; }
    组件基元（统一视觉语言 · 锐利 · 权重）
    ===================================================================== */
 
-/* 按钮：统一高度体系（--h-*），一排里必须等高；圆角走 --r-ctl */
+/* 按钮：无彩（monochrome）—— 主按钮用墨黑（不执色），其余用“有阴影的白”。
+   颜色只留给状态（绿/黄/红），按钮本身不抢色。 */
 .btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
-  height: var(--h-md); padding: 0 var(--sp-3); border-radius: var(--r-ctl); cursor: pointer;
-  font-size: var(--fs-xs); font-weight: var(--fw-med);
-  transition: background var(--d-fast) var(--ease-out), border-color var(--d-fast) var(--ease-out),
-    color var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out), transform .1s var(--ease-out);
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: var(--h-md); padding: 0 15px; border-radius: 10px; cursor: pointer;
+  font-size: 12.5px; font-weight: var(--fw-h); letter-spacing: .01em;
   border: 1px solid transparent; white-space: nowrap; line-height: 1;
+  transition: background .14s var(--ease-out), color .14s var(--ease-out),
+    border-color .14s var(--ease-out), box-shadow .18s var(--ease-out), transform .1s var(--ease-out);
 }
-.btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(31,41,55,.22); }
 .btn:active:not(:disabled) { transform: translateY(1px); }
-.btn:disabled { opacity: .5; cursor: not-allowed; }
-.btn.primary {
-  background: var(--brand); color: #fff;
-  box-shadow: 0 1px 2px rgba(20,30,45,.14), var(--hi);
-}
-.btn.primary:hover:not(:disabled) { background: var(--brand-strong); }
-.btn.ghost {
-  background: var(--surface); border-color: var(--line); color: var(--text-1);
-  box-shadow: 0 1px 2px rgba(20,30,45,.04);
-}
-.btn.ghost:hover:not(:disabled) { background: var(--surface); border-color: var(--line-strong); box-shadow: 0 2px 6px rgba(20,30,45,.07); }
-.btn.soft { background: var(--brand-soft); color: var(--brand); }
-.btn.soft:hover:not(:disabled) { background: #e4eef8; }
-.btn.danger { background: var(--surface); border-color: var(--line); color: var(--danger); }
-.btn.danger:hover:not(:disabled) { background: var(--danger-bg); border-color: transparent; }
-/* 三档高度：sm 与输入框等高，md 常规，lg 主行动 */
-.btn.sm { height: var(--h-sm); padding: 0 var(--sp-2); font-size: var(--fs-2xs); }
-.btn.lg { height: var(--h-lg); padding: 0 var(--sp-4); font-size: var(--fs-sm); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
 
-/* 图标（圆头 · 细线条 · 精确） */
+/* 主按钮：墨黑（中性而强，不需要品牌色） */
+.btn.primary {
+  background: #1f2937; color: #fff;
+  box-shadow: 0 1px 2px rgba(16,24,40,.2), 0 5px 14px -6px rgba(16,24,40,.4);
+}
+.btn.primary:hover:not(:disabled) {
+  background: #111827;
+  box-shadow: 0 2px 4px rgba(16,24,40,.22), 0 9px 20px -7px rgba(16,24,40,.45);
+}
+.btn.primary:active:not(:disabled) { background: #0b1220; box-shadow: 0 1px 2px rgba(16,24,40,.25); }
+
+/* 次按钮：白，带柔光投影（“有阴影的白”） */
+.btn.ghost {
+  background: #fff; color: var(--text-1); border-color: rgba(20,30,45,.07);
+  box-shadow: 0 1px 2px rgba(20,30,45,.06), 0 5px 12px -5px rgba(20,30,45,.15);
+}
+.btn.ghost:hover:not(:disabled) {
+  color: #111827;
+  box-shadow: 0 2px 4px rgba(20,30,45,.08), 0 9px 20px -7px rgba(20,30,45,.2);
+  transform: translateY(-1px);
+}
+.btn.ghost:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 1px 2px rgba(20,30,45,.09); }
+
+/* 柔按钮：中性浅灰 */
+.btn.soft { background: #f1f5f9; color: var(--text-1); }
+.btn.soft:hover:not(:disabled) { background: #e6ebf2; color: #111827; }
+
+/* 危险按钮：白 + 柔光，红字 */
+.btn.danger {
+  background: #fff; color: var(--danger); border-color: rgba(20,30,45,.07);
+  box-shadow: 0 1px 2px rgba(20,30,45,.06), 0 5px 12px -5px rgba(183,63,57,.22);
+}
+.btn.danger:hover:not(:disabled) { background: var(--danger-bg); border-color: var(--danger-line); }
+
+/* 三档高度：sm 与输入框等高，md 常规，lg 主行动 */
+.btn.sm { height: var(--h-sm); padding: 0 10px; font-size: var(--fs-2xs); border-radius: 8px; }
+.btn.lg { height: var(--h-lg); padding: 0 20px; font-size: var(--fs-sm); border-radius: 11px; }
+
+/* 图标（圆头 · 细线条 · 精确）—— 笔重提到 1.9，细线在小尺寸下才不显弱 */
 .ic {
-  width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.75;
+  width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.9;
   stroke-linecap: round; stroke-linejoin: round; flex: none; vertical-align: -2px;
 }
 
-/* 胶囊 */
+/* 胶囊：扁平 */
 .pill {
-  display: inline-flex; align-items: center; gap: 5px; padding: 3.5px 10px;
-  border-radius: 999px; font-size: 11.5px; color: var(--text-2);
-  background: var(--surface-2); border: 1px solid transparent; cursor: pointer;
-  white-space: nowrap; transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out),
-    border-color var(--d-fast) var(--ease-out);
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px;
+  border-radius: var(--r-full); font-size: 11.5px; color: var(--text-2);
+  background: var(--surface-2); border: 1px solid transparent; cursor: pointer; white-space: nowrap;
+  transition: background .14s var(--ease-out), color .14s var(--ease-out), border-color .14s var(--ease-out);
 }
-.pill:hover { background: var(--surface-3); }
-.pill.blue { background: var(--brand-soft); color: var(--brand); }
-.pill.blue:hover { background: #e3eaf3; }
+.pill:hover { background: var(--surface-3); color: var(--text-1); }
+.pill:active { transform: translateY(1px); }
+.pill.blue { background: var(--brand-soft); color: var(--brand-strong); }
+.pill.blue:hover { background: #e3e7ee; }
 .pill.ghost { background: var(--surface); border-color: var(--line); }
-.pill.ghost:hover { background: var(--surface-2); }
+.pill.ghost:hover { background: var(--surface-2); border-color: var(--line-strong); }
 
 /* 卡片：**靠光浮起，不靠边框框住**。
    透亮调的关键：画布与卡片同色，如果每张卡都描一圈边，一屏若干块就都是"灰格子"。

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import "./sheet.css";
 import { agentApi } from "../api-agent";
 import type { SheetPreview } from "../api-agent";
-import { IconXls } from "../components/icons";
+import { IconXls, IconExternal } from "../components/icons";
 import { SkTable } from "../components/Skeleton";
 
 /* 表预览（见 docs/agent-architecture/19-界面设计.md 阶段 1）
@@ -43,6 +43,12 @@ export default function SheetView({ file, sheet: sheetProp, highlight, onBack }:
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
 
+  // 用本机 Excel/WPS 打开：先问引擎装了哪些程序，多于一个才弹菜单
+  const [openPanel, setOpenPanel] = useState(false);
+  const [targets, setTargets] = useState<{ id: string; label: string }[] | null>(null);
+  const [opening, setOpening] = useState(false);
+  const [openMsg, setOpenMsg] = useState("");
+
   // 外部（看板/体检）换了目标 sheet 时跟着走
   useEffect(() => { setSheet(sheetProp); }, [sheetProp]);
 
@@ -73,6 +79,37 @@ export default function SheetView({ file, sheet: sheetProp, highlight, onBack }:
   // 数字列判定（账页式对齐）
   const numCols = pv ? numericCols(pv.sample, pv.header.length) : [];
 
+  // 用本机 Excel/WPS 打开这张表。引擎负责调系统；菜单里列出它探测到的程序。
+  const doOpen = async (target?: string) => {
+    setOpening(true);
+    setOpenMsg("");
+    try {
+      await agentApi.openFile(file, target);
+      const label = targets?.find((t) => t.id === target)?.label;
+      setOpenMsg(label ? `已用「${label}」打开` : "已用系统默认程序打开");
+      setOpenPanel(false);
+    } catch (e) {
+      setOpenMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setOpening(false);
+    }
+  };
+
+  const toggleOpen = async () => {
+    if (openPanel) { setOpenPanel(false); return; }
+    setOpenMsg("");
+    if (targets) { setOpenPanel(true); return; }
+    try {
+      const r = await agentApi.openTargets(file);
+      setTargets(r.targets ?? []);
+      // 只有“默认程序”一个选项 → 不弹菜单，直接开
+      if ((r.targets ?? []).length <= 1) { void doOpen("default"); return; }
+      setOpenPanel(true);
+    } catch (e) {
+      setOpenMsg(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   return (
     <div className="sheet-view">
       <header className="sv-top">
@@ -87,7 +124,27 @@ export default function SheetView({ file, sheet: sheetProp, highlight, onBack }:
             {pv.rows} 行 · {pv.cols} 列 · {pv.formulas} 公式
           </div>
         )}
+        {/* 入口：交给本机 Excel / WPS 打开。引擎探测装了哪些程序，多于一个才弹菜单。 */}
+        <div className="sv-open">
+          <button className="btn ghost sm sv-open-btn" onClick={() => void toggleOpen()} disabled={opening}
+            aria-haspopup="menu" aria-expanded={openPanel}>
+            <IconExternal size={13} />{opening ? "正在打开…" : "用 Excel / WPS 打开"}
+          </button>
+          {openPanel && targets && (
+            <>
+              <div className="sv-open-veil" onClick={() => setOpenPanel(false)} />
+              <div className="sv-open-menu" role="menu">
+                {targets.map((t) => (
+                  <button key={t.id} role="menuitem" className="sv-open-item"
+                    onClick={() => void doOpen(t.id)}>{t.label}</button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </header>
+
+      {openMsg && <p className="sv-open-msg">{openMsg}</p>}
 
       {/* 工作簿里的其他 sheet：点一下直接换。一个 xlsx 常有好几张表，
           不列出来等于把它们藏了。"这张表/共几张"也说清，免得以为只有一页。 */}

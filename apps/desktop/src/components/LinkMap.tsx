@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import type { CSSProperties } from "react";
 import type { GraphData, GraphNode, ScanIssue } from "../api-agent";
 import { nodeId } from "../api-agent";
 import { linkHealth, families, brokenRefs } from "../lib/linkage";
@@ -115,7 +116,7 @@ export default function LinkMap({ graph, issues, onOpenSheet, onOpenIssue }: {
                     <button
                       key={id}
                       className={`lm-chip${on ? " on" : ""}`}
-                      style={on ? { background: hue } : { color: hue, borderColor: hue }}
+                      style={on ? ({ "--h": hue } as CSSProperties) : { color: hue, borderColor: hue }}
                       onClick={() => onOpenSheet(n)}
                       title={`${n.sheet}${on ? "：有跨表引用（改动会传下去）" : "：孤立表（改动不会传进来，也不会传出去）"}`}
                     >
@@ -129,6 +130,37 @@ export default function LinkMap({ graph, issues, onOpenSheet, onOpenIssue }: {
           );
         })}
       </div>
+
+      {/* ===== 引用明细：到底谁引用谁 =====
+          树回答“属于哪个文件”，这里回答“谁在用谁”。跨文件的单独标出来——
+          跨文件引用最脆（换了文件名/挪了位置就断），也是最该被人看见的。 */}
+      {graph.edges.length > 0 && (
+        <div className="lm-edges">
+          <div className="lm-edges-h">
+            <span>引用明细</span>
+            <span className="lm-edges-n">{graph.edges.length} 条</span>
+          </div>
+          <ul className="lm-edge-list">
+            {graph.edges.slice(0, 10).map((e, i) => (
+              <li key={i} className={`lm-edge${e.crossFile ? " cross" : ""}`}>
+                <button className="lm-edge-row" onClick={() => onOpenSheet(e.to)}
+                  title={`打开 ${e.to.sheet}`}>
+                  <span className="lm-e-src">{e.to.sheet.replace(/\s*（日）\s*/, "")}</span>
+                  <span className="lm-e-arrow">{e.crossFile ? "⇢" : "→"}</span>
+                  <span className="lm-e-dst">{e.from.sheet.replace(/\s*（日）\s*/, "")}</span>
+                </button>
+                <span className="lm-e-kind">
+                  {e.kind === "formula" ? "公式" : e.kind === "declared" ? "声明" : "键列"} ×{e.count}
+                  {e.crossFile && <em>跨文件</em>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {graph.edges.length > 10 && (
+            <p className="lm-break-hint">另有 {graph.edges.length - 10} 条引用，在“联动图”里看全。</p>
+          )}
+        </div>
+      )}
 
       {/* 同名系列（如 14 张月表）：单独讲"这一族谁断了"。
           这不是重复——上面按文件列的是"属于谁"，这里讲的是"这一串该连着"。 */}

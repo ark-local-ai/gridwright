@@ -10,6 +10,8 @@ import './pages/site.css'
 // Desktop-only additions: custom title bar + window chrome sizing.
 import './desktop.css'
 import App from './App.tsx'
+// 浮层统一玻璃壳：必须最后引入，才能盖住各面板自己的 .xx-panel 底色
+import './panel-glass.css'
 
 // 只对接数据管家 Go 引擎（127.0.0.1:7700，由 Tauri 壳随包拉起）。
 // 离线可用：引擎在没有网络/没有配模型时也能起，看表、体检、联动图照常。

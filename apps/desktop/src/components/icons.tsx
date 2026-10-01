@@ -170,6 +170,14 @@ export const IconFiles = (p: P) => (
 export const IconArrowUp = (p: P) => (
   <svg {...base(p.size, p.className)}><path d="M12 19V5M6 11l6-6 6 6" /></svg>
 );
+/* 外部打开：一个方框 + 向外指的箭头（"用别的程序打开"） */
+export const IconExternal = (p: P) => (
+  <svg {...base(p.size, p.className)}>
+    <path d="M14 5h5v5" />
+    <path d="M19 5l-7.5 7.5" />
+    <path d="M19 14v4.2A1.8 1.8 0 0 1 17.2 20H5.8A1.8 1.8 0 0 1 4 18.2V6.8A1.8 1.8 0 0 1 5.8 5H10" />
+  </svg>
+);
 export const IconLink = (p: P) => (
   <svg {...base(p.size, p.className)}><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5" /><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5" /></svg>
 );

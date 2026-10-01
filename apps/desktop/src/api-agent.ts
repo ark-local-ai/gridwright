@@ -393,6 +393,13 @@ export const agentApi = {
     if (file) q.set("file", file);
     return get<SheetPreview>(`/api/v1/sheets/preview?${q.toString()}`);
   },
+  // 用本机 Excel / WPS 打开某张表（入口在表格预览页）。
+  // 引擎与工作区在同一台机器上，由它调系统打开：桌面壳与单文件版行为一致。
+  openTargets: (file?: string) =>
+    get<{ file: string; path: string; targets: { id: string; label: string }[] }>(
+      `/api/v1/open/targets${file ? `?file=${encodeURIComponent(file)}` : ""}`),
+  openFile: (file?: string, target?: string) =>
+    post<{ ok: boolean; path: string; target: string }>("/api/v1/open", { file, target }),
   // 回滚：列出可回滚的账目（带"能不能倒"的判断）+ 执行
   rollbackList: (limit = 200) =>
     get<{ items: RollbackItem[] }>(`/api/v1/rollback?limit=${limit}`),
