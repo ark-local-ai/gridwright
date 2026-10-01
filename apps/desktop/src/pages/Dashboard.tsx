@@ -2,7 +2,7 @@ import { useEffect, useCallback, useState } from "react";
 import "./dashboard.css";
 import "./dashboard-shell.css";
 import { agentApi, nodeId } from "../api-agent";
-import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, WorkspaceListItem, Proposal, SafetyReport, SelfCheckReport, SheetDetail } from "../api-agent";
+import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, WorkspaceListItem, Proposal, SafetyReport, SelfCheckReport, SheetDetail, TraceData } from "../api-agent";
 import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark, IconClock } from "../components/icons";
 import AttentionList from "../components/AttentionList";
 import DropZone from "../components/DropZone";
@@ -60,6 +60,8 @@ export default function Dashboard({ pickFolder, watchDrop }: {
   const [brainReady, setBrainReady] = useState(true);
   // 待确认清单（A）与应用结果提示
   const [proposal, setProposal] = useState<Proposal | null>(null);
+  /** 这份清单是怎么算出来的（后端 trace），给「运行详情」用。 */
+  const [planTrace, setPlanTrace] = useState<TraceData | null>(null);
   const [safetyRep, setSafetyRep] = useState<SafetyReport | null>(null);
   const [appliedNote, setAppliedNote] = useState("");
   const [partErr, setPartErr] = useState<Record<string, string>>({});
@@ -316,7 +318,7 @@ export default function Dashboard({ pickFolder, watchDrop }: {
               <button className="cd-x" onClick={() => setChatOpen(false)} aria-label="关闭对话"><IconX size={14} /></button>
             </header>
             <div className="cd-body">
-              <ChatPane wsKey={wsPath} onPlanReady={(p) => { setProposal(p); setChatOpen(false); }} />
+              <ChatPane wsKey={wsPath} onPlanReady={(p, tr) => { setProposal(p); setPlanTrace(tr ?? null); setChatOpen(false); }} />
             </div>
           </div>
         </>
@@ -390,15 +392,17 @@ export default function Dashboard({ pickFolder, watchDrop }: {
               </div>
               <PendingList
                 proposal={proposal}
+                trace={planTrace}
                 safety={safetyRep}
                 impactNode={proposal?.items?.[0] ? `${proposal.items[0].file}!${proposal.items[0].sheet}` : undefined}
                 onApplied={(r) => {
                   setProposal(null);
+                  setPlanTrace(null);
                   setAppliedNote(`${r.applied} 处已应用${r.rejected ? `，${r.rejected} 处被拒` : ""}`);
                   setLastSelfCheck(r.selfCheck ?? null);
                   void refresh();
                 }}
-                onDiscarded={() => setProposal(null)}
+                onDiscarded={() => { setProposal(null); setPlanTrace(null); }}
               />
             </section>
           )}

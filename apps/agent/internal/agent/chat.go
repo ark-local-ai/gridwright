@@ -8,6 +8,7 @@ import (
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/convo"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
+	"github.com/ark-local-ai/ark/apps/agent/internal/trace"
 )
 
 // Chat 是"会话"入口（见 docs/agent-architecture/7-对话与自动化任务.md）：
@@ -32,15 +33,26 @@ func (a *Agent) ChatWithImages(ctx context.Context, userText string, files []str
 	if a.Brain == nil || !a.Brain.Ready() {
 		return nil, fmt.Errorf("还没配置模型（脑）：请在设置里填 base_url 与 api_key 后就能对话了")
 	}
+	tr := trace.From(ctx)
+	donePrompt := tr.Step("组装提示")
 	prompt := assembleChatPrompt(userText, files, history)
 	if len(imgs) > 0 {
 		// 明确告诉模型图里是什么，否则它可能只当装饰
 		prompt += fmt.Sprintf("\n\n（用户随消息附了 %d 张图，通常是截图或照片里的数据；请从中读数。）", len(imgs))
 	}
+	tr.SetPrompt(prompt)
+	donePrompt(fmt.Sprintf("%d 字 · 历史 %d 条 · 工作区表 %d 张 · 附图 %d 张",
+		len([]rune(prompt)), len(history), len(files), len(imgs)))
+
+	doneBrain := tr.Step("调模型")
 	content, err := a.Brain.ChatJSONWithImages(ctx, prompt, imgs)
 	if err != nil {
+		doneBrain("失败：" + err.Error())
 		return nil, err
 	}
+	doneBrain(fmt.Sprintf("模型 %s", a.Brain.Model()))
+
+	doneParse := tr.Step("解析回话")
 	var raw struct {
 		Reply    string `json:"reply"`
 		Proposal *struct {
@@ -55,6 +67,7 @@ func (a *Agent) ChatWithImages(ctx context.Context, userText string, files []str
 	}
 	if err := json.Unmarshal([]byte(content), &raw); err != nil {
 		// 模型没按格式回：退回纯文本回话，不让整轮失败
+		doneParse("模型没按 JSON 回，退回纯文本")
 		return &convo.Message{Role: convo.RoleAgent, Text: strings.TrimSpace(content)}, nil
 	}
 	msg := &convo.Message{Role: convo.RoleAgent, Text: raw.Reply}
@@ -64,6 +77,9 @@ func (a *Agent) ChatWithImages(ctx context.Context, userText string, files []str
 			Schedule: raw.Proposal.Schedule, Action: raw.Proposal.Action,
 			Tools: raw.Proposal.Tools, Options: raw.Proposal.Options,
 		}
+		doneParse("proposal=" + raw.Proposal.Kind)
+	} else {
+		doneParse("无 proposal（纯回话）")
 	}
 	return msg, nil
 }

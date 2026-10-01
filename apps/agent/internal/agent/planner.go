@@ -17,6 +17,7 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory2"
 	"github.com/ark-local-ai/ark/apps/agent/internal/propose"
 	"github.com/ark-local-ai/ark/apps/agent/internal/terms"
+	"github.com/ark-local-ai/ark/apps/agent/internal/trace"
 )
 
 // 这是"待改清单"的产出（见 docs/agent-architecture/5-编辑语义.md、19-界面设计.md 阶段 4）。
@@ -90,10 +91,14 @@ type semanticEdit struct {
 //
 // 需要配好模型；但**规则命中时不需要**——这正是短路的收益：断网也能按规矩办事。
 func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) (*propose.Proposal, error) {
+	tr := trace.From(ctx)
 	// 规则短路优先：命中即返回，不调模型。
+	doneRules := tr.Step("规则短路")
 	if prop, err := a.planFromRules(instruction, opts); err == nil && prop != nil {
+		doneRules("命中规则，未调用模型")
 		return prop, nil
 	}
+	doneRules("无规则命中")
 	if a.Brain == nil || !a.Brain.Ready() {
 		return nil, fmt.Errorf("还没配置模型（脑）：请在设置里填 base_url 与 api_key，之后才能让它判断该改哪些格")
 	}
@@ -115,6 +120,7 @@ func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) 
 	}
 
 	// 素材：表结构 + 联动图
+	doneStruct := tr.Step("读表结构")
 	f, err := excelize.OpenFile(target)
 	if err != nil {
 		return nil, fmt.Errorf("打开目标表: %w", err)
@@ -124,27 +130,46 @@ func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) 
 	if err != nil {
 		return nil, err
 	}
-	g, _ := graph.ScanWorkspace(a.Layout.Root, files, graph.Options{})
+	doneStruct(fmt.Sprintf("%d 张工作表（%s）", len(structs), filepath.Base(target)))
 
-	// 相关记忆（见 docs/agent-architecture/21-记忆设计.md）：**只取与本次指令相关的**，
-	// 不把全部记忆塞进 prompt——上下文里没有噪音，模型更容易判对。
+	doneGraph := tr.Step("扫联动图")
+	g, _ := graph.ScanWorkspace(a.Layout.Root, files, graph.Options{})
+	edges := 0
+	if g != nil {
+		edges = len(g.Edges)
+	}
+	doneGraph(fmt.Sprintf("%d 个文件 · %d 条边", len(files), edges))
+
+	doneMem := tr.Step("记忆 / 术语")
 	memText := ""
 	if mem, merr := memory2.Open(a.Layout.Root); merr == nil {
 		memText = mem.RetrieveByText(instruction).Describe()
 	}
 	// 语义映射（见 24/25）：用户嘴里的模糊词先翻译成明确的表/字段/类别。
 	// "那笔钱""老李那家"这类说法，第一次问清、以后复用。
+	termHits := 0
 	if tm, terr := terms.Open(a.Layout.Root); terr == nil {
 		if hits := tm.Resolve(instruction); len(hits) > 0 {
+			termHits = len(hits)
 			memText = terms.Describe(hits) + memText
 		}
 	}
+	doneMem(fmt.Sprintf("术语命中 %d 条 · 记忆 %d 字", termHits, len([]rune(memText))))
 
+	donePrompt := tr.Step("组装提示")
 	prompt := assemblePlanPrompt(instruction, structs, g, memText, len(opts.Images) > 0)
+	tr.SetPrompt(prompt)
+	donePrompt(fmt.Sprintf("%d 字 · 附图 %d 张", len([]rune(prompt)), len(opts.Images)))
+
+	doneBrain := tr.Step("调模型")
 	resp, err := a.Brain.PlanSemanticWithImages(ctx, prompt, opts.Images)
 	if err != nil {
+		doneBrain("失败：" + err.Error())
 		return nil, err
 	}
+	doneBrain(fmt.Sprintf("模型 %s", a.Brain.Model()))
+
+	doneParse := tr.Step("解析指令")
 	// edits 的原始 JSON 在这里解析成 semanticEdit
 	var edits []semanticEdit
 	if len(resp.Edits) > 0 {
@@ -152,6 +177,7 @@ func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) 
 			return nil, fmt.Errorf("解析编辑指令: %w", err)
 		}
 	}
+	doneParse(fmt.Sprintf("%d 条语义指令 · 澄清 %d · 跳过说明 %d", len(edits), len(resp.Questions), len(resp.SkipReasons)))
 
 	prop := &propose.Proposal{Root: a.Layout.Root, Target: target, Summary: resp.Summary}
 	for _, q := range resp.Questions {
@@ -167,6 +193,7 @@ func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) 
 		return nil, err
 	}
 	defer f2.Close()
+	doneResolve := tr.Step("定位成格")
 	for _, e := range edits {
 		items, blocked := resolveEdits(f2, target, e)
 		if blocked != nil {
@@ -180,16 +207,29 @@ func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) 
 			prop.Items = append(prop.Items, it)
 		}
 	}
+	setN, appendN := 0, 0
+	for _, it := range prop.Items {
+		if it.Op == "append" {
+			appendN++
+		} else {
+			setN++
+		}
+	}
+	doneResolve(fmt.Sprintf("命中改格 %d · 新增行 %d · 被拦 %d", setN, appendN, len(prop.Blocked)))
 
 	// forbid 护栏：模型也不能动"禁止修改列"。
 	//
 	// 规则短路那条路有 guardEdits（rulesplan → agent.RunInboxFile 的路径），
 	// 而模型这条路原本没有——偏偏**模型才是最可能擅自改禁止列的一方**
 	// （规则是人写的，模型是猜的）。一视同仁地拦下，并让人看见。
+	doneGuard := tr.Step("护栏（禁止列）")
 	if rf, _, _, _, lerr := memory.Load(a.Layout.Rules, a.Layout.State); lerr == nil {
 		kept, blocked := filterForbidden(prop.Items, rf.ForbidSet())
 		prop.Items = kept
 		prop.Blocked = append(prop.Blocked, blocked...)
+		doneGuard(fmt.Sprintf("拦下 %d 条", len(blocked)))
+	} else {
+		doneGuard("无规则")
 	}
 
 	// 指纹：Apply 前据此确认文件没被换过

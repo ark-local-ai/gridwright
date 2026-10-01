@@ -359,6 +359,10 @@ export interface RollbackItem {
   group: string;
 }
 
+export interface TraceStep { name: string; detail?: string; ms: number; }
+/** 一次运行的步骤账（后端 trace 包），供「运行详情」面板直接渲染。 */
+export interface TraceData { runId: string; steps: TraceStep[]; prompt?: string; raw?: string; }
+
 export interface GenerateResult {
   ok: boolean;
   kind: string;
@@ -480,7 +484,7 @@ export const agentApi = {
   // images：随指令附的图。数据常常就在截图里（"按 D 列名字填 E、F 列"），
   // 不带图的话模型只能反问数据来源，把能做的事停成澄清。
   plan: async (instruction: string, file?: string, images?: string[], signal?: AbortSignal) => {
-    const r = await post<{ id: string; proposal: Proposal }>("/api/v1/plan", { instruction, file, images }, signal);
+    const r = await post<{ id: string; proposal: Proposal; trace?: TraceData }>("/api/v1/plan", { instruction, file, images }, signal);
     if (r?.proposal) r.proposal = normalizeProposal(r.proposal);
     return r;
   },
@@ -493,7 +497,7 @@ export const agentApi = {
     post<SelfCheckReport>("/api/v1/selfcheck", { node, kind, files }),
   // 会话
   chat: (message: string, conversationId?: string, images?: string[]) =>
-    post<{ conversationId: string; conversation: ConvoDto }>("/api/v1/chat", { message, conversationId, images }),
+    post<{ conversationId: string; conversation: ConvoDto; trace?: TraceData }>("/api/v1/chat", { message, conversationId, images }),
   conversations: () => get<{ items: ConvoSummary[] }>("/api/v1/conversations"),
   conversation: (id: string) => get<ConvoDto>(`/api/v1/conversation?id=${encodeURIComponent(id)}`),
   renameConversation: (id: string, title: string) =>

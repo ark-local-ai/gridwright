@@ -12,6 +12,7 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
 	"github.com/ark-local-ai/ark/apps/agent/internal/notify"
 	"github.com/ark-local-ai/ark/apps/agent/internal/propose"
+	"github.com/ark-local-ai/ark/apps/agent/internal/trace"
 )
 
 // 待确认闭环（见 docs/agent-architecture/19-界面设计.md 阶段 4）。
@@ -49,6 +50,8 @@ func (s *Server) handlePlan(w http.ResponseWriter, r *http.Request) {
 			"还没配置模型（脑）：请在设置里填 base_url 与 api_key；只读的看表与体检不受影响")
 		return
 	}
+	// trace 收「这一步做了什么」，随响应回给界面（运行详情）。
+	ctx, tr := trace.New(r.Context(), "plan")
 	brain := s.brainClient()
 	ag := agent.New(cfg, layout, led, brain)
 	// 图只放行 data:image/ 前缀（与 /chat 同一道校验）：不信任客户端传来的任意 URL，
@@ -57,13 +60,13 @@ func (s *Server) handlePlan(w http.ResponseWriter, r *http.Request) {
 	for _, d := range imgsForStore(req.Images) {
 		imgs = append(imgs, llm.ImageInput{DataURL: d})
 	}
-	prop, err := ag.Plan(r.Context(), req.Instruction, agent.PlanOptions{File: req.File, Images: imgs})
+	prop, err := ag.Plan(ctx, req.Instruction, agent.PlanOptions{File: req.File, Images: imgs})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	id := s.proposals().Put(prop)
-	writeJSON(w, http.StatusOK, map[string]any{"id": id, "proposal": prop})
+	writeJSON(w, http.StatusOK, map[string]any{"id": id, "proposal": prop, "trace": tr})
 }
 
 type applyReq struct {

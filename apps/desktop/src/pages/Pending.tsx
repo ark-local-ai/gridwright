@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import "./confirm.css";
 import { agentApi } from "../api-agent";
-import type { Proposal, ApplyResult, ImpactResult, SafetyReport, SelfCheckReport, ConvoSummary, DistillCandidate } from "../api-agent";
+import type { Proposal, ApplyResult, ImpactResult, SafetyReport, SelfCheckReport, ConvoSummary, DistillCandidate, TraceData } from "../api-agent";
+import RunTrace from "../components/RunTrace";
 import { IconCheck, IconSpark, IconSend, IconNote, IconLink, IconShield, IconRefresh, IconX, IconClock, IconPlus, IconTrash, IconRename, IconAssistant } from "../components/icons";
 
 /* 待确认（A）+ 会话（B）（见 docs/agent-architecture/19-界面设计.md 阶段 3-4）
@@ -9,7 +10,7 @@ import { IconCheck, IconSpark, IconSend, IconNote, IconLink, IconShield, IconRef
 
 /* ---------- 待确认卡片 ---------- */
 
-export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safety }: {
+export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safety, trace }: {
   proposal: Proposal | null;
   onApplied: (r: { applied: number; rejected: number; results: ApplyResult[]; selfCheck?: SelfCheckReport | null }) => void;
   onDiscarded: () => void;
@@ -17,6 +18,8 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
   impactNode?: string;
   /** 写入安全评估 */
   safety?: SafetyReport | null;
+  /** 这份清单是怎么算出来的（后端 trace），展开可看每步与模型收发 */
+  trace?: TraceData | null;
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -83,6 +86,7 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
         <b>{proposal.summary}</b>
         <span className="pend-target">{proposal.target.split(/[\\/]/).pop()}</span>
       </div>
+      <RunTrace trace={trace} label="清单是怎么算出来的" />
 
       <ul className="pend-items">
         {(proposal.items ?? []).map((it, i) => (
@@ -269,7 +273,7 @@ type ConvoMsg = {
 };
 
 export function ChatPane({ onPlanReady, wsKey }: {
-  onPlanReady: (p: Proposal) => void;
+  onPlanReady: (p: Proposal, trace?: TraceData) => void;
   /** 当前工作区标识（用于把没发出去的草稿按工作区隔离存下来） */
   wsKey?: string;
 }) {
@@ -281,8 +285,10 @@ export function ChatPane({ onPlanReady, wsKey }: {
   const [images, setImages] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [planning, setPlanning] = useState(false);
-  /** 已经算过清单的那几条建议（按下标记）。点过就置灰——避免同一条反复算。 */
-  const [planned, setPlanned] = useState<Record<number, boolean>>({});
+  /** 算清单失败的那几条（只有失败才需要手动重试：正常情况 agent 会自动算）。 */
+  const [planFailed, setPlanFailed] = useState<Record<number, boolean>>({});
+  /** 最近一次运行的步骤账（贴在对应的 agent 消息下面）。 */
+  const [runTrace, setRunTrace] = useState<{ at: number; trace: TraceData } | null>(null);
   const [err, setErr] = useState("");
   /** 放大查看的图（点消息里的图打开）。null = 没开。 */
   const [zoom, setZoom] = useState<string | null>(null);
@@ -529,7 +535,16 @@ export function ChatPane({ onPlanReady, wsKey }: {
     try {
       const r = await agentApi.chat(text, convoId || undefined, pics.length ? pics : undefined);
       setConvoId(r.conversationId);
-      setMsgs(r.conversation.messages);
+      const next = r.conversation.messages;
+      setMsgs(next);
+      const at = next.length - 1;
+      if (r.trace) setRunTrace({ at, trace: r.trace });
+      // agent 判定这是「改动表」的指令（kind=plan）→ **直接接着算清单**。
+      // 不再让用户多点一次「算出要改哪些格」：算清单本来就是 agent 该干的活，
+      // 它把结果摆出来、用户确认即可。需要澄清（kind=clarify）时不自动算。
+      if (next[at]?.role === "agent" && next[at]?.proposal?.kind === "plan") {
+        void makePlan(text, pics.length ? pics : undefined, at);
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -560,13 +575,14 @@ export function ChatPane({ onPlanReady, wsKey }: {
   const makePlan = async (instruction: string, images: string[] | undefined, at: number) => {
     setPlanning(true);
     setErr("");
+    setPlanFailed((p) => ({ ...p, [at]: false }));
     const ac = new AbortController();
     planAbort.current = ac;
     try {
       const r = await agentApi.plan(instruction, undefined, images, ac.signal);
-      onPlanReady(r.proposal);
-      setPlanned((p) => ({ ...p, [at]: true }));
+      onPlanReady(r.proposal, r.trace);
     } catch (e) {
+      setPlanFailed((p) => ({ ...p, [at]: true }));
       if (ac.signal.aborted) {
         setErr("已取消这次出清单（没有任何改动被写入）。");
       } else {
@@ -769,29 +785,31 @@ export function ChatPane({ onPlanReady, wsKey }: {
                     ))}
                   </div>
                 )}
-                {m.proposal.kind === "plan" && i === lastPlanIdx && (() => {
+                {/* 清单由 agent 自己算：正常情况这里没有任何按钮（已自动跑）。
+                    只在「正在算」时给进度与取消，「算失败」时给一个重试。 */}
+                {m.proposal.kind === "plan" && i === lastPlanIdx && (planning || planFailed[i]) && (() => {
                   // 这条回答要办的是**用户那句话**（以及他那张图），不是模型写的 detail。
                   // 用 detail 会丢掉“图里就是数据”这件事（detail 只是文字描述），
                   // 结果出清单时模型看不到数据 → 生成空清单。
                   const src = precedingUser(msgs, i);
-                  const done = !!planned[i];
                   return (
                     <div className="mp-opts">
-                      <button className="btn primary sm" disabled={planning || done}
-                        onClick={() => void makePlan(src.text, src.images, i)}>
-                        {done ? "清单已生成" : planning ? `正在算清单… ${planElapsed}s` : "算出要改哪些格"}
-                      </button>
-                      {planning && (
+                      {planning ? (
                         <>
-                          <span className="mp-wait">模型在出清单，通常 10–40 秒</span>
+                          <span className="mp-wait">正在算清单… {planElapsed}s（模型在算，通常 10–40 秒）</span>
                           <button className="btn ghost sm" onClick={cancelPlan}>取消</button>
                         </>
+                      ) : (
+                        <button className="btn primary sm" onClick={() => void makePlan(src.text, src.images, i)}>
+                          重试出清单
+                        </button>
                       )}
                     </div>
                   );
                 })()}
               </div>
             )}
+            {runTrace && runTrace.at === i && <RunTrace trace={runTrace.trace} />}
           </div>
         ))}
         {busy && <div className="msg agent"><div className="msg-text typing">正在想…</div></div>}

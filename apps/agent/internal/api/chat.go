@@ -8,6 +8,7 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/agent"
 	"github.com/ark-local-ai/ark/apps/agent/internal/convo"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
+	"github.com/ark-local-ai/ark/apps/agent/internal/trace"
 )
 
 // 会话接口（见 docs/agent-architecture/7-对话与自动化任务.md）。
@@ -138,12 +139,14 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	// 一个工作区多个 xlsx、一个 xlsx 多个 sheet 是常态，所以清单必须到 sheet 层。
 	files, _ := layout.DataFiles()
 	names := workspaceInventory(files)
+	// trace 收「这一步做了什么」，随响应回给界面（运行详情）。
+	ctx, tr := trace.New(r.Context(), "chat")
 	ag := agent.New(cfg, layout, led, s.brainClient())
 	imgs := make([]llm.ImageInput, 0, len(req.Images))
 	for _, d := range imgsForStore(req.Images) {
 		imgs = append(imgs, llm.ImageInput{DataURL: d})
 	}
-	reply, err := ag.ChatWithImages(r.Context(), req.Message, names, imgs, history)
+	reply, err := ag.ChatWithImages(ctx, req.Message, names, imgs, history)
 	if err != nil {
 		// 记下失败，避免对话看起来"没反应"
 		_, _ = store.Append(c.ID, convo.Message{Role: convo.RoleSystem, Text: "出错：" + err.Error()})
@@ -155,7 +158,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"conversationId": c.ID, "conversation": updated})
+	writeJSON(w, http.StatusOK, map[string]any{"conversationId": c.ID, "conversation": updated, "trace": tr})
 }
 
 // convoStore 取当前工作区的会话存储（跟着工作区走）。

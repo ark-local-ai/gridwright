@@ -16,6 +16,7 @@ import (
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/config"
 	"github.com/ark-local-ai/ark/apps/agent/internal/plan"
+	"github.com/ark-local-ai/ark/apps/agent/internal/trace"
 )
 
 // Client 封装一次 LLM 调用。
@@ -252,6 +253,9 @@ func (c *Client) post(ctx context.Context, body map[string]any) (string, error) 
 		// 只回给前端一句"调用失败"等于把线索丢了。
 		slog.Error("[llm] 返回非 200", "model", c.model, "status", resp.StatusCode,
 			"耗时", time.Since(start).Round(time.Millisecond), "body", truncate(string(raw), 800))
+		if tr := trace.From(ctx); tr != nil {
+			tr.Add("模型报错", fmt.Sprintf("HTTP %d: %s", resp.StatusCode, truncate(string(raw), 800)))
+		}
 		return "", fmt.Errorf("LLM 返回 %d: %s", resp.StatusCode, truncate(string(raw), 500))
 	}
 	log.Printf("[llm] %s ok（%s，%dB）", c.model, time.Since(start).Round(time.Millisecond), len(raw))
@@ -272,6 +276,10 @@ func (c *Client) post(ctx context.Context, body map[string]any) (string, error) 
 	}
 	if len(out.Choices) == 0 {
 		return "", fmt.Errorf("LLM 无返回内容: %s", truncate(string(raw), 500))
+	}
+	// 模型原样返回的正文也收进运行详情（界面直接看；与 debug 日志无关）。
+	if tr := trace.From(ctx); tr != nil {
+		tr.SetRaw(out.Choices[0].Message.Content)
 	}
 	// 容忍模型在 JSON 前后多吐了说明文字：截取第一个 { 到最后一个 }
 	return extractJSON(out.Choices[0].Message.Content), nil
