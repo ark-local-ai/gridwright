@@ -40,6 +40,9 @@ export default function Dashboard({ pickFolder, watchDrop }: {
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [active, setActive] = useState<GraphNode | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  // 「待确认」独立成面板：出提案时不再关掉对话，而是并排弹出，
+  // 这样用户能一边看对话（自己怎么说的、它怎么推的）一边看要改什么，做对比判断。
+  const [proposalOpen, setProposalOpen] = useState(false);
   // 对话抽屉宽度：起始读上次拖到的值（不写死），拖动时实时更新。
   // 记在本地而不是工作区里——"我喜欢多宽"是使用这台机器的人的习惯，
   // 跟哪份台账无关。
@@ -318,7 +321,7 @@ export default function Dashboard({ pickFolder, watchDrop }: {
               <button className="cd-x" onClick={() => setChatOpen(false)} aria-label="关闭对话"><IconX size={14} /></button>
             </header>
             <div className="cd-body">
-              <ChatPane wsKey={wsPath} onPlanReady={(p, tr) => { setProposal(p); setPlanTrace(tr ?? null); setChatOpen(false); }} />
+              <ChatPane wsKey={wsPath} onPlanReady={(p, tr) => { setProposal(p); setPlanTrace(tr ?? null); setProposalOpen(true); }} />
             </div>
           </div>
         </>
@@ -383,27 +386,17 @@ export default function Dashboard({ pickFolder, watchDrop }: {
             </div>
           </section>
 
-          {/* ② 要你动手的只有这一处：待确认 */}
+          {/* ② 要你动手的只有这一处：待确认。
+              这里只放**一行入口**——真正的清单在独立面板里（与对话并排），
+              免得它把看板占满、也免得一出提案对话就被关掉。 */}
           {proposal && proposal.items.length > 0 && (
             <section className="dcard dcard-act span2">
               <div className="dcard-h">
                 <h3>需要你确认</h3>
                 <span className="dcard-n act">{proposal.items.length} 处待确认</span>
+                <button className="btn primary sm" onClick={() => setProposalOpen(true)}>查看并确认</button>
               </div>
-              <PendingList
-                proposal={proposal}
-                trace={planTrace}
-                safety={safetyRep}
-                impactNode={proposal?.items?.[0] ? `${proposal.items[0].file}!${proposal.items[0].sheet}` : undefined}
-                onApplied={(r) => {
-                  setProposal(null);
-                  setPlanTrace(null);
-                  setAppliedNote(`${r.applied} 处已应用${r.rejected ? `，${r.rejected} 处被拒` : ""}`);
-                  setLastSelfCheck(r.selfCheck ?? null);
-                  void refresh();
-                }}
-                onDiscarded={() => { setProposal(null); setPlanTrace(null); }}
-              />
+              {proposal.summary && <p className="dash-muted">{proposal.summary}</p>}
             </section>
           )}
 
@@ -475,6 +468,37 @@ export default function Dashboard({ pickFolder, watchDrop }: {
           </section>
         </div>
       </div>
+
+      {/* 待确认面板：与对话独立、并排显示——对话留在右侧，清单在左侧，
+          方便“我是怎么说的 / 它准备怎么改”对照着判断。不盖遮罩，两侧都能用。 */}
+      {proposalOpen && proposal && proposal.items.length > 0 && (
+        <section className="prop-panel" aria-label="待确认改动">
+          <header className="prop-head">
+            <IconSpark size={14} />
+            <b>需要你确认</b>
+            <span className="prop-sub">{proposal.items.length} 处待确认 · 改动前会自动备份，每格旧值都记账</span>
+            <button className="prop-x" onClick={() => setProposalOpen(false)}
+              aria-label="收起面板（清单仍保留在看板上）"><IconX size={14} /></button>
+          </header>
+          <div className="prop-body">
+            <PendingList
+              proposal={proposal}
+              trace={planTrace}
+              safety={safetyRep}
+              impactNode={proposal?.items?.[0] ? `${proposal.items[0].file}!${proposal.items[0].sheet}` : undefined}
+              onApplied={(r) => {
+                setProposal(null);
+                setPlanTrace(null);
+                setProposalOpen(false);
+                setAppliedNote(`${r.applied} 处已应用${r.rejected ? `，${r.rejected} 处被拒` : ""}`);
+                setLastSelfCheck(r.selfCheck ?? null);
+                void refresh();
+              }}
+              onDiscarded={() => { setProposal(null); setPlanTrace(null); setProposalOpen(false); }}
+            />
+          </div>
+        </section>
+      )}
 
       {ledgerOpen && (
         <LedgerPanel onClose={() => setLedgerOpen(false)} onChanged={() => void refresh()} />

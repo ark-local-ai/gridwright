@@ -123,7 +123,7 @@
   display: inline-flex; align-items: center; gap: 5px;
   padding: 4px 10px; cursor: pointer; font-family: var(--font); font-size: var(--fs-2xs);
   border: 1px solid var(--line); border-radius: var(--r-full);
-  background: var(--surface); color: var(--text-2);
+  background: rgba(255, 255, 255, .6); color: var(--text-2);
   transition: color var(--d-fast) var(--ease-out), border-color var(--d-fast) var(--ease-out),
               background var(--d-fast) var(--ease-out);
 }
@@ -157,6 +157,11 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .ch-d { flex: none; font-size: 10px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+/* 「当前」标识：一眼看出我在跟哪条会话说话（打开时会自动续上上次那条） */
+.ch-tag {
+  flex: none; font-size: 10px; padding: 0 6px; border-radius: var(--r-full);
+  background: var(--brand-soft); color: var(--brand-strong); font-weight: var(--fw-h);
+}
 /* 行内操作（改名/删除）：平时很淡，悬停才实——列表本身是主体，动作是附带的 */
 .ch-act {
   flex: none; border: none; background: none; cursor: pointer; padding: 5px;
@@ -307,7 +312,7 @@
 .chat-input textarea {
   flex: 1; min-width: 0; padding: 10px 13px; font-size: 13px;
   border: 1px solid var(--line-strong); border-radius: 12px;
-  background: #fff; color: var(--text-1); font-family: var(--font);
+  background: rgba(255, 255, 255, .72); color: var(--text-1); font-family: var(--font);
   resize: none; line-height: 1.6; min-height: 64px; max-height: 180px;
   overflow-y: auto;
   transition: border-color var(--d-fast) var(--ease-out), box-shadow var(--d-fast) var(--ease-out);

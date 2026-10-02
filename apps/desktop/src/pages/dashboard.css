@@ -746,11 +746,13 @@
 .chat-drawer {
   position: absolute; top: 60px; right: 0; bottom: 0; width: min(460px, 92%);
   z-index: 60; display: flex; flex-direction: column;
-  background: rgba(255, 255, 255, .92);
-  -webkit-backdrop-filter: blur(26px) saturate(1.3);
-  backdrop-filter: blur(26px) saturate(1.3);
-  border-left: 1px solid rgba(20, 30, 45, .07);
-  box-shadow: -24px 0 60px -44px rgba(20, 30, 45, .4);
+  /* 更透的玻璃：让看板的极光透上来，和卡片同材质——不再是"一墙白"。
+     （用户反馈：“对话面板太瓷实了”，就是指旧版那层近乎不透明的白。） */
+  background: rgba(255, 255, 255, .66);
+  -webkit-backdrop-filter: blur(30px) saturate(1.4);
+  backdrop-filter: blur(30px) saturate(1.4);
+  border-left: 1px solid rgba(20, 30, 45, .06);
+  box-shadow: -24px 0 60px -46px rgba(20, 30, 45, .35);
   animation: drawer-in var(--d-base) var(--ease-out);
 }
 /* 左缘的拖动把手：一条窄的热区 + 中间一道发丝线。
@@ -781,6 +783,47 @@
 .cd-x:hover { background: var(--surface-2); color: var(--text-1); }
 .cd-body { flex: 1; min-height: 0; display: flex; padding: var(--sp-3) var(--sp-4); }
 .cd-body > * { flex: 1; min-width: 0; }
+
+/* ---------- 待确认面板：居中独立浮层 ----------
+   出提案时**自动居中弹出**，与对话没有任何位置关系（不盖深遮罩，
+   背后看图/看对话都照旧可点）。关掉后看板上仍留一行入口可再打开。 */
+.prop-panel {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  z-index: 65;
+  display: flex; flex-direction: column;
+  width: min(720px, calc(100vw - 48px));
+  max-height: min(86vh, 820px);
+  background: rgba(255, 255, 255, .93);
+  -webkit-backdrop-filter: blur(30px) saturate(1.3);
+  backdrop-filter: blur(30px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, .85);
+  border-radius: 20px;
+  box-shadow: 0 2px 6px rgba(20, 30, 45, .06), 0 40px 90px -36px rgba(20, 30, 45, .55);
+  overflow: hidden;
+  animation: prop-in var(--d-base) var(--ease-out) both;
+}
+@keyframes prop-in {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(.97); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.prop-head {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: 12px 16px; border-bottom: 1px solid var(--line); flex: none;
+}
+.prop-head > svg { color: var(--brand); }
+.prop-head b { font-size: var(--fs-sm); font-weight: var(--fw-h); color: var(--text-1); }
+.prop-sub { flex: 1; font-size: var(--fs-2xs); color: var(--text-3); }
+.prop-x {
+  border: none; background: none; cursor: pointer; padding: var(--sp-1);
+  border-radius: var(--r-ctl); color: var(--text-3);
+}
+.prop-x:hover { background: var(--surface-2); color: var(--text-1); }
+.prop-body { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 18px; }
+
+/* 窄屏：铺满宽度，但仍居中 */
+@media (max-width: 780px) {
+  .prop-panel { width: calc(100vw - 24px); }
+}
 
 .dash { position: relative; } /* 抽屉的定位基准 */
 

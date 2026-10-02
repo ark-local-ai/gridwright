@@ -310,6 +310,10 @@ export function ChatPane({ onPlanReady, wsKey }: {
   const [saving, setSaving] = useState(false);
   const [savedNote, setSavedNote] = useState("");
   const convoTitle = history.find((h) => h.id === convoId)?.title ?? "当前对话";
+  // 「停在上次那条」：打开对话时不再总是新开，而是回到上次用的那条。
+  // 会话多数是"接着上次说"，每次从零开始等于每次把上下文丢掉。
+  // 存本地、按工作区分开——"我在跟哪条记录说话"是本机习惯，不是服务端状态。
+  const lastConvoKey = `gw:chat-last:${wsKey || "default"}`;
   const endRef = useRef<HTMLDivElement | null>(null);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -461,6 +465,34 @@ export function ChatPane({ onPlanReady, wsKey }: {
       setErr(e instanceof Error ? e.message : String(e));
     }
   };
+
+  // 打开时恢复上次的会话。只跑一次：这是"进入时的一次动作"，
+  // 不该在每次渲染后再去覆盖用户的手动切换。
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    void (async () => {
+      try {
+        const items = (await agentApi.conversations()).items ?? [];
+        setHistory(items);
+        const last = localStorage.getItem(lastConvoKey);
+        if (last && items.some((c) => c.id === last)) {
+          const c = await agentApi.conversation(last);
+          setConvoId(c.id);
+          setMsgs(c.messages);
+        }
+      } catch { /* 读不到就当新会话，不拦人 */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastConvoKey]);
+
+  // 记住"当前在跟哪条记录说话"，供下次打开恢复，也用于列表里的标识。
+  useEffect(() => {
+    try {
+      if (convoId) localStorage.setItem(lastConvoKey, convoId);
+    } catch { /* 存不下只影响下次恢复 */ }
+  }, [convoId, lastConvoKey]);
 
   // ---------- 从记录提炼记忆 ----------
   //
@@ -667,6 +699,8 @@ export function ChatPane({ onPlanReady, wsKey }: {
           <IconAssistant size={13} />{distilling ? "正在提炼…" : "提炼记忆"}
         </button>
         {savedNote && <span className="cb-saved"><IconCheck size={12} />{savedNote}</span>}
+        {/* 判断标识：现在在跟哪条会话说话（打开时会自动续上上次那条）。 */}
+        <span className="cb-now" title="当前会话">{convoId ? convoTitle : "新对话"}</span>
       </div>
 
       {/* 历史列表：点一条切回去；可改名、可删。 */}
@@ -692,6 +726,7 @@ export function ChatPane({ onPlanReady, wsKey }: {
                 <>
                   <button className="ch-row" onClick={() => void openConvo(c.id)}>
                     <span className="ch-t">{c.title || "新对话"}</span>
+                    {c.id === convoId && <span className="ch-tag">当前</span>}
                     <span className="ch-d">{c.updated}</span>
                   </button>
                   <button className="ch-act" title="重命名"
