@@ -41,3 +41,6 @@ gui-test-screenshots/
 gridwright-workspaces.json
 # 本地测试工作区（含用户真表副本与运行状态）
 testXls/
+
+# pi 相关 scratch（下载的 pi 包、subagents 示例等，本地用）
+pi-package/
