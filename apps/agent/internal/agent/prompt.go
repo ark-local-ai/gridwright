@@ -9,6 +9,7 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/config"
+	"github.com/ark-local-ai/ark/apps/agent/internal/convo"
 	"github.com/ark-local-ai/ark/apps/agent/internal/graph"
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory"
 	"github.com/ark-local-ai/ark/apps/agent/internal/plan"
@@ -82,8 +83,14 @@ func readXLSXText(path string) (string, error) {
 //
 // 与旧的 assemblePrompt 关键区别：**要求模型输出业务语义坐标，不要输出单元格坐标**。
 // 因为真实台账里（合并单元格、汇总表列是日期序列号）坐标极易错行错列，坐标由代码算。
-func assemblePlanPrompt(instruction string, structures []*xl.Structure, g *graph.Graph, memoryText string, hasImages bool) string {
+func assemblePlanPrompt(instruction string, structures []*xl.Structure, g *graph.Graph, memoryText, historyText string, hasImages bool) string {
 	var b strings.Builder
+	// 对话背景放在最前：先让模型看到“之前说过什么”，再看当前指令在补充/纠正什么。
+	if strings.TrimSpace(historyText) != "" {
+		b.WriteString("# 背景（这次对话之前说过的，帮助你理解下面的指令在补充/纠正什么）\n")
+		b.WriteString(historyText)
+		b.WriteString("\n\n")
+	}
 	b.WriteString("# 任务\n")
 	b.WriteString(strings.TrimSpace(instruction))
 	if hasImages {
@@ -271,4 +278,59 @@ func ruleName(rules memory.RulesFile, reason string) string {
 		}
 	}
 	return "-"
+}
+
+// formatHistory 把一段对话渲染成给模型的"背景"。
+//
+// 只给最近若干条、每条截断——上下文不是越多越好：出清单的 prompt 本身已经很长，
+// 把整条会话塞进去会挤掉表结构。取最近 12 条足够覆盖"任务 → 追问 → 补充 → 纠正"。
+//
+// 跳过：系统消息（提示/报错，不是业务上下文）；与当前 instruction 完全相同的那条
+// 用户消息（它已经作为 `# 任务` 出现，重复会让模型以为是两件事）。
+func formatHistory(msgs []convo.Message, instruction string) string {
+	start := 0
+	if len(msgs) > 12 {
+		start = len(msgs) - 12
+	}
+	skip := lastUserMatching(msgs, strings.TrimSpace(instruction))
+	var lines []string
+	for i := start; i < len(msgs); i++ {
+		if i == skip {
+			continue
+		}
+		m := msgs[i]
+		if m.Role == convo.RoleSystem {
+			continue
+		}
+		txt := strings.TrimSpace(m.Text)
+		if txt == "" {
+			if len(m.Images) > 0 {
+				txt = "（附了一张图）"
+			} else {
+				continue
+			}
+		}
+		if len([]rune(txt)) > 400 {
+			txt = string([]rune(txt)[:400]) + "…"
+		}
+		who := "用户"
+		if m.Role == convo.RoleAgent {
+			who = "助手"
+		}
+		lines = append(lines, who+"："+txt)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// lastUserMatching 返回最后一条文本等于 target 的用户消息下标（无则 -1）。
+func lastUserMatching(msgs []convo.Message, target string) int {
+	if target == "" {
+		return -1
+	}
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Role == convo.RoleUser && strings.TrimSpace(msgs[i].Text) == target {
+			return i
+		}
+	}
+	return -1
 }

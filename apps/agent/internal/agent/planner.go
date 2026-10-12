@@ -10,6 +10,7 @@ import (
 
 	"github.com/xuri/excelize/v2"
 
+	"github.com/ark-local-ai/ark/apps/agent/internal/convo"
 	"github.com/ark-local-ai/ark/apps/agent/internal/graph"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
 	"github.com/ark-local-ai/ark/apps/agent/internal/locate"
@@ -63,6 +64,10 @@ type PlanOptions struct {
 	// "按 D 列名字把 E、F 列填进某表"这类指令的数据**就在图里**，
 	// 只给文字的话模型只能反问"数据来自哪张表"，把能做的事问成澄清。
 	Images []llm.ImageInput
+	// History 是产生这条指令的对话（用户与助手之前说过的）。
+	// /plan 只吃 instruction 字符串时，复核反馈（"那行改成累加"）没有上下文，
+	// 模型不知道在纠正哪一条；把对话带上，多轮纠正如人交接。
+	History []convo.Message
 }
 
 // semanticEdit 是模型返回的一条"业务语义"编辑（**不含坐标**）。
@@ -157,7 +162,7 @@ func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) 
 	doneMem(fmt.Sprintf("术语命中 %d 条 · 记忆 %d 字", termHits, len([]rune(memText))))
 
 	donePrompt := tr.Step("组装提示")
-	prompt := assemblePlanPrompt(instruction, structs, g, memText, len(opts.Images) > 0)
+	prompt := assemblePlanPrompt(instruction, structs, g, memText, formatHistory(opts.History, instruction), len(opts.Images) > 0)
 	tr.SetPrompt(prompt)
 	donePrompt(fmt.Sprintf("%d 字 · 附图 %d 张", len([]rune(prompt)), len(opts.Images)))
 

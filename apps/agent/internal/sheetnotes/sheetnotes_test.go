@@ -69,3 +69,35 @@ func TestOpenBrokenFileDegradesToEmpty(t *testing.T) {
 		t.Fatal("坏文件应降级为空库")
 	}
 }
+
+func TestPutLastChangePreservesDescription(t *testing.T) {
+	dir := t.TempDir()
+	s, err := Open(filepath.Join(dir, FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Put("a.xlsx!S1", Note{Description: "台账描述", At: "2026-10-01 10:00", Model: "m"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PutLastChange("a.xlsx!S1", "补充按揭信息和日期", "2026-10-04 22:00", "fake"); err != nil {
+		t.Fatal(err)
+	}
+	n, ok := s.Get("a.xlsx!S1")
+	if !ok {
+		t.Fatal("应能读回")
+	}
+	if n.Description != "台账描述" {
+		t.Errorf("最后一次改动不该冲掉描述：%+v", n)
+	}
+	if n.LastChange != "补充按揭信息和日期" || n.LastChangeAt != "2026-10-04 22:00" {
+		t.Errorf("上次改动未写入：%+v", n)
+	}
+	// 空总结不入库，也不覆盖已有的
+	if err := s.PutLastChange("a.xlsx!S1", "  ", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	n2, _ := s.Get("a.xlsx!S1")
+	if n2.LastChange != "补充按揭信息和日期" {
+		t.Errorf("空总结不该覆盖：%+v", n2)
+	}
+}

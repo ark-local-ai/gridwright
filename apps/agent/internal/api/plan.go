@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/agent"
+	"github.com/ark-local-ai/ark/apps/agent/internal/convo"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
 	"github.com/ark-local-ai/ark/apps/agent/internal/notify"
 	"github.com/ark-local-ai/ark/apps/agent/internal/propose"
@@ -63,7 +64,17 @@ func (s *Server) handlePlan(w http.ResponseWriter, r *http.Request) {
 	for _, d := range imgsForStore(req.Images) {
 		imgs = append(imgs, llm.ImageInput{DataURL: d})
 	}
-	prop, err := ag.Plan(ctx, req.Instruction, agent.PlanOptions{File: req.File, Images: imgs})
+	// 带上产生这条指令的对话：复核反馈（"那行改成累加"）离开上下文就不知道
+	// 在纠正哪一条。读不到就退回"只给指令"——上下文是增强，不是必需。
+	var history []convo.Message
+	if req.ConversationID != "" {
+		if store, serr := s.convoStore(); serr == nil {
+			if c := store.Get(req.ConversationID); c != nil {
+				history = c.Messages
+			}
+		}
+	}
+	prop, err := ag.Plan(ctx, req.Instruction, agent.PlanOptions{File: req.File, Images: imgs, History: history})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -95,8 +106,7 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "清单不存在或已过期（请重新计划）")
 		return
 	}
-	_, _, led, _ := s.cur()
-	cfg, _, _, _ := s.cur()
+	cfg, layout, led, _ := s.cur()
 	results, err := propose.Apply(prop, led, cfg.LLM.Model)
 	if err != nil {
 		// 指纹不符 / 写回失败等：保留清单让用户重试或重新计划
@@ -127,6 +137,33 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// 让模型把"这次改了什么"总结成**一句话**（≤20 字）：
+	//   · 写进工作表笔记 → 看板的"上次改动"显示人话，而不是 B2、C2；
+	//   · 随响应回给界面 → 对话里的回执也用这句。
+	// 结合对话上下文总结，才能写出"销售明细表补充按揭信息和日期"。
+	// 没配模型 / 调用失败都不影响改动本身（已落盘）。
+	var summaries []agent.SheetChangeSummary
+	if cfg.BrainReady() {
+		var conv *convo.Conversation
+		if prop.Conversation != "" {
+			if cs, cerr := s.convoStore(); cerr == nil {
+				conv = cs.Get(prop.Conversation)
+			}
+		}
+		ag := agent.New(cfg, layout, led, s.brainClient())
+		if ss, serr := ag.SummarizeChange(r.Context(), conv, results); serr == nil {
+			summaries = ss
+			if notes := s.notesStore(); notes != nil {
+				at := nowTs().Format("2006-01-02 15:04")
+				for _, sm := range ss {
+					_ = notes.PutLastChange(nodeKeyForFile(filepath.Base(prop.Target), sm.Sheet), sm.Text, at, cfg.LLM.Model)
+				}
+			}
+		} else {
+			log.Printf("[apply] 改动总结未生成: %v", serr)
+		}
+	}
+
 	// 通知：改完就推（此前只有 inbox 自动路径发通知，界面确认后改表**不发**——
 	// 主路径反而没有通知，是漏的）。
 	cfg2, _, _, _ := s.cur()
@@ -145,7 +182,7 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok": true, "applied": applied, "rejected": rejected,
-		"results": results, "selfCheck": sc,
+		"results": results, "selfCheck": sc, "summaries": summaries,
 	})
 }
 

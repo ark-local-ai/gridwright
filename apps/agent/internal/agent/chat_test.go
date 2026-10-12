@@ -97,7 +97,7 @@ func TestChatPromptNoFalseCapability(t *testing.T) {
 // TestPlanPromptOffersUpsert 出清单的提示必须给出 upsert 契约 ——
 // 否则模型想新增也无处表达，只能塞进 skip_reasons，清单永远是空的。
 func TestPlanPromptOffersUpsert(t *testing.T) {
-	p := assemblePlanPrompt("按 D 列名字填 E、F，查不到就新增", nil, nil, "", false)
+	p := assemblePlanPrompt("按 D 列名字填 E、F，查不到就新增", nil, nil, "", "", false)
 	for _, bad := range []string{"- 不能新增行", "不能新增行：", "只能改已存在的格", "系统做不到"} {
 		if strings.Contains(p, bad) {
 			t.Errorf("出清单提示不该把 %q 当成一条限制", bad)

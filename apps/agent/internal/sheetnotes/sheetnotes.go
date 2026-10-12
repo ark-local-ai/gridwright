@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -27,6 +28,12 @@ type Note struct {
 	// HeaderHash 是生成时的表头指纹。表头变了（列增删/移动）→ 描述可能过期，
 	// 下次体检会重算。空值表示没记录（老数据），视为过期。
 	HeaderHash string `json:"headerHash,omitempty"`
+
+	// LastChange 是最近一次改动的**一句话总结**（模型生成、≤20 字），
+	// 给看板的“上次改动”用——让人看懂“这次到底做了什么”，而不是坐标。
+	LastChange      string `json:"lastChange,omitempty"`
+	LastChangeAt    string `json:"lastChangeAt,omitempty"`
+	LastChangeModel string `json:"lastChangeModel,omitempty"`
 }
 
 // Store 是 sheet_notes.json 的读写器，线程安全（与 ledger 一样）。
@@ -88,6 +95,25 @@ func (s *Store) Put(key string, n Note) error {
 	if s.data.Notes == nil {
 		s.data.Notes = map[string]Note{}
 	}
+	s.data.Notes[key] = n
+	return s.saveLocked()
+}
+
+// PutLastChange 记下某张表最近一次改动的“一句话总结”，保留已有字段（描述等）。
+// 空总结不入库。
+func (s *Store) PutLastChange(key, text, at, model string) error {
+	if strings.TrimSpace(text) == "" {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.data.Notes == nil {
+		s.data.Notes = map[string]Note{}
+	}
+	n := s.data.Notes[key]
+	n.LastChange = text
+	n.LastChangeAt = at
+	n.LastChangeModel = model
 	s.data.Notes[key] = n
 	return s.saveLocked()
 }

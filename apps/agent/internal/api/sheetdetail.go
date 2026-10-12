@@ -78,11 +78,17 @@ func (s *Server) handleSheetDetail(w http.ResponseWriter, r *http.Request) {
 	if store := s.notesStore(); store != nil {
 		if n, ok := store.Get(nodeKeyForFile(base, sheet)); ok {
 			resp.Description, resp.DescriptionAt, resp.DescriptionModel = n.Description, n.At, n.Model
+			// 模型总结过“这次改了什么”就用它（人话）；否则退回账目里的坐标式文本
+			if n.LastChange != "" {
+				resp.LastChange, resp.LastChangeAt = n.LastChange, n.LastChangeAt
+			}
 		}
 	}
-	_, _, led, _ := s.cur()
-	entries, _ := led.Entries(500)
-	resp.LastChange, resp.LastChangeAt = lastChangeOf(entries, base, sheet)
+	if resp.LastChange == "" {
+		_, _, led, _ := s.cur()
+		entries, _ := led.Entries(500)
+		resp.LastChange, resp.LastChangeAt = lastChangeOf(entries, base, sheet)
+	}
 	writeJSON(w, http.StatusOK, resp)
 }
 

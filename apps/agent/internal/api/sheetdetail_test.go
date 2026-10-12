@@ -159,3 +159,31 @@ func TestHeaderHashChangesWithHeader(t *testing.T) {
 		t.Error("表头行不同，指纹却相同")
 	}
 }
+
+// 笔记里有"上次改动的一句话总结"时，详情卡优先用它（人话），而不是账目里的坐标式文本。
+func TestSheetDetailPrefersNoteLastChange(t *testing.T) {
+	s := newTestServer(t)
+	if store := s.notesStore(); store != nil {
+		if err := store.PutLastChange("测试表.xlsx!Sheet1", "销售明细表补充按揭信息和日期", "2026-10-04 22:00", "fake"); err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		t.Fatal("测试服务端应有描述缓存")
+	}
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/sheets/detail?file=测试表&sheet=Sheet1", nil))
+	if rec.Code != 200 {
+		t.Fatalf("状态 %d：%s", rec.Code, rec.Body.String())
+	}
+	var d sheetDetailResp
+	if err := json.Unmarshal(rec.Body.Bytes(), &d); err != nil {
+		t.Fatal(err)
+	}
+	if d.LastChange != "销售明细表补充按揭信息和日期" || d.LastChangeAt != "2026-10-04 22:00" {
+		t.Fatalf("应优先用笔记里的总结：%+v", d)
+	}
+	// PutLastChange 不该凭空造出描述
+	if d.Description != "" {
+		t.Fatalf("描述不该被造出来：%+v", d)
+	}
+}
