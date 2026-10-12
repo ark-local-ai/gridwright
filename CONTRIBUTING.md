@@ -85,3 +85,13 @@ not home and workspace."
 - 大面积一律白/米灰，颜色只用于「可点击 / 选中 / 强调」；绿/橙/红仅表状态
 - 风格：扁平优先、柔和圆角、低频阴影、紧凑排版；尊重 `prefers-reduced-motion`
 - 详情见项目讨论文档（本地 `docs/`）
+
+## 七、测试
+
+```bash
+cd apps/agent && go test ./...            # 单元测试（快，无外部依赖）
+bash apps/agent/scripts/test-race.sh      # 竞态检测（改了并发/共享状态就必须跑）
+```
+
+`-race` 在 Windows 上要求 cgo + 一个 gcc 兼容编译器；没装时脚本会给出提示。
+一次性安装：`winget install BrechtSanders.WinLibs.POSIX.UCRT`。

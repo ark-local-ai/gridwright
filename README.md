@@ -150,17 +150,27 @@ apps/
 ├─ agent/        # Go 引擎（"手"）：盯文件夹、读表、体检、改表、记账
 │  ├─ cmd/gridwright/    # 入口：起引擎 + 内嵌界面
 │  └─ internal/
+│     ├─ agent/               # 编排核心：取数据 → 问脑 → 校验执行 → 记账
+│     ├─ api/                 # 本地 HTTP 接口（/api/v1/*）
+│     ├─ config/              # config.yaml + 环境变量覆盖
 │     ├─ graph/  locate/      # 表结构图、语义坐标定位
 │     ├─ xl/                  # 读写 xlsx（含新增行）
 │     ├─ scan/                # 只读体检（跨表一致性）
+│     ├─ selfcheck/ impact/   # 改动后自检、影响面推断
 │     ├─ rules/               # 规则引擎：命中即短路，不调用模型
 │     ├─ propose/ rollback/   # 确认制改表、回滚
 │     ├─ ledger/              # 账目（每格一条，含旧值）
 │     ├─ safety/              # 含宏的表拒绝写入
-│     ├─ impact/ selfcheck/   # 影响面推断、改动后自检
-│     ├─ memory/ weight/      # 长期记忆、表权重
+│     ├─ generate/ newtable/  # 生成草稿（不碰原表）、新表识别
+│     ├─ convo/ prompts/      # 会话记录 conversations.json、快捷任务模板
+│     ├─ memory/ memory2/     # rules.yaml/state.yaml 读取；结构化记忆 memory.json
+│     ├─ terms/ sheetnotes/   # 语义映射 term-map、工作表描述缓存
+│     ├─ weight/ jobs/        # 表权重、定时任务
+│     ├─ plan/ llm/           # 结构化编辑契约、模型调用（密钥脱敏）
+│     ├─ notify/ trace/       # 通知出口、单次运行的步骤轨迹
+│     ├─ workspace/ proc/     # 工作区约定与注册表、父进程监视
 │     ├─ logx/                # 日志：slog → stdout、级别可调
-│     └─ webui/dist/          # 单文件版内嵌界面（构建时同步，非手改）
+│     └─ webui/               # 单文件版内嵌界面（构建时 embed dist/）
 ├─ frontend/     # 官网（纯静态落地页，与桌面端无代码共享）
 └─ desktop/      # 桌面壳（Tauri 2）+ 工作台界面，随包拉起 Go 引擎
 ```
@@ -172,11 +182,16 @@ apps/
 
 ```
 你的台账文件夹/
-├─ *.xlsx        # 被看管的表（可多张）
-├─ inbox/        # 新数据丢这里 → 处理完移入 done/
-├─ rules.yaml    # 规则（记事本可改）
-├─ ledger.csv    # 账目（append-only，含旧值 → 可回滚）
-└─ 生成/         # 生成的草稿，绝不改动原表
+├─ *.xlsx             # 被看管的表（可多张）
+├─ inbox/             # 新数据丢这里 → 处理完移入 inbox/done/
+├─ inbox/done/        # 处理完的归档
+├─ rules.yaml         # 规则（记事本可改）
+├─ ledger.csv         # 账目（append-only，含旧值 → 可回滚）
+├─ conversations.json # 对话逐字流水
+├─ memory.json        # 沉淀的记忆（必须人点头）
+├─ sheet_notes.json   # 工作表描述缓存
+├─ archive/           # 备份归档
+└─ 生成/              # 生成的草稿，绝不改动原表
 ```
 
 ### 技术选型里的几个"不"
@@ -189,7 +204,8 @@ apps/
 ## 测试
 
 ```bash
-cd apps/agent && go test ./...     # 187 个用例，覆盖 21 个包（共 30 个包）
+cd apps/agent && go test ./...                      # 229 个用例，覆盖 23 个包（共 33 个包）
+bash apps/agent/scripts/test-race.sh                # 竞态检测（需 gcc，见 CONTRIBUTING）
 ```
 
 ## 参与贡献

@@ -41,10 +41,33 @@ gridwright/
 │  │  ├─ internal/
 │  │  │  ├─ api/            # HTTP 路由与 handler（/api/v1/*）
 │  │  │  ├─ agent/          # 对话循环、规划（prompt.go / planner.go）、记忆
+│  │  │  ├─ config/         # config.yaml + 环境变量覆盖
+│  │  │  ├─ graph/          # 联动图：公式 / 声明 / 语义三路扫出表间依赖
 │  │  │  ├─ locate/         # 认表：找表头、按关键字定位行列
 │  │  │  ├─ xl/             # 读写 xlsx（excelize），含新增行
 │  │  │  ├─ propose/        # 改动提案与落盘（set / add / append）
-│  │  │  ├─ plan/ generate/ convo/ newtable/ rollback/ scan/ jobs/ weight/
+│  │  │  ├─ plan/           # LLM 与执行器之间的结构化编辑契约
+│  │  │  ├─ generate/       # 生成类任务：产物落 生成/，不碰原表
+│  │  │  ├─ newtable/       # 新表识别：它像链上的哪一节
+│  │  │  ├─ convo/          # 会话存储 conversations.json
+│  │  │  ├─ prompts/        # 快捷任务模板 prompts.yaml
+│  │  │  ├─ memory/         # rules.yaml / state.yaml 读取
+│  │  │  ├─ memory2/        # 结构化记忆 memory.json（人来批准）
+│  │  │  ├─ terms/          # 语义映射 term-map.yaml
+│  │  │  ├─ sheetnotes/     # 工作表描述缓存 sheet_notes.json
+│  │  │  ├─ weight/         # 表 / 边 / 记忆的注意力权重
+│  │  │  ├─ impact/         # 这一笔改动牵连谁
+│  │  │  ├─ selfcheck/      # 执行后自检：本次相关表动全了吗
+│  │  │  ├─ scan/           # 只读体检：错误值 / 坏引用 / 跨表核对
+│  │  │  ├─ rules/          # 规则引擎：when/then 命中即短路
+│  │  │  ├─ jobs/           # 定时任务 jobs.json + 极简 cron + 调度器
+│  │  │  ├─ rollback/       # 按账目逆向回滚（回滚也记账）
+│  │  │  ├─ ledger/         # 账目 ledger.csv（append-only，含旧值）
+│  │  │  ├─ safety/         # 写前检查：宏 / 透视 / 图表会被 excelize 破坏
+│  │  │  ├─ notify/         # 通知出口（console / serverchan / pushplus / webhook）
+│  │  │  ├─ trace/          # 单次运行每步轨迹，随响应回给界面
+│  │  │  ├─ workspace/      # 工作区约定（inbox/done/archive）+ 注册表
+│  │  │  ├─ proc/           # 监视父进程，壳没了就退出，不留孤儿占端口
 │  │  │  ├─ llm/            # 模型调用（请求/响应摘要日志，密钥脱敏）
 │  │  │  ├─ logx/           # 日志：slog → stdout、单时间戳、级别可调
 │  │  │  └─ webui/dist/     # 单文件版内嵌界面（构建时同步，非手改）
@@ -134,10 +157,12 @@ gridwright/
 | 路径 | 内容 |
 |---|---|
 | `*.xlsx` | 用户自己的台账 |
-| `rules.yaml` / `state.yaml` | 该工作区的规则与状态 |
+| `rules.yaml` | 该工作区的规则（人手可改） |
+| `state.yaml` | 可选的状态/摘要（引擎只读，不写） |
 | `ledger.csv` | 账目：每格改动一条，含旧值 |
 | `conversations.json` | 对话逐字流水（全自动写，不做判断） |
 | `memory.json` | 沉淀下来的记忆（要精炼、会过期、**必须人点头**） |
+| `sheet_notes.json` | 工作表描述缓存（模型生成） |
 | `inbox/`、`inbox/done/` | 新数据入口、处理完的归档 |
 | `archive/` | 备份归档 |
 
