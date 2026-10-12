@@ -243,6 +243,42 @@ export interface Proposal {
   conversation?: string;
 }
 
+/* ---------- 清单的整行预览 ---------- */
+
+/** 某一行里被改动的一格。 */
+export interface ProposalRowChange {
+  col: number;
+  /** A1 坐标，点击跳到那一格用。 */
+  ref?: string;
+  field: string;
+  op: string;
+  old?: unknown;
+  new?: unknown;
+  reason?: string;
+  affects?: string[];
+}
+
+/** 预览表里的一行：整行内容 + 这一行要改的格子。 */
+export interface ProposalRow {
+  row: number;
+  cells: string[];
+  kind: "edit" | "new";
+  changes: ProposalRowChange[];
+}
+
+export interface ProposalSheetRows {
+  sheet: string;
+  headerRow: number;
+  header: string[];
+  rows: ProposalRow[];
+}
+
+export interface ProposalRows {
+  id: string;
+  target: string;
+  sheets: ProposalSheetRows[];
+}
+
 /** 把引擎回传的清单收敛成界面可直接用的形状：null → []，并给每条补上 affects。 */
 export function normalizeProposal(p: Proposal): Proposal {
   const items = (p.items ?? []).map((it) => ({ ...it, affects: it.affects ?? [] }));
@@ -499,7 +535,12 @@ export const agentApi = {
     post<{
       ok: boolean; applied: number; rejected: number;
       results: ApplyResult[]; selfCheck?: SelfCheckReport | null;
+      /** 模型对“这次改了什么”的一句话总结（每张表一条，≤20 字） */
+      summaries?: { sheet: string; text: string }[];
     }>("/api/v1/apply", { id }),
+  /** 把清单里的改动还原成整行预览（只读，供待确认面板画表格） */
+  proposalRows: (id: string) =>
+    get<ProposalRows>(`/api/v1/proposal/rows?id=${encodeURIComponent(id)}`),
   selfCheck: (node: string, kind?: string, files?: string[]) =>
     post<SelfCheckReport>("/api/v1/selfcheck", { node, kind, files }),
   // 会话
@@ -507,6 +548,9 @@ export const agentApi = {
     post<{ conversationId: string; conversation: ConvoDto; trace?: TraceData }>("/api/v1/chat", { message, conversationId, images }),
   conversations: () => get<{ items: ConvoSummary[] }>("/api/v1/conversations"),
   conversation: (id: string) => get<ConvoDto>(`/api/v1/conversation?id=${encodeURIComponent(id)}`),
+  /** 追加一条 agent/system 消息（应用改动后把“这次做了什么”写回对话）。 */
+  appendConversation: (conversationId: string, text: string, role?: "agent" | "system") =>
+    post<{ ok: boolean; conversation: ConvoDto }>("/api/v1/conversation/append", { conversationId, text, role }),
   acceptProposal: (conversationId: string, index: number) =>
     post<{ ok: boolean; kind: string; note?: string }>("/api/v1/conversation/accept", { conversationId, index }),
   renameConversation: (id: string, title: string) =>
@@ -546,6 +590,22 @@ export const agentApi = {
   saveTerm: (p: { word: string; sheet?: string; field?: string; kind?: string; key?: Record<string,string>; note?: string; manual?: boolean }) =>
     post<{ ok: boolean }>("/api/v1/terms", p),
   termsDelete: (word: string) => post<{ ok: boolean }>("/api/v1/terms/delete", { word }),
+  // 快捷任务模板：从对话沉淀、人手可编辑；触发仍走 /plan，不短路
+  prompts: () => get<{ prompts: PromptTemplate[]; path: string }>("/api/v1/prompts"),
+  savePrompt: (p: Partial<PromptTemplate>) =>
+    post<{ ok: boolean; prompt: PromptTemplate }>("/api/v1/prompts", p),
+  deletePrompt: (id: string) => post<{ ok: boolean }>("/api/v1/prompts/delete", { id }),
+  usePrompt: (id: string) => post<{ ok: boolean }>("/api/v1/prompts/use", { id }),
+  /** 从一段对话总结出快捷任务候选（只读，不落盘） */
+  distillPrompt: (conversationId: string) =>
+    post<{ conversationId: string; title: string; candidates: PromptCandidate[] }>(
+      `/api/v1/prompts/distill?id=${encodeURIComponent(conversationId)}`, {}),
+  /** 只总结**勾选的那几条消息**（只读，不落盘） */
+  distillPromptMessages: (conversationId: string, messages: { role: string; text: string }[]) =>
+    post<{ conversationId: string; title: string; candidates: PromptCandidate[] }>(
+      "/api/v1/prompts/distill", { conversationId, messages }),
+  /** 随包内置的通用模板骨架（离线，可作起点） */
+  builtinPrompts: () => get<{ templates: PromptTemplate[] }>("/api/v1/prompts/builtin"),
   // 权重（结构重要性 + 活跃度 + 风险 → 注意力）
   weights: () => get<{ scores: WeightScore[]; hasUsage: boolean; note: string }>("/api/v1/weights"),
 };
@@ -647,6 +707,30 @@ export interface ConvoDto {
   messages: ConvoMsgDto[];
   created: string;
   updated: string;
+}
+
+/* ---------- 快捷任务模板 ---------- */
+
+/** 一条快捷任务模板：{槽位} 占位，触发后仍走 /chat → /plan → 确认。 */
+export interface PromptTemplate {
+  id: string;
+  name: string;
+  when?: string;
+  template: string;
+  slots: string[];
+  note?: string;
+  source?: string;
+  created?: string;
+  hits?: number;
+}
+
+/** 从对话总结出的候选（还没落盘，落盘前可改）。 */
+export interface PromptCandidate {
+  name: string;
+  when?: string;
+  template: string;
+  note?: string;
+  slots?: string[];
 }
 
 /* ---------- 规则引擎 ---------- */

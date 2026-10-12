@@ -35,11 +35,13 @@ function BackendGate() {
   }, [])
 
   useEffect(() => {
+    // 就绪后不必再探：长开的桌面进程不该一直每 1.5s 打一次健康检查。
+    if (ready) return
     void probe()
     const id = setInterval(() => void probe(), 1500)
     const t = setTimeout(() => setWaited(true), 8000)
     return () => { clearInterval(id); clearTimeout(t) }
-  }, [probe])
+  }, [probe, ready])
 
   if (ready) return <App />
   return (

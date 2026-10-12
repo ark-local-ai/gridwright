@@ -42,6 +42,14 @@
   --brand-line: #d7dce3;    /* 强调描边 */
   --brand-gradient: linear-gradient(135deg, #374151 0%, #1f2937 100%);
 
+  /* ---------- 提案卡（对话里的「改动清单提案」）----------
+     用户嫌原来的 --brand-soft 平灰丑。改用浅钢蓝：色相同用户气泡的 #3f6f9e，
+     但明度拉到接近纸白，做底不发脏；左侧用 accent 拉一条强调线。
+     要换配色只改这三个令牌。 */
+  --prop-bg: linear-gradient(180deg, #f7fafe 0%, #eef3fa 100%);
+  --prop-line: #dbe5f1;
+  --prop-accent: #3f6f9e;
+
   /* ---------- 运行中 / 流动 ---------- */
   --live: #374151;
   --live-soft: #eef1f5;

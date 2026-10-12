@@ -2,7 +2,7 @@ import { useEffect, useCallback, useState } from "react";
 import "./dashboard.css";
 import "./dashboard-shell.css";
 import { agentApi, nodeId } from "../api-agent";
-import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, WorkspaceListItem, Proposal, SafetyReport, SelfCheckReport, SheetDetail, TraceData } from "../api-agent";
+import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, WorkspaceListItem, Proposal, SafetyReport, SelfCheckReport, SheetDetail, TraceData, ApplyResult } from "../api-agent";
 import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark, IconClock } from "../components/icons";
 import AttentionList from "../components/AttentionList";
 import DropZone from "../components/DropZone";
@@ -56,6 +56,14 @@ export default function Dashboard({ pickFolder, watchDrop }: {
   const [rulesOpen, setRulesOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [zoomed, setZoomed] = useState(false);
+  // 浏览器/单文件版里没有系统文件夹选择框（App.tsx 只在 Tauri 壳注入 pickFolder）。
+  // 这里用服务端目录浏览 FolderPicker 顶替：把 onPick/onCancel 包成一个 Promise，
+  // DropZone 就能像用原生选择框一样"选完得到路径"，不必再各写一套。
+  const [pickDir, setPickDir] = useState<((dir: string | null) => void) | null>(null);
+  const browserPickFolder = useCallback(
+    () => new Promise<string | null>((resolve) => setPickDir(() => resolve)),
+    [],
+  );
   // 打开表格：{sheet, file, highlight} —— 表预览整屏覆盖（表数据要看全）
   const [opened, setOpened] = useState<{ sheet: string; file?: string; ref?: string } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -69,6 +77,72 @@ export default function Dashboard({ pickFolder, watchDrop }: {
   const [appliedNote, setAppliedNote] = useState("");
   const [partErr, setPartErr] = useState<Record<string, string>>({});
   const [lastSelfCheck, setLastSelfCheck] = useState<SelfCheckReport | null>(null);
+  // 复核反馈：待确认面板里指出哪里不对 → 写回原对话并重算清单。
+  // chatSync 递增时通知对话抽屉重载，让用户看见刚发进去的那句话。
+  const [chatSync, setChatSync] = useState(0);
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
+  const [feedbackErr, setFeedbackErr] = useState("");
+  // 写入进行中（应用 / 回滚）：与 planning 一样要锁住对话输入，避免边写边规划。
+  const [writeBusy, setWriteBusy] = useState(false);
+  // 从「自动化任务」面板运行的快捷任务：交给对话发送（走 /chat → /plan）。
+  const [quickRun, setQuickRun] = useState<{ text: string; token: number } | null>(null);
+  // 自检报告弹窗；以及给工作表详情卡的重取信号（改动后要刷新“上次改动”）。
+  const [selfCheckOpen, setSelfCheckOpen] = useState(false);
+  const [detailTick, setDetailTick] = useState(0);
+
+  // 复核反馈：把“哪里不对”接着说回产生这份清单的对话里，并据此重算清单。
+  //
+  // 上下文由后端 /plan 自己从这条对话读（见 planner.PlanOptions.History）：
+  // 先把反馈写进原对话，再让 /plan 带上 conversationId 重算即可，
+  // 前端不再手拼“原始任务 + 反馈”。清单不落盘，可以一轮轮改到用户满意才点“应用”。
+  const handleFeedback = async (text: string): Promise<boolean> => {
+    if (!proposal) return false;
+    setFeedbackBusy(true);
+    setFeedbackErr("");
+    try {
+      const convoId = proposal.conversation;
+      // 把反馈落进原对话（逐字留痕，界面能看到自己怎么说、它怎么答）
+      if (convoId) await agentApi.chat(text, convoId);
+      // /plan 会读这条对话当上下文；无会话时退回“只给这句反馈”
+      const r = await agentApi.plan(text, undefined, undefined, undefined, convoId || undefined);
+      if (!r?.proposal) throw new Error("没有拿到新的清单");
+      setProposal(r.proposal);
+      setPlanTrace(r.trace ?? null);
+      setProposalOpen(true);
+      if (convoId) setChatSync((n) => n + 1);
+      return true;
+    } catch (e) {
+      setFeedbackErr(e instanceof Error ? e.message : String(e));
+      return false;
+    } finally {
+      setFeedbackBusy(false);
+    }
+  };
+
+  // 应用之后把“这次做了什么”写回原对话——否则点完应用界面上没有任何交代。
+  // 用**确定性**文字（不花模型、离线可用）：改了哪些格 + 自检结论。
+  const appendApplySummary = async (p: Proposal | null, r: { applied: number; rejected: number; results: ApplyResult[]; selfCheck?: SelfCheckReport | null; summaries?: { sheet: string; text: string }[] }) => {
+    const convoId = p?.conversation;
+    if (!convoId) return;
+    const lines: string[] = [];
+    // 模型总结的一句话（≤20 字）放最前：先让人看懂“这次到底做了什么”。
+    const sum = (r.summaries ?? []).map((s) => s.text).filter(Boolean).join("；");
+    if (sum) lines.push(`这次改动：${sum}`);
+    lines.push(`已应用 ${r.applied} 处改动${r.rejected ? `，${r.rejected} 处被拒` : ""}（改动前已备份，每格旧值都记账，可回滚）。`);
+    for (const x of r.results.slice(0, 8)) {
+      const tail = x.status === "ok" ? "" : `（${x.status}${x.note ? "：" + x.note : ""}）`;
+      lines.push(`· ${x.sheet}!${x.ref} ${x.field}：${x.old ?? "（空）"} → ${x.new ?? "（空）"}${tail}`);
+    }
+    if (r.results.length > 8) lines.push(`…… 其余 ${r.results.length - 8} 处见账目`);
+    if (r.selfCheck) {
+      lines.push(`自检：${r.selfCheck.summary}`);
+      for (const f of r.selfCheck.findings.slice(0, 5)) lines.push(`· ${f.node.sheet}：${f.message}`);
+    }
+    try {
+      await agentApi.appendConversation(convoId, lines.join("\n"), "agent");
+      setChatSync((n) => n + 1);
+    } catch { /* 写回对话失败不该影响“已应用”这件事 */ }
+  };
 
   const refresh = useCallback(async () => {
     setLoad("loading");
@@ -250,9 +324,10 @@ export default function Dashboard({ pickFolder, watchDrop }: {
         <div className="dash-actions">
           {appliedNote && <span className="dash-applied"><IconCheck size={12} />{appliedNote}</span>}
           {lastSelfCheck && lastSelfCheck.level !== "ok" && (
-            <span className={`dash-self ${lastSelfCheck.level}`} title={lastSelfCheck.summary}>
+            <button type="button" className={`dash-self ${lastSelfCheck.level}`} title={lastSelfCheck.summary}
+              onClick={() => setSelfCheckOpen(true)}>
               自检 {lastSelfCheck.findings.length} 项待看
-            </span>
+            </button>
           )}
           {/* 也不放"联动图 / 体检"：联动图已收进下方折叠块，
               体检就在主角那一行（有事没事该在那儿说），放这里只会重复。 */}
@@ -321,7 +396,7 @@ export default function Dashboard({ pickFolder, watchDrop }: {
               <button className="cd-x" onClick={() => setChatOpen(false)} aria-label="关闭对话"><IconX size={14} /></button>
             </header>
             <div className="cd-body">
-              <ChatPane wsKey={wsPath} onPlanReady={(p, tr) => { setProposal(p); setPlanTrace(tr ?? null); setProposalOpen(true); }} />
+              <ChatPane wsKey={wsPath} syncToken={chatSync} syncConvoId={proposal?.conversation} externalRunning={feedbackBusy || writeBusy} externalLabel={feedbackBusy ? "待确认面板正在重新算，请稍候…" : writeBusy ? "正在写入表格（备份 → 写入 → 记账）…" : undefined} runText={quickRun ?? undefined} onRunConsumed={() => setQuickRun(null)} onPlanReady={(p, tr) => { setProposal(p); setPlanTrace(tr ?? null); setProposalOpen(true); }} />
             </div>
           </div>
         </>
@@ -344,14 +419,14 @@ export default function Dashboard({ pickFolder, watchDrop }: {
       {isFirstRun ? (
         <div className="dash-body dash-body-empty">
           <div className="dash-col">
-            <DropZone pickFolder={pickFolder} watchDrop={watchDrop} onDone={() => void refresh()} />
+            <DropZone pickFolder={pickFolder ?? browserPickFolder} watchDrop={watchDrop} onDone={() => void refresh()} />
           </div>
         </div>
       ) : isEmpty ? (
         <div className="dash-body dash-body-empty">
           <div className="dash-col">
             <EmptyHeader root={wsPath} />
-            <DropZone pickFolder={pickFolder} watchDrop={watchDrop} onDone={() => void refresh()} />
+            <DropZone pickFolder={pickFolder ?? browserPickFolder} watchDrop={watchDrop} onDone={() => void refresh()} />
           </div>
         </div>
       ) : (
@@ -417,6 +492,11 @@ export default function Dashboard({ pickFolder, watchDrop }: {
                   {tableCount} 个工作簿 · {graph.nodes.length} 张工作表
                   {lh && lh.isolated > 0 ? ` · ${lh.isolated} 张无引用` : ""}
                 </span>
+                {/* 联动图入口：LinkMap 只列前 10 条引用，余下的在这里看全。 */}
+                <button className="btn ghost sm" onClick={() => setZoomed(true)}
+                  title="打开联动图，看全部表间引用" aria-label="看联动图">
+                  <IconLink size={13} />看联动图
+                </button>
               </div>
               <LinkMap
                 graph={graph}
@@ -443,7 +523,7 @@ export default function Dashboard({ pickFolder, watchDrop }: {
               </div>
               <p className="nd-file"><IconXls size={12} />{active.file || "外部文件"}</p>
 
-              <SheetDetailBody file={active.file} sheet={active.sheet} />
+              <SheetDetailBody file={active.file} sheet={active.sheet} refreshTick={detailTick} />
             </section>
           )}
 
@@ -487,23 +567,33 @@ export default function Dashboard({ pickFolder, watchDrop }: {
               safety={safetyRep}
               impactNode={proposal?.items?.[0] ? `${proposal.items[0].file}!${proposal.items[0].sheet}` : undefined}
               onApplied={(r) => {
+                void appendApplySummary(proposal, r);
                 setProposal(null);
                 setPlanTrace(null);
                 setProposalOpen(false);
                 setAppliedNote(`${r.applied} 处已应用${r.rejected ? `，${r.rejected} 处被拒` : ""}`);
                 setLastSelfCheck(r.selfCheck ?? null);
+                setDetailTick((n) => n + 1);
                 void refresh();
               }}
               onDiscarded={() => { setProposal(null); setPlanTrace(null); setProposalOpen(false); }}
+              onFeedback={handleFeedback}
+              feedbackBusy={feedbackBusy}
+              feedbackErr={feedbackErr}
+              onOpenCell={(cell) => setOpened(cell)}
+              onBusyChange={setWriteBusy}
             />
           </div>
         </section>
       )}
 
       {ledgerOpen && (
-        <LedgerPanel onClose={() => setLedgerOpen(false)} onChanged={() => void refresh()} />
+        <LedgerPanel onClose={() => setLedgerOpen(false)} onChanged={() => void refresh()} onBusyChange={setWriteBusy} />
       )}
-      {tasksOpen && <TasksPanel onClose={() => setTasksOpen(false)} />}
+      {selfCheckOpen && lastSelfCheck && (
+        <SelfCheckModal report={lastSelfCheck} onClose={() => setSelfCheckOpen(false)} />
+      )}
+      {tasksOpen && <TasksPanel onClose={() => setTasksOpen(false)} onRunPrompt={(text) => { setQuickRun({ text, token: Date.now() }); setTasksOpen(false); setChatOpen(true); }} />}
       {rulesOpen && <RulesPanel onClose={() => setRulesOpen(false)} />}
       {generateOpen && <GeneratePanel onClose={() => setGenerateOpen(false)} />}
         </>
@@ -511,6 +601,14 @@ export default function Dashboard({ pickFolder, watchDrop }: {
 
       {zoomed && graph && (
         <GraphOverlay graph={graph} active={active} hot={hot} onPick={(n) => void pickNode(n)} onClose={() => setZoomed(false)} />
+      )}
+
+      {/* 浏览器里的"选择文件夹"：服务端列目录选完，把路径交回等待中的 DropZone。 */}
+      {pickDir && (
+        <FolderPicker
+          onPick={(d) => { const r = pickDir; setPickDir(null); r(d); }}
+          onCancel={() => { const r = pickDir; setPickDir(null); r(null); }}
+        />
       )}
     </div>
   );
@@ -532,7 +630,39 @@ export default function Dashboard({ pickFolder, watchDrop }: {
 
 /* ---------- 工作表详情：大概描述 / 上次改动 / 改动日期 ---------- */
 
-function SheetDetailBody({ file, sheet }: { file?: string; sheet: string }) {
+/* ---------- 改动后自检：弹窗看完整清单 ---------- */
+function SelfCheckModal({ report, onClose }: { report: SelfCheckReport; onClose: () => void }) {
+  return (
+    <div className="sc-overlay" onClick={onClose}>
+      <div className="sc-panel" onClick={(e) => e.stopPropagation()}>
+        <header className="sc-head">
+          <IconRefresh size={15} />
+          <b>改动后自检</b>
+          <span className={`sc-level ${report.level}`}>{report.summary}</span>
+          <span className="sc-time">{report.elapsed}</span>
+          <button className="sc-x" onClick={onClose} aria-label="关闭"><IconX size={14} /></button>
+        </header>
+        <div className="sc-body">
+          {report.findings.length === 0 ? (
+            <p className="dash-muted">没有需要你处理的发现。</p>
+          ) : (
+            <ul className="sc-list">
+              {report.findings.map((f, i) => (
+                <li key={i} className={f.level}>
+                  <span className="sc-sheet">{f.node.sheet}</span>
+                  <span className="sc-msg">{f.message}</span>
+                  {f.needClarify && <span className="sc-need">需确认</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SheetDetailBody({ file, sheet, refreshTick }: { file?: string; sheet: string; refreshTick?: number }) {
   const [d, setD] = useState<SheetDetail | null>(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
@@ -547,7 +677,7 @@ function SheetDetailBody({ file, sheet }: { file?: string; sheet: string }) {
       .catch((e: unknown) => { if (alive) setErr(e instanceof Error ? e.message : String(e)); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [file, sheet, tick]);
+  }, [file, sheet, tick, refreshTick]);
 
   // 读不到就明说，并给重试。失败与“没有”不能长得一样（产品铁律）。
   if (err) {

@@ -1,30 +1,45 @@
 import { useEffect, useState } from "react";
 import "./tasks.css";
 import { agentApi } from "../api-agent";
-import type { JobDto, JobRunDto } from "../api-agent";
+import type { JobDto, JobRunDto, PromptTemplate } from "../api-agent";
 import { IconRefresh, IconClock, IconCheck, IconX } from "../components/icons";
 
 /* 自动化任务（见 docs/agent-architecture/29-UI升级与剩余功能.md）
-   让"每天下班前体检一次"这句话真的能落地成一条会跑的定时任务。
+   两类东西放一个入口：
+     · 定时任务——到点自己跑（只读体检；定时改表要走确认）
+     · 快捷任务——一次成功的做法存成模板，一点即用（仍出清单等你确认）
+   这里只负责**选择与启动**；"把某段对话沉淀成模板"在对话面板里（上下文在那儿）。
    默认**暂停**：定时改你文件的开关必须由你亲自打开。 */
 
-export default function TasksPanel({ onClose }: { onClose: () => void }) {
+export default function TasksPanel({ onClose, onRunPrompt }: {
+  onClose: () => void;
+  /** 运行一个快捷任务：把渲染好的指令交回主界面，走对话 → 出清单的同一条路。 */
+  onRunPrompt?: (text: string) => void;
+}) {
   const [jobs, setJobs] = useState<JobDto[]>([]);
   const [runs, setRuns] = useState<JobRunDto[]>([]);
   const [name, setName] = useState("");
   const [when, setWhen] = useState("每天 17:30");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
-  const [tab, setTab] = useState<"jobs" | "runs">("jobs");
+  const [tab, setTab] = useState<"jobs" | "runs" | "quick">("jobs");
+
+  // ---------- 快捷任务：只列表 + 运行 ----------
+  const [prompts, setPrompts] = useState<PromptTemplate[]>([]);
+  const [quickTpl, setQuickTpl] = useState<PromptTemplate | null>(null);
+  const [quickVals, setQuickVals] = useState<Record<string, string>>({});
+  const [quickErr, setQuickErr] = useState("");
 
   const load = async () => {
     try {
-      const [j, r] = await Promise.all([
+      const [j, r, p] = await Promise.all([
         agentApi.jobs().catch(() => ({ jobs: [] })),
         agentApi.jobRuns().catch(() => ({ runs: [] })),
+        agentApi.prompts().catch(() => ({ prompts: [], path: "" })),
       ]);
       setJobs(j.jobs ?? []);
       setRuns(r.runs ?? []);
+      setPrompts(p.prompts ?? []);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e));
     }
@@ -76,19 +91,47 @@ export default function TasksPanel({ onClose }: { onClose: () => void }) {
     catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   };
 
+  // 点一个快捷任务：无槽位直接跑；有槽位先展开填写。
+  const pickQuick = (p: PromptTemplate) => {
+    setQuickErr("");
+    if ((p.slots?.length ?? 0) === 0) { runQuick(p); return; }
+    setQuickTpl(p);
+    setQuickVals({});
+  };
+
+  const runQuick = (p: PromptTemplate) => {
+    if ((p.slots?.length ?? 0) > 0) {
+      const missing = p.slots.filter((s) => !(quickVals[s] ?? "").trim());
+      if (missing.length) { setQuickErr("还差：" + missing.join("、")); return; }
+    }
+    let text = p.template;
+    for (const s of p.slots ?? []) text = text.split(`{${s}}`).join(quickVals[s].trim());
+    void agentApi.usePrompt(p.id).catch(() => {});
+    setQuickTpl(null);
+    onRunPrompt?.(text);
+  };
+
+  const delPrompt = async (id: string) => {
+    try { await agentApi.deletePrompt(id); await load(); }
+    catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
   return (
     <div className="tk-overlay" onClick={onClose}>
       <div className="tk-panel" onClick={(e) => e.stopPropagation()}>
         <header className="tk-head">
           <IconClock size={15} />
           <b>自动化任务</b>
-          <span className="tk-sub">到点自己跑；默认暂停，开关由你打开</span>
+          <span className="tk-sub">定时体检 · 快捷任务；都会先出清单等你确认</span>
           <button className="tk-x" onClick={onClose} aria-label="关闭"><IconX size={14} /></button>
         </header>
 
         <div className="tk-tabs">
           <button className={tab === "jobs" ? "on" : ""} onClick={() => setTab("jobs")}>
-            任务 <em>{jobs.length}</em>
+            定时任务 <em>{jobs.length}</em>
+          </button>
+          <button className={tab === "quick" ? "on" : ""} onClick={() => setTab("quick")}>
+            快捷任务 <em>{prompts.length}</em>
           </button>
           <button className={tab === "runs" ? "on" : ""} onClick={() => setTab("runs")}>
             运行记录 <em>{runs.length}</em>
@@ -98,7 +141,7 @@ export default function TasksPanel({ onClose }: { onClose: () => void }) {
 
         {msg && <p className="tk-msg">{msg}</p>}
 
-        {tab === "jobs" ? (
+        {tab === "jobs" && (
           <>
             <div className="tk-new">
               <input value={name} placeholder="任务名，如「下班前体检」"
@@ -144,7 +187,60 @@ export default function TasksPanel({ onClose }: { onClose: () => void }) {
               )}
             </ul>
           </>
-        ) : (
+        )}
+
+        {tab === "quick" && (
+          <>
+            <p className="tk-hint">
+              快捷任务把一次成功的做法存成模板，下次一点即用；触发后仍会<b>出改动清单等你确认</b>。
+              要新建：在<b>对话</b>里点「沉淀为快捷」——勾选对话消息总结，或选内置模板。
+            </p>
+            <ul className="tk-list">
+              {prompts.map((p) => (
+                <li key={p.id} className="tk-job">
+                  <div className="tk-job-main">
+                    <b>{p.name}</b>
+                    {p.when && <span className="tk-sched">{p.when}</span>}
+                  </div>
+                  <div className="tk-job-meta">
+                    {(p.slots?.length ?? 0) > 0
+                      ? <span className="tk-next">需填 {p.slots.length} 项</span>
+                      : <span className="tk-ok">直接可跑</span>}
+                    {!!p.hits && <span>用过 {p.hits} 次</span>}
+                  </div>
+                  {quickTpl?.id === p.id && (p.slots?.length ?? 0) > 0 && (
+                    <div className="tk-slots">
+                      {p.slots.map((s) => (
+                        <label key={s}><span>{s}</span>
+                          <input value={quickVals[s] ?? ""} placeholder={`填「${s}」`}
+                            onChange={(e) => setQuickVals((v) => ({ ...v, [s]: e.target.value }))} /></label>
+                      ))}
+                      {quickErr && <p className="tk-msg">{quickErr}</p>}
+                    </div>
+                  )}
+                  <div className="tk-job-ops">
+                    {quickTpl?.id === p.id ? (
+                      <>
+                        <button className="btn ghost sm" onClick={() => { setQuickTpl(null); setQuickErr(""); }}>取消</button>
+                        <button className="btn primary sm" onClick={() => runQuick(p)}>执行</button>
+                      </>
+                    ) : (
+                      <button className="btn primary sm" onClick={() => pickQuick(p)}>
+                        {(p.slots?.length ?? 0) > 0 ? "填写并执行" : "运行"}
+                      </button>
+                    )}
+                    <button className="tk-del" onClick={() => void delPrompt(p.id)} aria-label="删除快捷任务"><IconX size={12} /></button>
+                  </div>
+                </li>
+              ))}
+              {prompts.length === 0 && (
+                <li className="tk-empty">还没有快捷任务。在「对话」里点「沉淀为快捷」新建一个。</li>
+              )}
+            </ul>
+          </>
+        )}
+
+        {tab === "runs" && (
           <ul className="tk-runs">
             {runs.map((r, i) => (
               <li key={i} className={r.ok ? "ok" : "bad"}>

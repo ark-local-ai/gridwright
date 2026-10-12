@@ -9,9 +9,11 @@ import { IconRefresh, IconCheck, IconNote, IconX } from "../components/icons";
    为什么要有这一页：官网写着"能回滚"，就得真能在这里点。
    回滚本身也记账，所以可以再倒回去（=重做），历史永不丢。 */
 
-export default function LedgerPanel({ onClose, onChanged }: {
+export default function LedgerPanel({ onClose, onChanged, onBusyChange }: {
   onClose: () => void;
   onChanged?: () => void;
+  /** 回滚进行中回调：上层据此在对话里显示“正在执行”并锁住输入。 */
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [items, setItems] = useState<RollbackItem[]>([]);
   const [sel, setSel] = useState<Set<number>>(new Set());
@@ -57,6 +59,7 @@ export default function LedgerPanel({ onClose, onChanged }: {
     const ids = [...sel];
     if (ids.length === 0) return;
     setBusy(true);
+    onBusyChange?.(true);
     setMsg("");
     try {
       const r = await agentApi.rollback(ids);
@@ -67,6 +70,7 @@ export default function LedgerPanel({ onClose, onChanged }: {
       setMsg(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
+      onBusyChange?.(false);
     }
   };
 

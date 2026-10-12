@@ -109,19 +109,21 @@ export default function DropZone({ onDone, pickFolder, watchDrop }: {
 
   const pick = async () => {
     if (pickFolder) {
+      // 桌面壳弹系统框；浏览器里由 Dashboard 注入一个基于 FolderPicker 的实现。
+      // 两条路都返回目录；取消（null）就到此为止——浏览器读不到文件路径，
+      // 再弹 <input type=file> 只会又落到“读不到完整路径”的死路上。
       const dir = await pickFolder();
-      if (dir) {
-        setBusy(true);
-        try {
-          await agentApi.openWorkspace(dir);
-          onDone();
-        } catch (e) {
-          setErr(e instanceof Error ? e.message : String(e));
-        } finally {
-          setBusy(false);
-        }
-        return;
+      if (!dir) return;
+      setBusy(true);
+      try {
+        await agentApi.openWorkspace(dir);
+        onDone();
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e));
+      } finally {
+        setBusy(false);
       }
+      return;
     }
     fileRef.current?.click();
   };

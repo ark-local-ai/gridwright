@@ -55,6 +55,31 @@
 .pend-actions .btn.primary { height: var(--h-lg); padding: 0 var(--sp-5); }
 .pend-hint { font-size: 11.5px; color: var(--text-3); }
 
+/* 复核反馈：用户检查清单后指出哪里不对 → 回到原对话继续矫正并重算。
+   与 .pend-impact（只记关系记忆）区分：这个会真的重出清单。
+   沿用提案卡的浅钢蓝，与对话里那张提案卡同一族。 */
+.pend-feedback {
+  border-radius: var(--r-panel); padding: 13px 15px;
+  background: var(--prop-bg); border: 1px solid var(--prop-line);
+  border-left: 3px solid var(--prop-accent);
+  display: flex; flex-direction: column; gap: 9px;
+}
+.pf-h { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; flex-wrap: wrap; }
+.pf-h b { font-weight: var(--fw-h); color: var(--text-1); }
+.pf-h svg { color: var(--prop-accent); flex: none; align-self: center; }
+.pf-sub { font-size: 11.5px; color: var(--text-3); }
+.pend-feedback textarea {
+  width: 100%; min-height: 56px; resize: vertical;
+  padding: 9px 11px; font-size: 12.5px; line-height: 1.6;
+  border: 1px solid var(--line-strong); border-radius: var(--r-ctl);
+  background: var(--surface); color: var(--text-1); font-family: var(--font);
+}
+.pend-feedback textarea:focus { outline: none; border-color: var(--prop-accent); box-shadow: var(--focus-ring); }
+.pend-feedback textarea:disabled { opacity: .6; }
+.pf-err { font-size: 12px; color: var(--danger); margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pf-foot { display: flex; align-items: center; gap: 10px; }
+.pf-hint { margin-right: auto; font-size: 11px; color: var(--text-3); }
+
 /* ---------- 会话 ---------- */
 .chat { display: flex; flex-direction: column; height: 100%; min-height: 0; position: relative; }
 .chat-scroll {
@@ -274,16 +299,21 @@
 .cz-x:hover { background: rgba(0,0,0,.6); }
 @keyframes cz-in { from { opacity: 0 } to { opacity: 1 } }
 
-/* 结构化建议卡 */
+/* 结构化建议卡。
+   原来铺的是 --brand-soft（#eef1f5）——一整块平灰，夹在白色气泡里显脏、显土。
+   现在改成「浅钢蓝渐变 + 左侧强调条」：与用户气泡的 #3f6f9e 同一族，
+   既和 agent 白气泡分得开，又不是一块死灰。要再调只动这三个值即可。 */
 .msg-prop {
-  margin-top: 7px; border: 1px solid var(--brand-line); border-radius: var(--r-panel);
-  background: var(--brand-soft); padding: 10px 12px;
+  margin-top: 7px; border: 1px solid var(--prop-line); border-left: 3px solid var(--prop-accent);
+  border-radius: var(--r-panel);
+  background: var(--prop-bg); padding: 10px 12px;
+  box-shadow: 0 1px 2px rgba(20, 30, 45, .03);
   /* 提案块必须能被压窄：它是气泡里的内容，不能反过来把气泡撑破。
      缺了 min-width:0，flex/grid 子项的最小内容宽度会顶开容器——
      实测一个长选项 pill 把它顶到 443px（容器 417px），整条会话出现横向滚动条。 */
   min-width: 0; max-width: 100%; overflow-wrap: anywhere;
 }
-.mp-kind { font-size: 10.5px; color: var(--brand); font-weight: var(--fw-h); margin-bottom: 3px; }
+.mp-kind { font-size: 10.5px; color: var(--prop-accent); font-weight: var(--fw-h); margin-bottom: 3px; }
 .mp-title { font-size: 13px; font-weight: var(--fw-h); color: var(--text-1); overflow-wrap: anywhere; }
 .mp-detail { font-size: 12px; color: var(--text-2); margin-top: 3px; line-height: 1.6; overflow-wrap: anywhere; }
 .mp-meta { font-size: 11.5px; color: var(--text-3); margin-top: 5px; font-family: var(--mono); overflow-wrap: anywhere; }
@@ -460,3 +490,140 @@
   transition: transform var(--d-fast) var(--ease-out);
 }
 .msg-pic:hover img { transform: scale(1.03); }
+
+/* ---------- 待确认：整行预览表 ----------
+   不再只给一排坐标，而是把改动所在的那一行整行摆出来：
+   · 左边距颜色区分「改动行」（钢蓝）与「新增行」（玉绿）
+   · 改动的格子标色，改动格显示旧值 → 新值
+   横向可滚（台账列多），行号列粘在左侧。 */
+.ppv { display: flex; flex-direction: column; gap: 14px; }
+.ppv-sheet { display: flex; flex-direction: column; gap: 6px; }
+.ppv-sheet-h { display: flex; align-items: baseline; gap: 10px; }
+.ppv-name { font-size: 13px; font-weight: var(--fw-h); color: var(--text-1); }
+.ppv-meta { font-size: 11px; color: var(--text-3); }
+.ppv-scroll {
+  overflow-x: auto; border: 1px solid var(--line);
+  border-radius: var(--r-panel); background: var(--surface);
+}
+.ppv-table { border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+.ppv-table th, .ppv-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--line); }
+.ppv-table thead th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--surface-2); color: var(--text-2);
+  font-weight: var(--fw-h); font-size: 11px;
+}
+.ppv-table tbody tr:last-child td { border-bottom: none; }
+.ppv-rownum {
+  position: sticky; left: 0; z-index: 1;
+  background: var(--surface); color: var(--text-3);
+  font-variant-numeric: tabular-nums; text-align: right;
+  font-family: var(--mono); border-right: 3px solid transparent;
+}
+.ppv-table thead .ppv-rownum { background: var(--surface-2); z-index: 2; }
+.ppv-row.edit .ppv-rownum { border-right-color: var(--prop-accent); color: var(--prop-accent); font-weight: var(--fw-h); }
+.ppv-row.new .ppv-rownum { border-right-color: var(--ok); color: var(--ok); font-weight: var(--fw-h); }
+.ppv-cell { color: var(--text-2); }
+.ppv-cell.edit { background: #eef4fc; color: var(--prop-accent); }
+.ppv-cell.new { background: var(--ok-bg); color: var(--ok); }
+.ppv-new { font-weight: var(--fw-h); }
+.ppv-old { color: var(--text-3); text-decoration: line-through; }
+.ppv-arrow { color: var(--prop-accent); margin: 0 4px; }
+.ppv-op {
+  margin-left: 6px; font-size: 10px; padding: 0 5px;
+  border-radius: var(--r-full); background: var(--prop-accent); color: #fff;
+}
+.ppv-reasons { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.ppv-reasons li { font-size: 11px; color: var(--text-2); }
+.ppv-reasons em { font-style: normal; font-family: var(--mono); color: var(--text-3); margin-right: 6px; }
+.ppv-legend { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-3); }
+.ppv-lg { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.ppv-lg.edit { background: #eef4fc; border: 1px solid var(--prop-line); margin-left: 8px; }
+.ppv-lg.new { background: var(--ok-bg); border: 1px solid var(--ok-line); margin-left: 8px; }
+
+/* agent 运行中：对话里的一条进度 + 输入框锁定提示。
+   放在输入区上方——用户眼睛在输入框附近，运行状态要在那里说。 */
+.chat-run {
+  flex: none; display: flex; align-items: center; gap: 8px;
+  margin-top: 8px; padding: 8px 12px;
+  border: 1px solid var(--prop-line); border-radius: var(--r-panel);
+  background: var(--prop-bg); font-size: 12px; color: var(--text-2);
+}
+.cr-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex: none;
+  background: var(--prop-accent);
+  animation: cr-pulse 1s ease-in-out infinite;
+}
+.cr-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+@keyframes cr-pulse {
+  0%, 100% { opacity: .35; transform: scale(.85); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+/* 预览表里可跳转的改动格：整格做成按钮，点了打开原表定位 */
+.ppv-cell.jump { padding: 0; }
+.ppv-jump {
+  width: 100%; padding: 6px 10px; border: none; background: none;
+  cursor: pointer; font: inherit; color: inherit; text-align: left;
+}
+.ppv-jump:hover { text-decoration: underline; }
+
+/* ---------- 沉淀为快捷任务面板（对话里打开） ---------- */
+.pd-overlay {
+  position: fixed; inset: 0; z-index: 150; background: var(--scrim); backdrop-filter: var(--scrim-blur);
+  display: grid; place-items: center; padding: var(--sp-6);
+}
+.pd-panel {
+  background: var(--surface); border-radius: var(--r-overlay); box-shadow: var(--el-3);
+  width: min(900px, 100%); max-height: 86vh; display: flex; flex-direction: column; overflow: hidden;
+}
+.pd-head {
+  display: flex; align-items: baseline; gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--line); flex: none;
+}
+.pd-head > svg { color: var(--prop-accent); align-self: center; }
+.pd-head b { font-size: var(--fs-h); font-weight: var(--fw-h); color: var(--ink); }
+.pd-sub { font-size: var(--fs-2xs); color: var(--text-3); }
+.pd-x { margin-left: auto; border: none; background: none; cursor: pointer; padding: var(--sp-1); border-radius: var(--r-ctl); color: var(--text-3); }
+.pd-x:hover { background: var(--surface-2); color: var(--text-1); }
+.pd-body { display: grid; grid-template-columns: 1fr 1fr; flex: 1; min-height: 0; }
+.pd-msgs { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.pd-col-h { padding: var(--sp-3) var(--sp-4); font-size: var(--fs-2xs); color: var(--text-2); border-bottom: 1px solid var(--line); flex: none; }
+.pd-col-h em { font-style: normal; color: var(--text-3); }
+.pd-msgs ul { list-style: none; margin: 0; padding: var(--sp-2); overflow: auto; display: flex; flex-direction: column; gap: var(--sp-1); }
+.pd-msg { display: flex; align-items: flex-start; gap: var(--sp-2); padding: var(--sp-2); border-radius: var(--r-ctl); cursor: pointer; font-size: var(--fs-2xs); }
+.pd-msg:hover { background: var(--surface-2); }
+.pd-msg input { margin-top: 2px; flex: none; }
+.pd-who { flex: none; color: var(--text-3); min-width: 34px; }
+.pd-msg.user .pd-who { color: var(--prop-accent); }
+.pd-text { color: var(--text-1); overflow-wrap: anywhere; line-height: 1.5; }
+.pd-empty { padding: var(--sp-4); color: var(--text-3); font-size: var(--fs-2xs); text-align: center; }
+.pd-build { padding: var(--sp-3) var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-2); overflow: auto; }
+.pd-tabs { display: flex; gap: var(--sp-1); }
+.pd-tabs button { border: none; background: none; cursor: pointer; font-family: var(--font); font-size: var(--fs-2xs); color: var(--text-2); padding: var(--sp-1) var(--sp-2); border-radius: var(--r-ctl); }
+.pd-tabs button.on { background: var(--prop-bg); color: var(--prop-accent); font-weight: var(--fw-h); border: 1px solid var(--prop-line); }
+.pd-builtins { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
+.pd-builtins button {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; cursor: pointer;
+  padding: var(--sp-2) var(--sp-3); border: 1px solid var(--line); border-radius: var(--r-ctl);
+  background: var(--surface); font-family: var(--font);
+}
+.pd-builtins button.on { border-color: var(--prop-accent); background: var(--prop-bg); }
+.pd-builtins b { font-size: var(--fs-xs); color: var(--text-1); font-weight: var(--fw-h); }
+.pd-builtins span { font-size: var(--fs-2xs); color: var(--text-3); }
+.pd-builtins em { font-style: normal; font-size: var(--fs-2xs); color: var(--text-2); }
+.pd-paste { width: 100%; padding: 6px 9px; border: 1px solid var(--line-strong); border-radius: var(--r-ctl); font-family: var(--font); font-size: var(--fs-2xs); line-height: 1.5; resize: vertical; }
+.pd-edit { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-2); border-top: 1px dashed var(--line); padding-top: var(--sp-3); }
+.pd-choose { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.pd-choose button { padding: 3px 9px; border-radius: var(--r-full); border: 1px solid var(--line); background: var(--surface); color: var(--text-2); font-size: var(--fs-2xs); font-family: var(--font); cursor: pointer; }
+.pd-choose button.on { color: var(--prop-accent); background: var(--prop-bg); border-color: var(--prop-line); }
+.pd-field { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-2xs); color: var(--text-2); }
+.pd-field.col { flex-direction: column; align-items: stretch; gap: 4px; }
+.pd-field input, .pd-field textarea {
+  width: 100%; min-width: 0; padding: 5px 9px; line-height: 1.5;
+  border: 1px solid var(--line-strong); border-radius: var(--r-ctl);
+  background: var(--surface); color: var(--text-1); font-family: var(--font); font-size: var(--fs-2xs);
+}
+.pd-field textarea { resize: vertical; }
+.pd-field input:focus, .pd-field textarea:focus, .pd-paste:focus { outline: none; border-color: var(--brand); box-shadow: var(--focus-ring); }
+.pd-foot { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-3) var(--sp-5); border-top: 1px solid var(--line); flex: none; }
+.pd-err { margin-right: auto; font-size: var(--fs-2xs); color: var(--danger); overflow-wrap: anywhere; }

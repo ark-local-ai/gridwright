@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import "./confirm.css";
 import { agentApi } from "../api-agent";
-import type { Proposal, ApplyResult, ImpactResult, SafetyReport, SelfCheckReport, ConvoSummary, DistillCandidate, TraceData } from "../api-agent";
+import type { Proposal, ApplyResult, ImpactResult, SafetyReport, SelfCheckReport, ConvoSummary, DistillCandidate, TraceData, ProposalRows } from "../api-agent";
 import RunTrace from "../components/RunTrace";
+import PromptDistillPanel from "./PromptDistillPanel";
 import { IconCheck, IconSpark, IconSend, IconNote, IconLink, IconShield, IconRefresh, IconX, IconClock, IconPlus, IconTrash, IconRename, IconAssistant } from "../components/icons";
 
 /* 待确认（A）+ 会话（B）（见 docs/agent-architecture/19-界面设计.md 阶段 3-4）
@@ -10,9 +11,9 @@ import { IconCheck, IconSpark, IconSend, IconNote, IconLink, IconShield, IconRef
 
 /* ---------- 待确认卡片 ---------- */
 
-export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safety, trace }: {
+export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safety, trace, onFeedback, feedbackBusy, feedbackErr, onOpenCell, onBusyChange }: {
   proposal: Proposal | null;
-  onApplied: (r: { applied: number; rejected: number; results: ApplyResult[]; selfCheck?: SelfCheckReport | null }) => void;
+  onApplied: (r: { applied: number; rejected: number; results: ApplyResult[]; selfCheck?: SelfCheckReport | null; summaries?: { sheet: string; text: string }[] }) => void;
   onDiscarded: () => void;
   /** 改动点（用于推断"这笔还牵连谁"） */
   impactNode?: string;
@@ -20,8 +21,20 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
   safety?: SafetyReport | null;
   /** 这份清单是怎么算出来的（后端 trace），展开可看每步与模型收发 */
   trace?: TraceData | null;
+  /** 复核反馈：用户指出哪里不对 → 回到产生这份清单的对话里继续矫正并重算。
+      返回 true=已重新出清单；false=失败（输入不自动清空，便于改后重试）。 */
+  onFeedback?: (text: string) => Promise<boolean> | boolean;
+  /** 反馈重算进行中 */
+  feedbackBusy?: boolean;
+  /** 反馈重算的错误 */
+  feedbackErr?: string;
+  /** 点击预览表里的改动格 → 打开那张表并定位（可选）。 */
+  onOpenCell?: (cell: { sheet: string; file?: string; ref?: string }) => void;
+  /** 写入进行中（应用）回调：上层据此在对话里显示"正在执行"并锁住输入。 */
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState("");
   const [err, setErr] = useState("");
   const [impact, setImpact] = useState<ImpactResult | null>(null);
   const [kind, setKind] = useState("");
@@ -29,6 +42,8 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
   const [extra, setExtra] = useState("");
   const [learned, setLearned] = useState("");
   const [selfCheck, setSelfCheck] = useState<SelfCheckReport | null>(null);
+  // 整行预览（只读拉取）：把清单里的改动摆回原表的行与表头里
+  const [rows, setRows] = useState<ProposalRows | null>(null);
 
   // 推断"这一笔还牵连谁"（见 23-影响面推断）
   useEffect(() => {
@@ -39,6 +54,17 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
       .catch(() => { if (alive) setImpact(null); });
     return () => { alive = false; };
   }, [impactNode, kind]);
+
+  // 整行预览：清单变了就重拉一次，把改动还原成原表的行。
+  // 拉不到就退回下面的文字清单（预览是增强，不是唯一路径）。
+  useEffect(() => {
+    if (!proposal?.id) { setRows(null); return; }
+    let alive = true;
+    agentApi.proposalRows(proposal.id)
+      .then((r) => { if (alive) setRows(r); })
+      .catch(() => { if (alive) setRows(null); });
+    return () => { alive = false; };
+  }, [proposal?.id]);
 
   // 用户纠正："还要看 X 表" → 存成关系记忆，下次自动带上
   const learn = async () => {
@@ -56,6 +82,15 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
     }
   };
 
+  // 复核反馈：把用户这句话交回上游（Dashboard）→ 写进原对话 + 重新出清单。
+  // 只有成功才清空，失败保留原文供改后重试。
+  const submitFeedback = async () => {
+    const t = feedback.trim();
+    if (!t || feedbackBusy || !onFeedback) return;
+    const ok = await onFeedback(t);
+    if (ok !== false) setFeedback("");
+  };
+
   if (!proposal) {
     return (
       <div className="act-empty">
@@ -68,6 +103,7 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
 
   const apply = async () => {
     setBusy(true);
+    onBusyChange?.(true);
     setErr("");
     try {
       const r = await agentApi.apply(proposal.id);
@@ -77,6 +113,7 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
+      onBusyChange?.(false);
     }
   };
 
@@ -88,6 +125,9 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
       </div>
       <RunTrace trace={trace} label="清单是怎么算出来的" />
 
+      {rows && rows.sheets.length > 0 ? (
+        <ProposalPreview data={rows} onOpenCell={onOpenCell} />
+      ) : (
       <ul className="pend-items">
         {(proposal.items ?? []).map((it, i) => (
           <li key={i} className="pend-item">
@@ -124,6 +164,7 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
           </li>
         ))}
       </ul>
+      )}
 
       {(proposal.blocked?.length ?? 0) > 0 && (
         <div className="pend-blocked">
@@ -215,12 +256,137 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
         </div>
       )}
 
+      {/* 复核反馈：用户检查一遍，哪里不对就在这里说一句——
+          会回到产生这份清单的对话里继续矫正，并重新出清单。
+          与上面「漏了？」不同：那个只记关系记忆，这个真的重算。 */}
+      {onFeedback && (
+        <div className="pend-feedback">
+          <div className="pf-h">
+            <IconAssistant size={13} />
+            <b>检查下来哪里不对？</b>
+            <span className="pf-sub">说一句，回到这次对话里改，重新出清单再给你看</span>
+          </div>
+          <textarea
+            value={feedback}
+            rows={2}
+            placeholder="例如：b30 那行不该累加；漏了 2025年12月那张表；金额应该减掉已收部分…"
+            onChange={(e) => setFeedback(e.target.value)}
+            onKeyDown={(e) => {
+              // Ctrl/⌘+Enter 发送，Enter 留给换行——反馈常常不止一句
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void submitFeedback(); }
+            }}
+            disabled={feedbackBusy}
+          />
+          {feedbackErr && <p className="pf-err">{feedbackErr}</p>}
+          <div className="pf-foot">
+            <span className="pf-hint">Ctrl/⌘ + Enter 发送</span>
+            <button className="btn sm" onClick={() => void submitFeedback()}
+              disabled={feedbackBusy || !feedback.trim()}>
+              {feedbackBusy ? "正在重新算…" : "反馈并重新算"}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="pend-actions">
         <button className="btn primary" onClick={() => void apply()} disabled={busy || proposal.items.length === 0}>
           {busy ? "应用中…" : `应用这 ${proposal.items.length} 处`}
         </button>
         <button className="btn ghost" onClick={onDiscarded} disabled={busy}>忽略</button>
         <span className="pend-hint">改动前会自动备份，每格旧值都记账</span>
+      </div>
+    </div>
+  );
+}
+
+/** 清单的整行预览：把改动还原到原表的行与表头里，改动的格子标色。
+ *  改动行与新增行用不同颜色的左边距区分；改动格显示旧值→新值。 */
+function ProposalPreview({ data, onOpenCell }: { data: ProposalRows; onOpenCell?: (cell: { sheet: string; file?: string; ref?: string }) => void }) {
+  return (
+    <div className="ppv">
+      {data.sheets.map((sh, si) => {
+        // 列数取表头与各行内容的较大者，避免行宽于表头时丢列
+        const cols = Math.max(sh.header.length, ...sh.rows.map((r) => r.cells.length), 0);
+        return (
+          <div key={si} className="ppv-sheet">
+            <div className="ppv-sheet-h">
+              <span className="ppv-name">{sh.sheet}</span>
+              <span className="ppv-meta">表头第 {sh.headerRow} 行 · {sh.rows.length} 处</span>
+            </div>
+            <div className="ppv-scroll">
+              <table className="ppv-table">
+                <thead>
+                  <tr>
+                    <th className="ppv-rownum">行</th>
+                    {Array.from({ length: cols }).map((_, ci) => (
+                      <th key={ci}>{sh.header[ci] ?? `第${ci + 1}列`}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sh.rows.map((r, ri) => {
+                    const byCol = new Map(r.changes.map((c) => [c.col, c]));
+                    return (
+                      <tr key={ri} className={`ppv-row ${r.kind}`}>
+                        <td className="ppv-rownum">{r.kind === "new" ? "新增" : r.row}</td>
+                        {Array.from({ length: cols }).map((_, ci) => {
+                          const ch = byCol.get(ci + 1);
+                          if (!ch) return <td key={ci} className="ppv-cell">{r.cells[ci] ?? ""}</td>;
+                          const isNew = r.kind === "new" || ch.op === "append";
+                          const tip = [
+                            ch.old !== undefined && ch.old !== "" ? `旧值：${fmt(ch.old)}` : "",
+                            ch.reason ?? "",
+                            (ch.affects?.length ?? 0) > 0 ? `牵动 ${ch.affects!.length} 张表` : "",
+                          ].filter(Boolean).join(" · ");
+                          const body = isNew ? (
+                            <span className="ppv-new">{fmt(ch.new)}</span>
+                          ) : (
+                            <>
+                              <span className="ppv-old">{fmt(ch.old)}</span>
+                              <span className="ppv-arrow">→</span>
+                              <span className="ppv-new">{fmt(ch.new)}</span>
+                              {ch.op === "add" && <span className="ppv-op">累加</span>}
+                            </>
+                          );
+                          // 有 ref 且给了跳转回调：这一格可点，直接打开原表定位
+                          const jump = onOpenCell && ch.ref;
+                          return (
+                            <td key={ci} className={`ppv-cell ${isNew ? "new" : "edit"}${jump ? " jump" : ""}`}
+                              title={[tip, jump ? "点击跳到这一格" : ""].filter(Boolean).join(" · ") || undefined}>
+                              {jump ? (
+                                <button className="ppv-jump"
+                                  onClick={() => onOpenCell!({ sheet: sh.sheet, file: data.target, ref: ch.ref })}>
+                                  {body}
+                                </button>
+                              ) : body}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {sh.rows.some((r) => r.changes.some((c) => c.reason)) && (
+              <ul className="ppv-reasons">
+                {sh.rows.flatMap((r) =>
+                  Array.from(new Map(r.changes.filter((c) => c.reason).map((c) => [c.field + c.reason, c])).values())
+                    .map((c, ci) => (
+                      <li key={`${r.row}-${ci}`}>
+                        <em>{r.kind === "new" ? "新增" : `第 ${r.row} 行`}</em>
+                        {c.field}：{c.reason}
+                      </li>
+                    ))
+                )}
+              </ul>
+            )}
+          </div>
+        );
+      })}
+      <div className="ppv-legend">
+        <span className="ppv-lg edit" />改动
+        <span className="ppv-lg new" />新增行
       </div>
     </div>
   );
@@ -274,10 +440,22 @@ type ConvoMsg = {
   };
 };
 
-export function ChatPane({ onPlanReady, wsKey }: {
+export function ChatPane({ onPlanReady, wsKey, syncToken, syncConvoId, externalRunning, externalLabel, runText, onRunConsumed }: {
   onPlanReady: (p: Proposal, trace?: TraceData) => void;
   /** 当前工作区标识（用于把没发出去的草稿按工作区隔离存下来） */
   wsKey?: string;
+  /** 外部（待确认面板的复核反馈）把一句话写进原对话后，递增值让这里重载。 */
+  syncToken?: number;
+  /** 要重载的会话 id；空则重载当前会话。 */
+  syncConvoId?: string;
+  /** 外部正在跑（面板重算 / 写入）——对话也要锁住输入并显示运行中。 */
+  externalRunning?: boolean;
+  /** 外部运行时的说明文字（如“正在写入表格…”）。 */
+  externalLabel?: string;
+  /** 从「自动化任务」面板点运行的快捷任务：渲染好的指令在这里发出去。 */
+  runText?: { text: string; token: number };
+  /** 这条快捷任务已被消费（上层清掉，避免重开抽屉时又跑一遍）。 */
+  onRunConsumed?: () => void;
 }) {
   const [convoId, setConvoId] = useState<string>("");
   const [msgs, setMsgs] = useState<ConvoMsg[]>([]);
@@ -309,6 +487,7 @@ export function ChatPane({ onPlanReady, wsKey }: {
   const [distilling, setDistilling] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedNote, setSavedNote] = useState("");
+  const [distillOpen, setDistillOpen] = useState(false);
   const convoTitle = history.find((h) => h.id === convoId)?.title ?? "当前对话";
   // 「停在上次那条」：打开对话时不再总是新开，而是回到上次用的那条。
   // 会话多数是"接着上次说"，每次从零开始等于每次把上下文丢掉。
@@ -487,6 +666,26 @@ export function ChatPane({ onPlanReady, wsKey }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastConvoKey]);
 
+  // 外部反馈回来时刷新对话：待确认面板里说了句反馈 → 后端已把这句写进原对话，
+  // 这里从服务端重载一次，用户就能在对话里看见自己刚说的话与它的回应。
+  // 只在 token 真的变化时重载（用 ref 跳过挂载时的首次）。
+  const lastSyncRef = useRef(syncToken);
+  useEffect(() => {
+    if (syncToken === undefined || syncToken === lastSyncRef.current) return;
+    lastSyncRef.current = syncToken;
+    void (async () => {
+      const id = syncConvoId || convoId;
+      if (!id) return;
+      try {
+        const c = await agentApi.conversation(id);
+        setConvoId(c.id);
+        setMsgs(c.messages as ConvoMsg[]);
+        setErr("");
+      } catch { /* 刷新失败不该打断反馈主流程 */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncToken]);
+
   // 记住"当前在跟哪条记录说话"，供下次打开恢复，也用于列表里的标识。
   useEffect(() => {
     try {
@@ -558,7 +757,7 @@ export function ChatPane({ onPlanReady, wsKey }: {
     // 发出去的会是上一句（或空）。这是个真踩过的陈旧状态 bug。
     const text = (textArg ?? input).trim();
     // 只有图片、没文字也算一条消息（"帮我看看这张图"常常就是拍张照）
-    if ((!text && images.length === 0) || busy) return;
+    if ((!text && images.length === 0) || busy || planning || externalRunning) return;
     setBusy(true);
     setErr("");
     setInput("");
@@ -577,7 +776,7 @@ export function ChatPane({ onPlanReady, wsKey }: {
       // 不再让用户多点一次「算出要改哪些格」：算清单本来就是 agent 该干的活，
       // 它把结果摆出来、用户确认即可。需要澄清（kind=clarify）时不自动算。
       if (next[at]?.role === "agent" && next[at]?.proposal?.kind === "plan") {
-        void makePlan(text, pics.length ? pics : undefined, at);
+        void makePlan(text, pics.length ? pics : undefined, at, r.conversationId);
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -606,14 +805,14 @@ export function ChatPane({ onPlanReady, wsKey }: {
 
   const cancelPlan = () => { planAbort.current?.abort(); };
 
-  const makePlan = async (instruction: string, images: string[] | undefined, at: number) => {
+  const makePlan = async (instruction: string, images: string[] | undefined, at: number, convoIdArg?: string) => {
     setPlanning(true);
     setErr("");
     setPlanFailed((p) => ({ ...p, [at]: false }));
     const ac = new AbortController();
     planAbort.current = ac;
     try {
-      const r = await agentApi.plan(instruction, undefined, images, ac.signal, convoId || undefined);
+      const r = await agentApi.plan(instruction, undefined, images, ac.signal, convoIdArg || convoId || undefined);
       onPlanReady(r.proposal, r.trace);
     } catch (e) {
       setPlanFailed((p) => ({ ...p, [at]: true }));
@@ -656,15 +855,35 @@ export function ChatPane({ onPlanReady, wsKey }: {
     }
   };
 
-  // 动作按钮只挂在**最后一条** plan 提议上：历史消息再挂按钮既是噪音，
-  // 也已经过期（待确认清单一次只可能有一份）。生成类入口已移出对话，
-  // 见看板顶栏的「生成」面板。
-  const lastPlanIdx = (() => {
+  // 快捷任务（从「自动化任务」面板点运行）→ 在这里发出去，走 send 的同一条路
+  // （/chat → /plan → 出清单）。用 token 去重；消费后由上层清掉。
+  const lastRunToken = useRef(0);
+  useEffect(() => {
+    if (!runText || runText.token === lastRunToken.current) return;
+    lastRunToken.current = runText.token;
+    void send(runText.text);
+    onRunConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runText?.token]);
+
+  // agent 是否在跑：本面板在发/在算，或外部（待确认面板）在重算。
+  // 跑的时候**必须锁住输入框**——否则用户在半途又发一句，两轮规划会互相覆盖。
+  const agentRunning = busy || planning || !!externalRunning;
+
+  // 最近一次“算清单失败”的 agent 消息下标（用于重试）；-1 = 没有。
+  const planFailIdx = (() => {
     for (let k = msgs.length - 1; k >= 0; k--) {
-      if (msgs[k].proposal?.kind === "plan") return k;
+      if (planFailed[k]) return k;
     }
     return -1;
   })();
+
+  // 重试出清单：取那条回答在回的那句用户话（含图），这也是它当初该办的。
+  const retryPlan = () => {
+    if (planFailIdx < 0) return;
+    const src = precedingUser(msgs, planFailIdx);
+    void makePlan(src.text, src.images, planFailIdx);
+  };
 
   return (
     <div className={`chat${dragOver ? " dropping" : ""}`}
@@ -697,6 +916,10 @@ export function ChatPane({ onPlanReady, wsKey }: {
         <button className="cb-btn" onClick={() => void startDistill()}
           disabled={distilling || !convoId} title="从这条记录里提炼值得长期记住的东西">
           <IconAssistant size={13} />{distilling ? "正在提炼…" : "提炼记忆"}
+        </button>
+        {/* 沉淀为快捷任务：勾选对话消息 → 总结/选模板 → 存成可复用的快捷任务 */}
+        <button className="cb-btn" onClick={() => setDistillOpen(true)} title="把勾选的对话消息沉淀成快捷任务">
+          <IconSpark size={13} />沉淀为快捷
         </button>
         {savedNote && <span className="cb-saved"><IconCheck size={12} />{savedNote}</span>}
         {/* 判断标识：现在在跟哪条会话说话（打开时会自动续上上次那条）。 */}
@@ -829,7 +1052,9 @@ export function ChatPane({ onPlanReady, wsKey }: {
             )}
             <div className="msg-text">{m.text}</div>
             {m.time && <div className="msg-time">{m.time}</div>}
-            {m.proposal && (
+            {/* 改动清单不再在对话里重复展示：它由待确认面板专门呈现（整行预览）。
+                对话只留 agent 的文字回应；其余提案（任务/规则/工具/澄清）照旧。 */}
+            {m.proposal && m.proposal.kind !== "plan" && (
               <div className="msg-prop">
                 <div className="mp-kind">{kindLabel(m.proposal.kind)}</div>
                 <div className="mp-title">{m.proposal.title}</div>
@@ -842,28 +1067,7 @@ export function ChatPane({ onPlanReady, wsKey }: {
                     ))}
                   </div>
                 )}
-                {/* 清单由 agent 自己算：正常情况这里没有任何按钮（已自动跑）。
-                    只在「正在算」时给进度与取消，「算失败」时给一个重试。 */}
-                {m.proposal.kind === "plan" && i === lastPlanIdx && (planning || planFailed[i]) && (() => {
-                  // 这条回答要办的是**用户那句话**（以及他那张图），不是模型写的 detail。
-                  // 用 detail 会丢掉“图里就是数据”这件事（detail 只是文字描述），
-                  // 结果出清单时模型看不到数据 → 生成空清单。
-                  const src = precedingUser(msgs, i);
-                  return (
-                    <div className="mp-opts">
-                      {planning ? (
-                        <>
-                          <span className="mp-wait">正在算清单… {planElapsed}s（模型在算，通常 10–40 秒）</span>
-                          <button className="btn ghost sm" onClick={cancelPlan}>取消</button>
-                        </>
-                      ) : (
-                        <button className="btn primary sm" onClick={() => void makePlan(src.text, src.images, i)}>
-                          重试出清单
-                        </button>
-                      )}
-                    </div>
-                  );
-                })()}
+                {/* 改动清单改由待确认面板（整行预览）呈现，对话里不再重复。 */}
                 {/* 非 plan 类提案（定时任务 / 规则 / 工具申请）：给一个明确的「采纳」。 */}
                 {(m.proposal.kind === "task" || m.proposal.kind === "rule" || m.proposal.kind === "tool_request") && (
                   <div className="mp-opts">
@@ -901,6 +1105,28 @@ export function ChatPane({ onPlanReady, wsKey }: {
         </div>
       )}
 
+      {/* agent 运行中：给一条明确的进度，并把输入框锁住（见 agentRunning）。
+          待确认面板里的重算也算——焦点在那里时，对话同样显示"在跑"。 */}
+      {(agentRunning || planFailIdx >= 0) && (
+        <div className="chat-run">
+          {agentRunning ? (
+            <>
+              <span className="cr-dot" />
+              <span className="cr-text">
+                {planning ? `正在算清单… ${planElapsed}s（模型在算，通常 10–40 秒）`
+                  : externalLabel ?? (externalRunning ? "待确认面板正在重新算，请稍候…" : "正在想…")}
+              </span>
+              {planning && <button className="btn ghost sm" onClick={cancelPlan}>取消</button>}
+            </>
+          ) : (
+            <>
+              <span className="cr-text">算清单失败</span>
+              <button className="btn primary sm" onClick={() => void retryPlan()}>重试出清单</button>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="chat-input">
         {/* 传图的入口是「粘贴」与「拖入」：截图 Ctrl+V 直接进来，
             也可以把图片文件拖到这块区域。都不需要先存成文件再点选。 */}
@@ -915,10 +1141,10 @@ export function ChatPane({ onPlanReady, wsKey }: {
             // Enter 发送，Shift+Enter 换行（多行指令常见，别逼人一行写完）
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); }
           }}
-          disabled={busy}
+          disabled={agentRunning}
         />
         <button className="btn primary" onClick={() => void send()}
-          disabled={busy || (!input.trim() && images.length === 0)}
+          disabled={agentRunning || (!input.trim() && images.length === 0)}
           title="发送（Enter）">
           <IconSend size={13} />
         </button>
@@ -943,6 +1169,16 @@ export function ChatPane({ onPlanReady, wsKey }: {
       <p className="chat-foot">
         <IconNote size={12} /> 它只建议，不会自己改表；要改的会进「待确认」等你点头。
       </p>
+
+      {distillOpen && (
+        <PromptDistillPanel msgs={msgs} convoId={convoId}
+          onClose={() => setDistillOpen(false)}
+          onSaved={(name) => {
+            setDistillOpen(false);
+            setSavedNote("已存入快捷任务：" + name);
+            setTimeout(() => setSavedNote(""), 4000);
+          }} />
+      )}
     </div>
   );
 }
