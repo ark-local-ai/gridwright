@@ -13,6 +13,7 @@ import (
 	"archive/zip"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 )
 
@@ -123,6 +124,15 @@ func Check(path string) (*Report, error) {
 		}
 	}
 
+	// ⑥ 只读属性：微信等渠道收到的文件常带“只读”。不影响能否写入
+	// （应用时会自动解除），但要在界面上说一声，免得用户以为哪里坏了。
+	if info, err := os.Stat(path); err == nil && info.Mode().Perm()&0o200 == 0 {
+		rep.Risks = append(rep.Risks, Risk{
+			Level: LevelWarn, Kind: "readonly", Where: path,
+			Detail: "文件是只读的（常见于微信收到的文件）。应用改动时会自动解除只读，无需手动处理。",
+		})
+	}
+
 	rep.Level = highest(rep.Risks)
 	rep.CanWrite = rep.Level != LevelBlock
 	rep.Advice = adviceFor(rep.Level, rep.Risks)
@@ -171,6 +181,7 @@ func kindsOf(rs []Risk) string {
 	label := map[string]string{
 		"macro": "宏", "pivot": "数据透视表", "pivotCache": "透视缓存",
 		"chart": "图表", "externalLink": "外部链接", "conditionalFormat": "条件格式",
+		"readonly": "只读文件",
 	}
 	for _, r := range rs {
 		if seen[r.Kind] {

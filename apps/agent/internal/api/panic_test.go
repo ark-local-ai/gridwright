@@ -52,7 +52,12 @@ func TestPanicAfterWriteHeaderDoesNotDoubleWrite(t *testing.T) {
 	}
 }
 
-// TestOptionsStillShortCircuits CORS 预检不能被这次重构改动行为。
+// TestOptionsStillShortCircuits CORS 预检仍要短路：无 Origin 的 OPTIONS 直接回 204、
+// 不进业务 handler，但**不再**下发任何 CORS 头。
+//
+// 这条断言过去写的是 ACAO == "*"，那正是要被修掉的旧行为（引擎无鉴权且只听
+// 127.0.0.1，任何一个网页都能靠这个通配头跨域驱动本机引擎）。现在没有 Origin
+// 就没有 CORS 头，"*" 更不该再出现。
 func TestOptionsStillShortCircuits(t *testing.T) {
 	reached := false
 	h := withCommon(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +73,27 @@ func TestOptionsStillShortCircuits(t *testing.T) {
 	if rec.Code != http.StatusNoContent {
 		t.Errorf("OPTIONS 应回 204，实际 %d", rec.Code)
 	}
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
-		t.Errorf("CORS 头丢了，实际 %q", got)
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Errorf("无 Origin 的预检不该下发 ACAO，实际 %q", got)
+	}
+}
+
+// TestOptionsPreflightEchoesLocalOrigin 带本机 Origin 的预检要放行：仍回 204，
+// 但 ACAO 回显来源本身（而不是 "*"），这样浏览器才继续发真实请求。
+func TestOptionsPreflightEchoesLocalOrigin(t *testing.T) {
+	h := withCommon(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("OPTIONS 预检不该进到业务 handler")
+	}))
+
+	req := httptest.NewRequest(http.MethodOptions, "/api/v1/plan", nil)
+	req.Header.Set("Origin", "http://localhost:5173")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("OPTIONS 应回 204，实际 %d", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:5173" {
+		t.Errorf("预检应回显本机来源，实际 %q", got)
 	}
 }

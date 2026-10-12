@@ -132,6 +132,44 @@ func TestLocateRowFieldRejectsAmbiguity(t *testing.T) {
 	}
 }
 
+// TestLocateMonthCellRejectsAmbiguity 同一键落在**两行真实数据**上时，写路径必须报错，
+// 不静默取第一行——否则会把钱改到错的铺位上。
+func TestLocateMonthCellRejectsAmbiguity(t *testing.T) {
+	f := excelize.NewFile()
+	for i, h := range []string{"序号", "物业位置", "2026年9月", "2026年10月"} {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+		_ = f.SetCellValue("Sheet1", cell, h)
+	}
+	// 同名铺位两行（都不是空行，月份列都有值）
+	_ = f.SetCellValue("Sheet1", "A2", 1)
+	_ = f.SetCellValue("Sheet1", "B2", "A03")
+	_ = f.SetCellValue("Sheet1", "C2", 100)
+	_ = f.SetCellValue("Sheet1", "A3", 2)
+	_ = f.SetCellValue("Sheet1", "B3", "A03")
+	_ = f.SetCellValue("Sheet1", "C3", 200)
+	// 另一铺位只占一行，用来验证正常单命中仍能定位
+	_ = f.SetCellValue("Sheet1", "A4", 3)
+	_ = f.SetCellValue("Sheet1", "B4", "A05")
+	_ = f.SetCellValue("Sheet1", "C4", 300)
+
+	s, err := LoadSheet(f, "Sheet1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 歧义：A03 匹配到两行，必须报错而不是取第一行
+	if cell, err := s.LocateMonthCell(map[string]string{"物业位置": "A03"}, 2026, 9); err == nil {
+		t.Fatalf("同一键落在两行真实数据上时应报错，却定位到 %s", cell.Ref)
+	}
+	// 单命中：A05 只有一行，应正确落在 C4
+	cell, err := s.LocateMonthCell(map[string]string{"物业位置": "A05"}, 2026, 9)
+	if err != nil {
+		t.Fatalf("定位 A05 失败: %v", err)
+	}
+	if cell.Ref != "C4" {
+		t.Fatalf("A05 2026年9月 得到 %s，期望 C4", cell.Ref)
+	}
+}
+
 // TestLocateRealWorkbook 用真实台账验证定位器（表在就测，不在就跳过）。
 func TestLocateRealWorkbook(t *testing.T) {
 	root := filepath.Join("..", "..", "..", "..")

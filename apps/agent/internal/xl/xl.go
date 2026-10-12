@@ -240,6 +240,23 @@ func coerce(v any) any {
 	return s
 }
 
+// EnsureWritable 保证文件可写：微信等渠道收到的文件常带"只读"属性，
+// excelize 直接 SaveAs 会以 "Access is denied" 失败（用户实测踩到）。
+// 这里只清掉只读位（不动内容），已有备份兜底；清不掉就返回可照做的错误。
+func EnsureWritable(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if info.Mode().Perm()&0o200 != 0 {
+		return nil // 已可写，不动它
+	}
+	if err := os.Chmod(path, 0o644); err != nil {
+		return fmt.Errorf("文件是只读的，自动解除失败（%v）。请右键文件 → 属性 → 去掉“只读”，或把表复制到工作区再改", err)
+	}
+	return nil
+}
+
 // Backup 复制 path 到同目录 <name>.bak-<unixnano>，并只保留最近 keep 份。
 func Backup(path string, keep int) (string, error) {
 	abs, err := filepath.Abs(path)

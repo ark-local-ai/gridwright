@@ -14,6 +14,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -27,6 +28,7 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/config"
+	"github.com/ark-local-ai/ark/apps/agent/internal/convo"
 	"github.com/ark-local-ai/ark/apps/agent/internal/graph"
 	"github.com/ark-local-ai/ark/apps/agent/internal/ledger"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
@@ -51,6 +53,7 @@ type Server struct {
 	props  *propose.Store
 	brain  *llm.Client
 	notes  *sheetnotes.Store // 工作表描述缓存（sheet_notes.json），随工作区切换重建
+	convos *convo.Store      // 会话存储（conversations.json），随工作区切换重建；全局共享一份
 }
 
 // New 构造 server。Addr 形如 "127.0.0.1:7700"。
@@ -60,9 +63,10 @@ func New(cfg *config.Config, layout *workspace.Layout, led *ledger.Ledger, addr 
 	}
 	return &Server{
 		Cfg: cfg, Layout: layout, Ledger: led, Addr: addr,
-		props: propose.NewStore(30 * time.Minute),
-		brain: llm.New(cfg.LLM),
-		notes: openSheetNotes(layout),
+		props:  propose.NewStore(30 * time.Minute),
+		brain:  llm.New(cfg.LLM),
+		notes:  openSheetNotes(layout),
+		convos: openConvoStore(layout),
 	}
 }
 
@@ -74,6 +78,22 @@ func openSheetNotes(layout *workspace.Layout) *sheetnotes.Store {
 	st, err := sheetnotes.Open(filepath.Join(layout.Root, sheetnotes.FileName))
 	if err != nil {
 		log.Printf("[sheetnotes] 打开描述缓存失败（描述功能降级）：%v", err)
+		return nil
+	}
+	return st
+}
+
+// openConvoStore 打开工作区根下的会话存储；打不开就返回 nil（对话功能降级，不影响其它）。
+//
+// 关键：**整个进程只开一份**。Store 自带互斥锁并持有内存副本，若每个请求都新开一个
+// 实例，两个并发请求会各自「读文件 → 追加 → 整份写回」，后写的把先写的覆盖掉，消息就丢了。
+func openConvoStore(layout *workspace.Layout) *convo.Store {
+	if layout == nil {
+		return nil
+	}
+	st, err := convo.Open(layout.Root)
+	if err != nil {
+		log.Printf("[convo] 打开会话存储失败（对话功能降级）：%v", err)
 		return nil
 	}
 	return st
@@ -137,6 +157,7 @@ func (s *Server) SwitchWorkspace(dir string) error {
 	s.Layout = layout
 	s.Ledger = led
 	s.notes = openSheetNotes(layout)
+	s.convos = openConvoStore(layout)
 	s.Cfg.Workspace = layout.Root
 	s.Cfg.MarkWorkspaceChosen() // 用户显式选了 → 不再是"首次运行"
 	cfg := s.Cfg
@@ -292,10 +313,20 @@ func withCommon(next http.Handler) http.Handler {
 			}
 		}()
 
-		// 简单 CORS：桌面壳 / 网页预览从不同 origin 访问本机服务
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		// CORS：只回显本机来源，不再无条件写 "*"。
+		//
+		// 引擎只听 127.0.0.1 且没有鉴权，/api/v1/fs/list、/api/v1/workspace/open
+		// 这类接口能读写本机文件。原先的 "*" 等于把门敞开：用户随便打开一个网页，
+		// 页面里的 JS 就能跨域调用本机引擎（localhost CSRF / 一键挂马）。
+		// 现在只允许本机来源；其余来源干脆不下发 ACAO 头，由浏览器拦下响应。
+		// 没有 Origin 的请求（curl、Vite dev proxy 转发的服务端请求）照常处理，
+		// 只是拿不到 CORS 头，不影响服务端逻辑。
+		if origin := r.Header.Get("Origin"); origin != "" && isLocalOrigin(origin) {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.Header().Add("Vary", "Origin")
+		}
 		if r.Method == http.MethodOptions {
 			rec.WriteHeader(http.StatusNoContent)
 			return
@@ -320,6 +351,34 @@ func withCommon(next http.Handler) http.Handler {
 		log.Printf("%s %s -> %d  %s  %dB", r.Method, target, rec.status,
 			time.Since(start).Round(time.Millisecond), rec.bytes)
 	})
+}
+
+// isLocalOrigin 判断 Origin 头是否为本机合法来源，决定要不要回显 ACAO。
+//
+// 允许三类：
+//   - http(s)://localhost[:port]，端口任意（Vite dev server、内嵌预览页等）；
+//   - http(s)://127.0.0.1[:port]，端口任意；
+//   - Tauri 自定义协议：tauri://localhost 与 https://tauri.localhost。
+//
+// 用 net/url 解析后只比 Hostname()，端口不影响判断；其余来源（含 null、
+// 外站域名、带凭据的 URL）一律拒绝。
+func isLocalOrigin(origin string) bool {
+	u, err := url.Parse(origin)
+	if err != nil || u.Hostname() == "" {
+		return false
+	}
+	switch u.Scheme {
+	case "tauri":
+		// macOS/Linux 桌面壳的自定义协议。
+		return u.Hostname() == "localhost"
+	case "http", "https":
+		// Windows/Android 上的 Tauri 走 https://tauri.localhost。
+		switch u.Hostname() {
+		case "localhost", "127.0.0.1", "tauri.localhost":
+			return true
+		}
+	}
+	return false
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

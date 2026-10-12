@@ -124,6 +124,11 @@ func Apply(p *Proposal, led *ledger.Ledger, model string) ([]ApplyResult, error)
 		// 备份失败照常写（但要记账说明）
 		results = append(results, ApplyResult{Status: "rejected", Note: "备份失败（已继续写回）：" + err.Error()})
 	}
+	// 只读文件（微信收到的那种）先解除只读，否则 SaveAs 报 Access is denied。
+	// 放在备份之后：万一解除失败，至少副本已落下。
+	if err := xl.EnsureWritable(p.Target); err != nil {
+		return results, fmt.Errorf("写回失败: %w", err)
+	}
 	if err := f.SaveAs(p.Target); err != nil {
 		return results, fmt.Errorf("写回失败: %w", err)
 	}

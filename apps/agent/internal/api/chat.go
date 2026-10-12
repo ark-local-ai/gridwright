@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -162,9 +163,18 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 }
 
 // convoStore 取当前工作区的会话存储（跟着工作区走）。
+//
+// 返回 Server 上共享的那一份实例，而不是每次新开一个：Store 的互斥锁只在实例内有效，
+// 每个请求各开一个就等于没上锁——并发追加会各自读文件、各自整份写回，后写的覆盖先写的，
+// 消息就丢了。切换工作区时指针会被换掉，所以要在读锁内取。
 func (s *Server) convoStore() (*convo.Store, error) {
-	_, layout, _, _ := s.cur()
-	return convo.Open(layout.Root)
+	s.mu.RLock()
+	st := s.convos
+	s.mu.RUnlock()
+	if st == nil {
+		return nil, fmt.Errorf("会话存储不可用")
+	}
+	return st, nil
 }
 
 // sourceTitles 会返回「会话 id → 标题」。账目里的 source 写的是 "对话:<id>"，

@@ -20,6 +20,7 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory2"
 	"github.com/ark-local-ai/ark/apps/agent/internal/notify"
 	"github.com/ark-local-ai/ark/apps/agent/internal/plan"
+	"github.com/ark-local-ai/ark/apps/agent/internal/safety"
 	"github.com/ark-local-ai/ark/apps/agent/internal/workspace"
 	"github.com/ark-local-ai/ark/apps/agent/internal/xl"
 )
@@ -202,6 +203,16 @@ func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
 		return nil
 	}
 
+	// 4.5) 写入安全：含宏这类 excelize 会破坏的内容，**默认拒绝写**。
+	// 自动这条路和人工确认那条路共用同一把锁——没人盯着也不能放宽。
+	// 拒绝即返回错误：文件留在 inbox（不移 done），下轮重试或由人来判断。
+	// （见 docs/agent-architecture/24-语义映射与安全边界.md）
+	if rep, err := safety.Check(target); err == nil {
+		if !rep.CanWrite {
+			return fmt.Errorf("这张表含程序无法安全处理的内容，已拒绝写入：%s", rep.Describe())
+		}
+	}
+
 	// 5) 读结构 + 组 prompt
 	f, err := excelize.OpenFile(target)
 	if err != nil {
@@ -225,18 +236,18 @@ func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
 			f.Close()
 			return fmt.Errorf("没有规则命中，且未配置模型：%s 留在 inbox 待处理", source)
 		}
-			// 相关记忆：按**这批新数据的内容**检索（而不是按用户指令——
-			// 自动这条路没有指令，进来的只有数据本身）。
-			// 用数据原文当查询，才能把"含运费""B31"这类词对应上的规矩带出来。
-			memText := ""
-			if mem, merr := memory2.Open(a.Layout.Root); merr == nil {
-				memText = mem.RetrieveByText(data).Describe()
-				if memText != "" {
-					log.Printf("带上相关记忆（%d 段）", strings.Count(memText, "\n  - "))
-				}
+		// 相关记忆：按**这批新数据的内容**检索（而不是按用户指令——
+		// 自动这条路没有指令，进来的只有数据本身）。
+		// 用数据原文当查询，才能把"含运费""B31"这类词对应上的规矩带出来。
+		memText := ""
+		if mem, merr := memory2.Open(a.Layout.Root); merr == nil {
+			memText = mem.RetrieveByText(data).Describe()
+			if memText != "" {
+				log.Printf("带上相关记忆（%d 段）", strings.Count(memText, "\n  - "))
 			}
-			prompt := assemblePrompt(a.Cfg, structures, source, data, recentLedger, rules, state, memText)
-			log.Printf("调用脑（%s）…", a.Brain.Model())
+		}
+		prompt := assemblePrompt(a.Cfg, structures, source, data, recentLedger, rules, state, memText)
+		log.Printf("调用脑（%s）…", a.Brain.Model())
 		p, err = a.Brain.Plan(ctx, prompt)
 		if err != nil {
 			f.Close()
@@ -267,6 +278,12 @@ func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
 	if applied > 0 {
 		if _, err := xl.Backup(target, 5); err != nil {
 			log.Printf("备份失败（继续写回）: %v", err)
+		}
+		// 只读文件（微信收到的那种）先解除只读，否则 SaveAs 报 Access is denied。
+		// 放在备份之后：万一解除失败，至少副本已落下。
+		if err := xl.EnsureWritable(target); err != nil {
+			f.Close()
+			return fmt.Errorf("写回失败: %w", err)
 		}
 		if err := f.SaveAs(target); err != nil {
 			f.Close()

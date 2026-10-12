@@ -336,10 +336,15 @@ func (s *Sheet) LocateMonthCell(keys map[string]string, year, month int) (*Cell,
 		}
 		keyCols[col] = val
 	}
-	row := s.RowByKeys(hdrIdx+1, keyCols)
-	if row < 0 {
+	rows := s.MatchRows(hdrIdx+1, keyCols)
+	if len(rows) == 0 {
 		return nil, fmt.Errorf("表「%s」找不到匹配行 %v", s.Name, keys)
 	}
+	if len(rows) > 1 {
+		return nil, fmt.Errorf("表「%s」：键 %v 匹配到 %d 行（第 %s），无法确定改哪一行；请补一个能区分它们的键（如房号/收据号）",
+			s.Name, keys, len(rows), joinRows(rows, 3))
+	}
+	row := rows[0]
 	col := ColByMonth(header, year, month)
 	if col < 0 {
 		return nil, fmt.Errorf("表「%s」找不到 %d-%02d 的列", s.Name, year, month)
