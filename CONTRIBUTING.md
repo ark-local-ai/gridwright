@@ -93,5 +93,7 @@ cd apps/agent && go test ./...            # 单元测试（快，无外部依赖
 bash apps/agent/scripts/test-race.sh      # 竞态检测（改了并发/共享状态就必须跑）
 ```
 
-`-race` 在 Windows 上要求 cgo + 一个 gcc 兼容编译器；没装时脚本会给出提示。
-一次性安装：`winget install BrechtSanders.WinLibs.POSIX.UCRT`。
+`-race` 在 Windows 上要求 cgo + 一个 gcc 兼容编译器；脚本会自动去找（本机 MSYS2 的
+`mingw64`、winget 装的 WinLibs 都在搜索列表里），找不到才报错。
+一次性安装二选一：MSYS2（本机装在 `D:\softWare\msys64`）里 `pacman -S mingw-w64-x86_64-gcc`，
+或 `winget install BrechtSanders.WinLibs.POSIX.UCRT`。
