@@ -66,3 +66,48 @@
   ; 而 DeleteRegKey 是可靠的。这个键只存安装路径与界面语言。
   DeleteRegKey HKCU "${MANUPRODUCTKEY}"
 !macroend
+
+; =====================================================================
+; 默认安装目录：改到 D 盘
+;
+; 为什么需要这个：模板的 .onInit 在 installMode=currentUser 时把 $INSTDIR 设成
+; "$LOCALAPPDATA\${PRODUCTNAME}"（也就是 C 盘）。而模板**没有** preInit 钩子，
+; NsisConfig 里也**没有** installDir 配置项（只有 installMode/template/installerHooks
+; 等），所以只能在「选择安装目录」页显示的那一刻改默认值。
+;
+; 时机：MUI2 的目录页 show 回调会 Call MUI_PAGE_CUSTOMFUNCTION_SHOW，并随即
+; !undef（不会漏给后面的页）——见 NSIS 的 Contrib\Modern UI 2\Pages.nsh 里的
+; MUI_PAGE_FUNCTION_CUSTOM。本文件在模板顶部 include，正好赶在
+; "!insertmacro MUI_PAGE_DIRECTORY" 之前，所以在这里 !define 就生效。
+;
+; 只改「全新安装」的默认：若 .onInit 已通过 RestorePreviousInstallLocation 把
+; $INSTDIR 恢复成上次装过的路径（升级/重装），就不动它——否则升级会把已装位置
+; 悄悄搬走。判据就是模板那个默认值本身，故这里写字面量。
+;
+; 两个「不能踩」的坑（都跟 NSIS 的解析顺序有关）：
+;   ① 本文件 include 得很早，**不能**引用 ${PRODUCTNAME}/${MANUPRODUCTKEY} 这类
+;      后面才 !define 的符号（!define 在解析期展开，会报未定义）。
+;   ② 同理不能引用 $mui.DirectoryPage.Directory 这个 Var（它要到目录页声明时才
+;      存在），所以这里用 FindWindow/GetDlgItem + 控件 id 1019——MUI2 自己也用这个 id。
+;
+; 说明：静默安装（/S）与被动模式（/P）会跳过目录页，show 回调不执行，默认仍是
+; C 盘；那种场景请显式传 /D=<目标目录>。
+; =====================================================================
+
+!ifdef GRIDWRIGHT_DEFAULT_INSTDIR
+; 只有构建时显式传 /DGRIDWRIGHT_DEFAULT_INSTDIR=<目录> 才改默认安装位置。
+; 不在源码里写死盘符：公开产物不应带有某台机器的目录习惯，
+; 没有 D 盘的机器也会被装到不存在的路径。
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW GridwrightDefaultInstallDir
+
+Function GridwrightDefaultInstallDir
+  StrCmp $INSTDIR "$LOCALAPPDATA\gridwright" 0 gridwright_default_dir_done
+    StrCpy $INSTDIR "${GRIDWRIGHT_DEFAULT_INSTDIR}"
+    ; 输入框里的文字也得换：离开本页时 NSIS 是从输入框读回 $INSTDIR 的，
+    ; 只改 $INSTDIR 而不改输入框，用户点「下一步」时会被旧值覆盖回来。
+    FindWindow $R0 "#32770" "" $HWNDPARENT
+    GetDlgItem $R1 $R0 1019
+    SendMessage $R1 ${WM_SETTEXT} 0 "STR:$INSTDIR"
+  gridwright_default_dir_done:
+FunctionEnd
+!endif
