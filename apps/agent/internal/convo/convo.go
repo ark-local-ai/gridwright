@@ -49,6 +49,10 @@ type Proposal struct {
 	Options []string `json:"options,omitempty"`
 	// 待确认改动的清单 id（kind=plan 时，指向 propose.Store 里的清单）
 	PlanID string `json:"planId,omitempty"`
+	// ZoneID / Mode 只用于 kind=task：跑哪个作业区、演习还是真改。
+	// Mode 空 = dryRun（安全默认）；schedule 为空 = 立即入队跑一次。
+	ZoneID string `json:"zoneId,omitempty"`
+	Mode   string `json:"mode,omitempty"`
 	// 是否已被采纳（人点过确认）
 	Accepted bool `json:"accepted,omitempty"`
 }

@@ -162,6 +162,13 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	// 作业区上下文只加在**送给模型**的这句里，不写进会话原文：
 	// 用户说的是“补一下这个月的”，历史里不该多出一句自己没说过的话。
 	chatText := req.Message
+	zoneLines := []string{}
+	if st := s.zonesStore(); st != nil {
+		for _, z := range st.List() {
+			zoneLines = append(zoneLines, fmt.Sprintf("%s｜%s｜输入=%s｜目标=%s｜mode=%s",
+				z.ID, z.Name, z.Input.Type, z.Target.File, z.Mode))
+		}
+	}
 	if req.ZoneID != "" {
 		st := s.zonesStore()
 		z, ok := zones.Zone{}, false
@@ -174,7 +181,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 		chatText = fmt.Sprintf("（当前作业区：%s；目标表：%s）\n%s", z.Name, z.Target.File, req.Message)
 	}
-	reply, err := ag.ChatWithImages(ctx, chatText, names, imgs, history)
+	reply, err := ag.ChatWithImages(ctx, chatText, names, imgs, history, zoneLines...)
 	if err != nil {
 		// 记下失败，避免对话看起来"没反应"
 		_, _ = store.Append(c.ID, convo.Message{Role: convo.RoleSystem, Text: "出错：" + err.Error()})

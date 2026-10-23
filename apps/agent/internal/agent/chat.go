@@ -31,7 +31,7 @@ func (a *Agent) Chat(ctx context.Context, userText string, files []string) (*con
 // history 是**这段对话之前说过的话**。不加它，模型每轮都是失忆重启：
 // 同一件事会被反复追问（实测连问 4 轮，用户答过“先出对照清单”之后又被重新问一遍），
 // 而图里的数据也会因为“这一轮没带图”被当成“未提供数据”。所以必须带上。
-func (a *Agent) ChatWithImages(ctx context.Context, userText string, files []string, imgs []llm.ImageInput, history []convo.Message) (*convo.Message, error) {
+func (a *Agent) ChatWithImages(ctx context.Context, userText string, files []string, imgs []llm.ImageInput, history []convo.Message, zoneLines ...string) (*convo.Message, error) {
 	if a.Brain == nil || !a.Brain.Ready() {
 		return nil, fmt.Errorf("还没配置模型（脑）：请在设置里填 base_url 与 api_key 后就能对话了")
 	}
@@ -41,7 +41,7 @@ func (a *Agent) ChatWithImages(ctx context.Context, userText string, files []str
 	logx.Step("chat", "enter", "chars", len([]rune(userText)), "files", len(files),
 		"images", len(imgs), "history", len(history))
 	donePrompt := tr.Step("组装提示")
-	prompt := assembleChatPrompt(userText, files, history)
+	prompt := assembleChatPrompt(userText, files, history, zoneLines...)
 	if len(imgs) > 0 {
 		// 明确告诉模型图里是什么，否则它可能只当装饰
 		prompt += fmt.Sprintf("\n\n（用户随消息附了 %d 张图，通常是截图或照片里的数据；请从中读数。）", len(imgs))
@@ -75,6 +75,8 @@ func (a *Agent) ChatWithImages(ctx context.Context, userText string, files []str
 			Action   string   `json:"action"`
 			Tools    []string `json:"tools"`
 			Options  []string `json:"options"`
+			ZoneID   string   `json:"zoneId"`
+			Mode     string   `json:"mode"`
 		} `json:"proposal"`
 	}
 	if err := json.Unmarshal([]byte(content), &raw); err != nil {
@@ -96,6 +98,7 @@ func (a *Agent) ChatWithImages(ctx context.Context, userText string, files []str
 			Kind: raw.Proposal.Kind, Title: raw.Proposal.Title, Detail: raw.Proposal.Detail,
 			Schedule: raw.Proposal.Schedule, Action: raw.Proposal.Action,
 			Tools: raw.Proposal.Tools, Options: raw.Proposal.Options,
+			ZoneID: raw.Proposal.ZoneID, Mode: raw.Proposal.Mode,
 		}
 		doneParse("proposal=" + raw.Proposal.Kind)
 		logx.Step("chat", "exit", "model", a.Brain.Model(), "proposal", raw.Proposal.Kind, "title", raw.Proposal.Title)
@@ -164,7 +167,7 @@ func renderHistory(history []convo.Message) string {
 
 // assembleChatPrompt 组装会话 prompt。
 // 关键：明确告诉模型"你是配置入口"，产出结构化 proposal；不确定就问（澄清）。
-func assembleChatPrompt(userText string, files []string, history []convo.Message) string {
+func assembleChatPrompt(userText string, files []string, history []convo.Message, zoneLines ...string) string {
 	var b strings.Builder
 	b.WriteString("# 你在做什么\n")
 	b.WriteString("你是「数据管家」的配置入口。用户会用自然语言让你安排工作。\n")
@@ -178,6 +181,17 @@ func assembleChatPrompt(userText string, files []string, history []convo.Message
 		b.WriteString(strings.Join(files, "\n- "))
 	}
 	b.WriteString("\n\n")
+	if len(zoneLines) > 0 {
+		b.WriteString("# 作业区（可以把某个区跑一遍）\n")
+		for _, zl := range zoneLines {
+			if strings.TrimSpace(zl) != "" {
+				b.WriteString("- ")
+				b.WriteString(zl)
+				b.WriteString("\n")
+			}
+		}
+		b.WriteString("\n")
+	}
 	if h := renderHistory(history); h != "" {
 		b.WriteString(h)
 		b.WriteString("\n")
@@ -226,6 +240,14 @@ func assembleChatPrompt(userText string, files []string, history []convo.Message
   用户确认后才写。**不要把"不能新增行"当成拒绝或反问的理由**。
 - **不能新增工作表、不能建公式、不能动被禁止的列**。
 - 说不出清楚的地方，用 clarify 并把**可选项**给出来（options），让人点一下就能回答。
-- 如果只是**问问题**，proposal 可以为 null，直接 reply 回答。`)
+- 如果只是**问问题**，proposal 可以为 null，直接 reply 回答。
+- 如果用户要**现在把某个作业区跑一遍**（"把发票目录跑一次""试一下系统导出"）：kind=task，
+  zoneId 填上面作业区清单里的 id，mode 填 dryRun；**schedule 必须留空**（留空=立即入队跑一次）。
+  title 写"运行：<区名>"，detail 一句话说明依据（他哪句话/哪个目录让你跑这个区）。
+- mode 只在用户明说"直接写/真改/apply"时才填 apply，否则一律 dryRun。
+- zoneId 只能取上面清单里的 id。没有匹配的区 → kind=clarify，options 列出现有区名，
+  **不要编 id、不要建任务**。
+- 只是问问题、讨论方案、或要改表里的数（"记一笔收款"→plan），不要用 task。
+  task 只负责"跑一遍作业区"，不产出改动清单。`)
 	return b.String()
 }

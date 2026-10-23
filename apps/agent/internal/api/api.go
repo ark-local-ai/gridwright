@@ -39,6 +39,7 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/propose"
 	"github.com/ark-local-ai/ark/apps/agent/internal/scan"
 	"github.com/ark-local-ai/ark/apps/agent/internal/sheetnotes"
+	"github.com/ark-local-ai/ark/apps/agent/internal/tasks"
 	"github.com/ark-local-ai/ark/apps/agent/internal/webui"
 	"github.com/ark-local-ai/ark/apps/agent/internal/workspace"
 	"github.com/ark-local-ai/ark/apps/agent/internal/zones"
@@ -67,6 +68,7 @@ type Server struct {
 	notes  *sheetnotes.Store // 工作表描述缓存（sheet_notes.json），随工作区切换重建
 	convos *convo.Store      // 会话存储（conversations.json），随工作区切换重建；全局共享一份
 	zones  *zones.Store      // 作业区（zones.json），随工作区切换重建
+	tasks  *tasks.Queue      // 任务队列（tasks.json），一次只跑一个；随工作区切换重建
 
 	// 只读结果缓存（见 cache.go）。cacheMu 与 mu 分开：缓存不该阻塞工作区切换。
 	cacheMu      sync.Mutex
@@ -83,7 +85,7 @@ func New(cfg *config.Config, layout *workspace.Layout, led *ledger.Ledger, addr 
 	if addr == "" {
 		addr = "127.0.0.1:7700"
 	}
-	return &Server{
+	srv := &Server{
 		Cfg: cfg, Layout: layout, Ledger: led, Addr: addr,
 		props:  propose.NewStore(30 * time.Minute),
 		brain:  llm.New(cfg.LLM),
@@ -91,6 +93,9 @@ func New(cfg *config.Config, layout *workspace.Layout, led *ledger.Ledger, addr 
 		convos: openConvoStore(layout),
 		zones:  openZonesStore(layout),
 	}
+	// 队列在构造末尾启动：runner 需要 s 已经完整（它通过 s 查账目/脑）。
+	srv.tasks = srv.newTaskQueue(layout)
+	return srv
 }
 
 // openSheetNotes 打开工作区根下的描述缓存；打不开就返回 nil（描述功能降级，不影响其它）。
@@ -200,6 +205,8 @@ func (s *Server) SwitchWorkspace(dir string) error {
 	s.notes = openSheetNotes(layout)
 	s.convos = openConvoStore(layout)
 	s.zones = openZonesStore(layout)
+	oldTasks := s.tasks
+	s.tasks = s.newTaskQueue(layout)
 	s.Cfg.Workspace = layout.Root
 	s.Cfg.MarkWorkspaceChosen() // 用户显式选了 → 不再是"首次运行"
 	cfg := s.Cfg
@@ -223,6 +230,11 @@ func (s *Server) SwitchWorkspace(dir string) error {
 			logx.Step("workspace", "切换 exit", "root", layout.Root, "err", err.Error())
 			return err
 		}
+	}
+	// 非阻塞转交：切换接口不该等 watcher 主循环。
+	// 旧队列在锁外关闭：可能要等当前任务停下，不能占着 s.mu。
+	if oldTasks != nil {
+		_ = oldTasks.Close()
 	}
 	logx.Step("workspace", "切换 exit", "root", layout.Root)
 	// 用户显式选中一个目录 → 视为一次授权（只影响自动监听，不扩大 token 权限）。
@@ -253,6 +265,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/zones", s.handleZones)
 	mux.HandleFunc("/api/v1/zones/delete", s.handleZoneDelete)
 	mux.HandleFunc("/api/v1/zones/runs", s.handleZoneRuns)
+	// 任务队列（作业区运行 / 看板状态 / 历史）
+	mux.HandleFunc("/api/v1/tasks", s.handleTasks)
+	mux.HandleFunc("/api/v1/tasks/history", s.handleTasksHistory)
+	mux.HandleFunc("/api/v1/tasks/run", s.handleTasksRun)
+	mux.HandleFunc("/api/v1/tasks/cancel", s.handleTasksCancel)
 	// 收件箱队列（列出状态 / 手动处理 / 跳过）
 	mux.HandleFunc("/api/v1/inbox", s.handleInbox)
 	mux.HandleFunc("/api/v1/inbox/run", s.handleInboxRun)
