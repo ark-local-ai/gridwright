@@ -210,6 +210,75 @@ export interface LedgerEntry {
   status: string;
 }
 
+/* ---------- 作业区与任务 ---------- */
+
+export interface ZoneInput {
+  type: "folder" | "system" | "manual";
+  path?: string;
+  connector?: string;
+  watch?: string;
+  pattern?: string;
+}
+
+export interface ZoneTarget {
+  file?: string;
+  sheet?: string;
+  newTable?: string;
+}
+
+export interface Zone {
+  id: string;
+  name: string;
+  icon?: string;
+  input: ZoneInput;
+  target: ZoneTarget;
+  rules?: string[];
+  mode: "dryRun" | "apply";
+  status?: string;
+  lastRun?: string;
+  lastError?: string;
+  outputs?: string[];
+  createdAt?: string;
+}
+
+export interface ZoneRun {
+  zoneId: string;
+  started: string;
+  ok: boolean;
+  applied: number;
+  rejected: number;
+  summary?: string;
+  err?: string;
+}
+
+export interface TaskStep {
+  key: string;
+  label: string;
+  status: "pending" | "running" | "ok" | "skipped" | "failed";
+  detail?: string;
+}
+
+export interface Task {
+  id: string;
+  zoneId: string;
+  title: string;
+  status: "queued" | "running" | "ok" | "failed" | "canceled";
+  dryRun: boolean;
+  steps: TaskStep[];
+  summary?: string;
+  error?: string;
+  counts?: Record<string, number>;
+  createdAt: string;
+  startedAt?: string;
+  endedAt?: string;
+}
+
+export interface TaskSnapshot {
+  runningId: string;
+  items: Task[];
+  queued: number;
+}
+
 export interface SheetSummary {
   label: string;
   values: string[];
@@ -535,6 +604,22 @@ export const agentApi = {
   scan: () => get<ScanResult>("/api/v1/scan"),
   scanRun: () => post<{ ok: boolean; errors: number; warns: number; report: ScanReport }>("/api/v1/scan/run"),
   ledger: (limit = 50) => get<{ entries: LedgerEntry[]; limit: number }>(`/api/v1/ledger?limit=${limit}`),
+  // 作业区：卡片列表、创建/更新、运行（入任务队列）
+  zones: () => get<{ items: Zone[] }>("/api/v1/zones"),
+  saveZone: (z: Partial<Zone>) => post<{ ok: boolean; zone: Zone }>("/api/v1/zones", z),
+  deleteZone: (id: string) => post<{ ok: boolean }>("/api/v1/zones/delete", { id }),
+  zoneRuns: (id?: string, limit = 20) =>
+    get<{ items: ZoneRun[] }>(`/api/v1/zones/runs?limit=${limit}` + (id ? `&id=${encodeURIComponent(id)}` : "")),
+  // 任务队列：看板最多 6 条；历史另取
+  tasks: () => get<TaskSnapshot>("/api/v1/tasks"),
+  tasksHistory: (limit = 50) => get<{ items: Task[] }>(`/api/v1/tasks/history?limit=${limit}`),
+  runZone: (zoneId: string, dryRun: boolean) =>
+    post<{ ok: boolean; task: Task }>("/api/v1/tasks/run", { zoneId, dryRun }),
+  cancelTask: (id: string) => post<{ ok: boolean }>("/api/v1/tasks/cancel", { id }),
+  // 路径授权：作业区的输入目录必须先在这里登记（用户显式输入路径 = 一次授权）。
+  grants: () => get<{ enabled: boolean; items: { root: string; source: string; mode: string; resolved: string; added: string }[] }>("/api/v1/grants"),
+  saveGrant: (path: string, mode: "rw" | "read" = "read") =>
+    post<{ ok: boolean }>("/api/v1/grants", { path, mode }),
   /** 账目 CSV 导出（带鉴权）。筛选参数与后端 /ledger/export 一致。 */
   ledgerExport: (params: { table?: string; status?: string; op?: string; since?: string; until?: string; source?: string; zone?: string } = {}) => {
     const q = new URLSearchParams();
@@ -654,7 +739,7 @@ export const agentApi = {
   appendConversation: (conversationId: string, text: string, role?: "user" | "agent" | "system") =>
     post<{ ok: boolean; conversation: ConvoDto }>("/api/v1/conversation/append", { conversationId, text, role }),
   acceptProposal: (conversationId: string, index: number) =>
-    post<{ ok: boolean; kind: string; note?: string }>("/api/v1/conversation/accept", { conversationId, index }),
+    post<{ ok: boolean; kind: string; note?: string; task?: Task }>("/api/v1/conversation/accept", { conversationId, index }),
   renameConversation: (id: string, title: string) =>
     put<{ ok: boolean; title: string }>(`/api/v1/conversation?id=${encodeURIComponent(id)}`, { title }),
   deleteConversation: (id: string) =>

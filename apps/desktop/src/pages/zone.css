@@ -1,0 +1,94 @@
+/* 作业区看板（替代原来的「最近改动」整卡）。
+   视觉沿用 dcard 语言：卡片是同一层级的浅底 + 1px 边，状态只用点与文字，
+   不用进度环或百分比——这里没有可精确计量的进度。 */
+
+.zone-board .dcard-h { flex-wrap: wrap; }
+.zone-msg {
+  margin: 0; padding: var(--sp-2) var(--sp-5);
+  font-size: var(--fs-2xs); color: var(--text-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.zone-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+}
+
+.zone-card {
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  min-width: 0;
+}
+.zone-card.live { border-color: color-mix(in srgb, var(--brand) 35%, var(--line)); }
+.zone-card.running { box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 12%, transparent); }
+
+.zone-card-h { display: flex; align-items: baseline; gap: var(--sp-2); }
+.zone-card-h b {
+  font-size: var(--fs-xs); color: var(--ink); font-weight: var(--fw-title);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.zone-mode {
+  margin-left: auto; flex: none;
+  font-size: 10px; padding: 1px var(--sp-1); border-radius: var(--r-ctl);
+  color: var(--text-3); background: var(--surface-2);
+}
+.zone-mode.apply { color: var(--warn); }
+
+.zone-src {
+  margin: 0; font-size: var(--fs-2xs); color: var(--text-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.zone-chain {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2);
+}
+.zone-step { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-3); }
+.zone-step i {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--surface-3); border: 1px solid var(--line-strong);
+}
+.zone-step em { font-style: normal; color: var(--text-3); }
+.zone-step.running { color: var(--brand); }
+.zone-step.running i { background: var(--brand); border-color: var(--brand); animation: zone-pulse 1s ease-in-out infinite; }
+.zone-step.ok { color: var(--ok); }
+.zone-step.ok i { background: var(--ok); border-color: var(--ok); }
+.zone-step.failed { color: var(--danger); }
+.zone-step.failed i { background: var(--danger); border-color: var(--danger); }
+.zone-step.skipped { opacity: .55; }
+
+@keyframes zone-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+.zone-card-f {
+  display: flex; align-items: center; gap: var(--sp-2);
+  margin-top: auto; padding-top: var(--sp-1);
+  border-top: 1px dashed var(--line);
+}
+.zone-when { font-size: 10px; color: var(--text-3); margin-right: auto; }
+
+.zone-form {
+  display: flex; flex-wrap: wrap; gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.zone-form .zone-wide { flex: 1 1 320px; }
+
+.zone-hist { list-style: none; margin: 0; padding: 0; }
+.zone-hist-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.2fr) 64px 86px minmax(160px, 1.4fr) minmax(180px, 1fr);
+  gap: var(--sp-2); align-items: center;
+  padding: var(--sp-2) var(--sp-5);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-2xs);
+}
+.zone-hist-row .zh-title { color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zone-hist-row .zh-when { color: var(--text-3); font-variant-numeric: tabular-nums; }
+.zone-hist-row .zh-sum { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zone-hist-row .zh-counts { color: var(--text-3); font-variant-numeric: tabular-nums; }

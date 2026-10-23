@@ -68,6 +68,8 @@ gridwright/
 │  │  │  ├─ trace/          # 单次运行每步轨迹，随响应回给界面
 │  │  │  ├─ workspace/      # 工作区约定（inbox/done/skipped/archive）+ 注册表
 │  │  │  ├─ zones/          # 作业区 zones.json（工作区内的派单作用域，不是新工作区）
+│  │  │  ├─ zoneingest/     # 作业区取件：列目录 / 去重（看 inbox+done）/ 复制进 inbox
+│  │  │  ├─ tasks/          # 任务队列 tasks.json：单 worker 串行、最多展示 6 条、历史可查
 │  │  │  ├─ pathsafe/       # 路径白名单：自动监听/连接器只能碰已授权根目录
 │  │  │  ├─ filelock/       # 同一张表的进程内串行写锁（apply/回滚/inbox 共用）
 │  │  │  ├─ proc/           # 监视父进程，壳没了就退出，不留孤儿占端口
@@ -169,6 +171,7 @@ gridwright/
 | `memory.json` | 沉淀下来的记忆（要精炼、会过期、**必须人点头**） |
 | `sheet_notes.json` | 工作表描述缓存（模型生成） |
 | `zones.json` | 作业区定义（输入源 / 目标表 / 规则 / dryRun） |
+| `tasks.json` | 任务队列与运行历史（单 worker，重启中断会标失败） |
 | `inbox_failures.json` | 收件箱失败原因（界面读它，不靠日志解析） |
 | `inbox/`、`inbox/done/` | 新数据入口、处理完的归档 |
 | `inbox/skipped/` | 人工跳过的文件（不是“已处理”，不记账） |

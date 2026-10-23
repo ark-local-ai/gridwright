@@ -23,6 +23,8 @@
 | 表格预览（整屏） | `pages/SheetView.tsx` | 点格子或问题条目 |
 | 账目 / 回滚 | `pages/LedgerPanel.tsx` | 折叠块“账目”里的查看；支持筛选与 CSV 导出 |
 | 收件箱队列 | `pages/InboxPanel.tsx` | 顶栏收件箱图标（有等待文件时带角标） |
+| 作业区卡片 | `pages/ZoneBoard.tsx` | 主看板底部（替代原「最近改动」整卡）；点卡片试运行/运行 |
+| 历史工作 | `pages/ZoneBoard.tsx` 内浮层 | 作业区卡头的「历史工作」 |
 | 定时任务 | `pages/TasksPanel.tsx` | 顶栏时钟图标 |
 | 规则（rules.yaml） | `pages/RulesPanel.tsx` | 顶栏规则图标 |
 | 生成（草稿/清单，不动原表） | `pages/GeneratePanel.tsx` | 顶栏生成图标 |

@@ -410,12 +410,15 @@ type ConvoMsg = {
   proposal?: {
     kind: string; title: string; detail: string; schedule?: string;
     action?: string; tools?: string[]; options?: string[];
+    /** kind=task 且带 zoneId：采纳后立即入队跑一次作业区。 */
+    zoneId?: string;
+    mode?: string;
     /** 人点过"采纳"（task/rule/tool_request）。落盘了，重启后仍在。 */
     accepted?: boolean;
   };
 };
 
-export function ChatPane({ onPlanReady, wsKey, syncToken, syncConvoId, externalRunning, externalLabel, runText, onRunConsumed }: {
+export function ChatPane({ onPlanReady, wsKey, syncToken, syncConvoId, externalRunning, externalLabel, runText, onRunConsumed, onTaskQueued }: {
   onPlanReady: (p: Proposal, trace?: TraceData) => void;
   /** 当前工作区标识（用于把没发出去的草稿按工作区隔离存下来） */
   wsKey?: string;
@@ -431,6 +434,8 @@ export function ChatPane({ onPlanReady, wsKey, syncToken, syncConvoId, externalR
   runText?: { text: string; token: number };
   /** 这条快捷任务已被消费（上层清掉，避免重开抽屉时又跑一遍）。 */
   onRunConsumed?: () => void;
+  /** 采纳了一个作业区任务：上层据此刷新看板（不必等下一次轮询）。 */
+  onTaskQueued?: () => void;
 }) {
   const [convoId, setConvoId] = useState<string>("");
   const [msgs, setMsgs] = useState<ConvoMsg[]>([]);
@@ -823,6 +828,8 @@ export function ChatPane({ onPlanReady, wsKey, syncToken, syncConvoId, externalR
       setMsgs(c.messages as ConvoMsg[]);
       setSavedNote(r.note || "已采纳");
       setTimeout(() => setSavedNote(""), 5000);
+      // 作业区任务已入队：让看板立刻刷新一次（双保险，看板自己也在轮询）。
+      if (r.task) onTaskQueued?.();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -1031,9 +1038,12 @@ export function ChatPane({ onPlanReady, wsKey, syncToken, syncConvoId, externalR
                 对话只留 agent 的文字回应；其余提案（任务/规则/工具/澄清）照旧。 */}
             {m.proposal && m.proposal.kind !== "plan" && (
               <div className="msg-prop">
-                <div className="mp-kind">{kindLabel(m.proposal.kind)}</div>
+                <div className="mp-kind">{kindLabel(m.proposal.kind, m.proposal.zoneId)}</div>
                 <div className="mp-title">{m.proposal.title}</div>
                 {m.proposal.detail && <div className="mp-detail">{m.proposal.detail}</div>}
+                {m.proposal.zoneId && (
+                  <div className="mp-meta">将运行：{m.proposal.title.replace(/^(试运行|运行)：/, "")}（{m.proposal.mode === "apply" ? "写入" : "试运行"}）</div>
+                )}
                 {m.proposal.schedule && <div className="mp-meta">时间：{m.proposal.schedule}</div>}
                 {m.proposal.options && m.proposal.options.length > 0 && (
                   <div className="mp-opts">
@@ -1208,9 +1218,9 @@ function precedingUser(msgs: ConvoMsg[], at: number): { text: string; images: st
   return { text: texts.reverse().join("\n"), images };
 }
 
-function kindLabel(k: string): string {
+function kindLabel(k: string, zoneId?: string): string {
   switch (k) {
-    case "task": return "自动化任务提案";
+    case "task": return zoneId ? "运行任务" : "自动化任务提案";
     case "rule": return "规则提案";
     case "tool_request": return "工具申请";
     case "clarify": return "需要你确认";

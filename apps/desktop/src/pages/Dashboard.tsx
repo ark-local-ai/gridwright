@@ -2,7 +2,7 @@ import { useEffect, useCallback, useState } from "react";
 import "./dashboard.css";
 import "./dashboard-shell.css";
 import { agentApi, nodeId } from "../api-agent";
-import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, WorkspaceListItem, Proposal, SafetyReport, SelfCheckReport, SheetDetail, TraceData, ApplyResult } from "../api-agent";
+import type { ScanReport, GraphData, GraphNode, WorkspaceFiles, WorkspaceListItem, Proposal, SafetyReport, SelfCheckReport, SheetDetail, TraceData, ApplyResult } from "../api-agent";
 import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark, IconClock, IconFiles } from "../components/icons";
 import AttentionList from "../components/AttentionList";
 import DropZone from "../components/DropZone";
@@ -15,6 +15,7 @@ import InboxPanel from "./InboxPanel";
 import TasksPanel from "./TasksPanel";
 import RulesPanel from "./RulesPanel";
 import GeneratePanel from "./GeneratePanel";
+import ZoneBoard from "./ZoneBoard";
 import { PendingList, ChatPane } from "./Pending";
 import { hotspots } from "../lib/issues";
 import { linkHealth } from "../lib/linkage";
@@ -38,7 +39,6 @@ export default function Dashboard({ pickFolder, watchDrop }: {
   const [files, setFiles] = useState<WorkspaceFiles | null>(null);
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [scan, setScan] = useState<ScanReport | null>(null);
-  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [active, setActive] = useState<GraphNode | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   // 「待确认」独立成面板：出提案时不再关掉对话，而是并排弹出，
@@ -55,6 +55,8 @@ export default function Dashboard({ pickFolder, watchDrop }: {
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const [inboxCount, setInboxCount] = useState(0);
+  // 对话里采纳了一个作业区任务时递增；ZoneBoard 收到后立刻重拉状态。
+  const [zoneTick, setZoneTick] = useState(0);
   const [tasksOpen, setTasksOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -168,17 +170,15 @@ export default function Dashboard({ pickFolder, watchDrop }: {
         setPartErr((p) => ({ ...p, [part]: msg }));
         return null;
       };
-      const [f, g, s, l, ib] = await Promise.all([
+      const [f, g, s, ib] = await Promise.all([
         agentApi.files().catch(failed("文件清单")),
         agentApi.graph().catch(failed("表间关联")),
         agentApi.scanRun().catch(failed("体检")),
-        agentApi.ledger(5).catch(failed("账目")),
         agentApi.inbox().catch(failed("收件箱")),
       ]);
       setFiles(f);
       setGraph(g);
       setScan(s?.report ?? null);
-      setLedger(l?.entries ?? []);
       setInboxCount(ib?.count ?? 0);
       // 安全报告：告诉用户"这张表能不能写"（含宏=硬拒绝）。确认改动前必须知道。
       // 读不到时不能静静留空——那会显示成“没有风险”，而实际是“没查成”。
@@ -410,7 +410,7 @@ export default function Dashboard({ pickFolder, watchDrop }: {
               <button className="cd-x" onClick={() => setChatOpen(false)} aria-label="关闭对话"><IconX size={14} /></button>
             </header>
             <div className="cd-body">
-              <ChatPane wsKey={wsPath} syncToken={chatSync} syncConvoId={proposal?.conversation} externalRunning={feedbackBusy || writeBusy} externalLabel={feedbackBusy ? "待确认面板正在重新算，请稍候…" : writeBusy ? "正在写入表格（备份 → 写入 → 记账）…" : undefined} runText={quickRun ?? undefined} onRunConsumed={() => setQuickRun(null)} onPlanReady={(p, tr) => { setProposal(p); setPlanTrace(tr ?? null); setProposalOpen(true); }} />
+              <ChatPane wsKey={wsPath} syncToken={chatSync} syncConvoId={proposal?.conversation} externalRunning={feedbackBusy || writeBusy} externalLabel={feedbackBusy ? "待确认面板正在重新算，请稍候…" : writeBusy ? "正在写入表格（备份 → 写入 → 记账）…" : undefined} runText={quickRun ?? undefined} onRunConsumed={() => setQuickRun(null)} onTaskQueued={() => setZoneTick((n) => n + 1)} onPlanReady={(p, tr) => { setProposal(p); setPlanTrace(tr ?? null); setProposalOpen(true); }} />
             </div>
           </div>
         </>
@@ -471,7 +471,6 @@ export default function Dashboard({ pickFolder, watchDrop }: {
               <Metric label="工作簿" value={String(tableCount)} />
               <Metric label="工作表" value={String(graph?.nodes.length ?? 0)} />
               <Metric label="表间关联" value={String(graph?.edges.length ?? 0)} />
-              <Metric label="最近改动" value={String(ledger.length)} />
             </div>
           </section>
 
@@ -514,9 +513,7 @@ export default function Dashboard({ pickFolder, watchDrop }: {
               </div>
               <LinkMap
                 graph={graph}
-                issues={issues}
                 onOpenSheet={(n) => void pickNode(n)}
-                onOpenIssue={(it) => setOpened({ sheet: it.sheet, file: it.file, ref: it.ref })}
               />
             </section>
           )}
@@ -541,25 +538,9 @@ export default function Dashboard({ pickFolder, watchDrop }: {
             </section>
           )}
 
-          {/* ⑥ 最近改动 */}
-          <section className="dcard span2">
-            <div className="dcard-h">
-              <h3>最近改动</h3>
-              <button className="btn ghost sm" onClick={() => setLedgerOpen(true)}>查看 / 回滚</button>
-            </div>
-            <div className="ledger-inline">
-              {ledger.length === 0
-                ? <p className="dash-muted">还没有改动记录。让它改一次表，这里就会留下每一格的旧值。</p>
-                : ledger.map((e, i) => (
-                  <span key={`${e.ts}-${e.cell}-${e.old}-${e.new}`} className={`dl-row${i === 0 ? " fresh" : ""}`}>
-                    <em>{e.ts}</em> {e.table} {e.cell} {e.old}→{e.new}
-                    {/* 「哪次对话让我改的」：标题由后端从 source="对话:<id>" 译回。 */}
-                    {e.sourceTitle && <span className="dl-src" title={`来自对话：${e.sourceTitle}`}>来自对话·{e.sourceTitle}</span>}
-                    <span className={e.status === "ok" ? "ok" : "rj"}>{e.status}</span>
-                  </span>
-                ))}
-            </div>
-          </section>
+          {/* ⑥ 作业区：替换原来的「最近改动」整卡。
+              卡片本身就是运行入口；任务状态在这里实时刷新，历史在抽屉里。 */}
+          <ZoneBoard onOpenLedger={() => setLedgerOpen(true)} onChanged={() => void refresh()} syncToken={zoneTick} />
         </div>
       </div>
 

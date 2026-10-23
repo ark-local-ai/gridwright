@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import type { CSSProperties } from "react";
-import type { GraphData, GraphNode, ScanIssue } from "../api-agent";
+import type { GraphData, GraphNode } from "../api-agent";
 import { nodeId } from "../api-agent";
-import { linkHealth, families, brokenRefs } from "../lib/linkage";
+import { linkHealth, families } from "../lib/linkage";
 import { assignHues } from "../lib/hues";
 import { IconXls, IconTable } from "./icons";
 
@@ -22,15 +22,12 @@ import { IconXls, IconTable } from "./icons";
  * 与色块 chip** —— 每张 sheet 一个稳定色相，连着的是实心、孤立的是空心。
  * 颜色认对象不认位置（见 lib/hues），所以同一张表在哪儿都是同一个颜色。
  */
-export default function LinkMap({ graph, issues, onOpenSheet, onOpenIssue }: {
+export default function LinkMap({ graph, onOpenSheet }: {
   graph: GraphData;
-  issues: ScanIssue[];
   onOpenSheet: (n: GraphNode) => void;
-  onOpenIssue: (it: ScanIssue) => void;
 }) {
   const health = useMemo(() => linkHealth(graph), [graph]);
   const fams = useMemo(() => families(graph), [graph]);
-  const breaks = useMemo(() => brokenRefs(issues), [issues]);
 
   // 有跨表引用的表（判"连着/孤立"）
   const linkedIds = useMemo(() => {
@@ -131,37 +128,6 @@ export default function LinkMap({ graph, issues, onOpenSheet, onOpenIssue }: {
         })}
       </div>
 
-      {/* ===== 引用明细：到底谁引用谁 =====
-          树回答“属于哪个文件”，这里回答“谁在用谁”。跨文件的单独标出来——
-          跨文件引用最脆（换了文件名/挪了位置就断），也是最该被人看见的。 */}
-      {graph.edges.length > 0 && (
-        <div className="lm-edges">
-          <div className="lm-edges-h">
-            <span>引用明细</span>
-            <span className="lm-edges-n">{graph.edges.length} 条</span>
-          </div>
-          <ul className="lm-edge-list">
-            {graph.edges.slice(0, 10).map((e, i) => (
-              <li key={i} className={`lm-edge${e.crossFile ? " cross" : ""}`}>
-                <button className="lm-edge-row" onClick={() => onOpenSheet(e.to)}
-                  title={`打开 ${e.to.sheet}`}>
-                  <span className="lm-e-src">{e.to.sheet.replace(/\s*（日）\s*/, "")}</span>
-                  <span className="lm-e-arrow">{e.crossFile ? "⇢" : "→"}</span>
-                  <span className="lm-e-dst">{e.from.sheet.replace(/\s*（日）\s*/, "")}</span>
-                </button>
-                <span className="lm-e-kind">
-                  {e.kind === "formula" ? "公式" : e.kind === "declared" ? "声明" : "键列"} ×{e.count}
-                  {e.crossFile && <em>跨文件</em>}
-                </span>
-              </li>
-            ))}
-          </ul>
-          {graph.edges.length > 10 && (
-            <p className="lm-break-hint">另有 {graph.edges.length - 10} 条引用，在“联动图”里看全。</p>
-          )}
-        </div>
-      )}
-
       {/* 同名系列（如 14 张月表）：单独讲"这一族谁断了"。
           这不是重复——上面按文件列的是"属于谁"，这里讲的是"这一串该连着"。 */}
       {fams.length > 0 && (
@@ -177,34 +143,6 @@ export default function LinkMap({ graph, issues, onOpenSheet, onOpenIssue }: {
         </div>
       )}
 
-      {/* 断口：具体是哪些表、多少处。点一下就跳到那一格。 */}
-      {breaks.length > 0 && (
-        <div className="lm-breaks">
-          <div className="lm-breaks-h">
-            <span>引用断掉的地方</span>
-            <span className="lm-breaks-n">{breaks.reduce((n, b) => n + b.count, 0)} 处</span>
-          </div>
-          <ul className="lm-break-list">
-            {breaks.map((b) => {
-              const hue = sheetHue.get(b.sheet) ?? "var(--danger)";
-              return (
-                <li key={b.sheet}>
-                  <button className="lm-break-row" onClick={() => onOpenIssue(b.sample)}
-                    title={`点开跳到 ${b.sample.ref}`}>
-                    <span className="lm-break-dot" style={{ background: hue }} aria-hidden />
-                    <span className="lm-break-sheet">{b.sheet.replace(/\s*（日）\s*/, "")}</span>
-                    <code className="lm-break-ref">{b.sample.ref}</code>
-                    <span className="lm-break-n">{b.count} 处</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          <p className="lm-break-hint">
-            公式原来指向被改动的表；现在指向空处，所以这一格算不出来。
-          </p>
-        </div>
-      )}
     </div>
   );
 }
