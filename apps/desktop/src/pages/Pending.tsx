@@ -4,7 +4,7 @@ import { agentApi } from "../api-agent";
 import type { Proposal, ApplyResult, ImpactResult, SafetyReport, SelfCheckReport, ConvoSummary, DistillCandidate, TraceData, ProposalRows } from "../api-agent";
 import RunTrace from "../components/RunTrace";
 import PromptDistillPanel from "./PromptDistillPanel";
-import { IconCheck, IconSpark, IconSend, IconNote, IconLink, IconShield, IconRefresh, IconX, IconClock, IconPlus, IconTrash, IconRename, IconAssistant } from "../components/icons";
+import { IconCheck, IconSpark, IconSend, IconNote, IconLink, IconShield, IconX, IconClock, IconPlus, IconTrash, IconRename, IconAssistant } from "../components/icons";
 
 /* 待确认（A）+ 会话（B）（见 docs/agent-architecture/19-界面设计.md 阶段 3-4）
    用户的规则：看清单 → 你确认 → 才改。会话是配置入口，产出结构化建议。 */
@@ -41,18 +41,21 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
   const [correcting, setCorrecting] = useState(false);
   const [extra, setExtra] = useState("");
   const [learned, setLearned] = useState("");
-  const [selfCheck, setSelfCheck] = useState<SelfCheckReport | null>(null);
   // 整行预览（只读拉取）：把清单里的改动摆回原表的行与表头里
   const [rows, setRows] = useState<ProposalRows | null>(null);
 
-  // 推断"这一笔还牵连谁"（见 23-影响面推断）
+  // 推断"这一笔还牵连谁"（见 23-影响面推断）。
+  // kind 是输入框：每敲一个字都请求一次 impact 是纯浪费（"收租"要打两次），
+  // 停手 400ms 再算；impactNode 变化（点另一行）仍然立即生效。
   useEffect(() => {
     if (!impactNode) { setImpact(null); return; }
     let alive = true;
-    agentApi.impact(impactNode, kind || undefined)
-      .then((r) => { if (alive) setImpact(r); })
-      .catch(() => { if (alive) setImpact(null); });
-    return () => { alive = false; };
+    const t = setTimeout(() => {
+      agentApi.impact(impactNode, kind || undefined)
+        .then((r) => { if (alive) setImpact(r); })
+        .catch(() => { if (alive) setImpact(null); });
+    }, 400);
+    return () => { alive = false; clearTimeout(t); };
   }, [impactNode, kind]);
 
   // 整行预览：清单变了就重拉一次，把改动还原成原表的行。
@@ -107,7 +110,6 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
     setErr("");
     try {
       const r = await agentApi.apply(proposal.id);
-      setSelfCheck(r.selfCheck ?? null);
       onApplied(r);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -217,33 +219,6 @@ export function PendingList({ proposal, onApplied, onDiscarded, impactNode, safe
             <button className="pi-fix" onClick={() => setCorrecting(true)}>
               {learned || "漏了？告诉我还要看哪些表（会记住）"}
             </button>
-          )}
-        </div>
-      )}
-
-      {/* 自检结果（见 docs/agent-architecture/26-自检流程.md） */}
-      {selfCheck && (
-        <div className={`pend-self ${selfCheck.level}`}>
-          <div className="ps-h">
-            <IconRefresh size={13} />
-            <b>改完自检</b>
-            <span className="ps-sum">{selfCheck.summary}</span>
-            <span className="ps-time">{selfCheck.elapsed}</span>
-          </div>
-          {selfCheck.findings.length > 0 && (
-            <ul className="ps-list">
-              {selfCheck.findings.map((f, i) => (
-                <li key={i} className={f.level}>
-                  <span className="ps-sheet">{f.node.sheet}</span>
-                  <span className="ps-msg">{f.message}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          {selfCheck.findings.some((f) => f.needClarify) && (
-            <p className="ps-clarify">
-              以上需要你确认；漏了哪些表就说一声，我会记住。
-            </p>
           )}
         </div>
       )}

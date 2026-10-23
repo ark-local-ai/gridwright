@@ -93,3 +93,22 @@
   background: var(--ok-bg); padding: 0 var(--sp-1); border-radius: var(--r-ctl);
   margin-right: var(--sp-2);
 }
+
+/* 账目筛选行（在 .lg-bar 之后、列表之前）。
+   不复用 .lg-bar 的原因：那里 .btn:last-child 有 margin-left:auto 的约定
+   （回滚按钮靠它贴右），在这行里插入按钮会被推到不该去的位置。 */
+.lg-filter {
+  display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
+  padding: var(--sp-2) var(--sp-5);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.lg-input {
+  height: 26px; padding: 0 var(--sp-2);
+  border: 1px solid var(--line); border-radius: var(--r-ctl);
+  background: var(--surface); color: var(--text-1);
+  font-size: var(--fs-2xs); font-family: inherit;
+}
+.lg-input:focus { outline: none; border-color: var(--brand); }
+input.lg-input[type="date"] { width: 132px; }
+.lg-export { margin-left: auto; }

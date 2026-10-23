@@ -6,49 +6,116 @@
 // 开发时走 Vite 代理 /agent-api → 127.0.0.1:7700；桌面构建时由 VITE_AGENT_API_BASE 注入。
 const BASE = import.meta.env.VITE_AGENT_API_BASE ?? "/agent-api";
 
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`);
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error((body as { error?: string }).error ?? `${res.status}`);
+// 本机访问令牌（见 apps/agent/internal/api/auth.go）。
+//
+// 引擎启动时生成一个令牌，除 health/session 外的接口都要求
+// `Authorization: Bearer <token>`。界面在第一次请求前向 /session 领一次，
+// 之后缓存在内存里；成功后不再重复请求。
+//
+// 旧版引擎没有 /session（404）：视为鉴权未启用，照常无头请求。
+let token: string | null = null;
+let tokenLoaded = false;
+let tokenInflight: Promise<void> | null = null;
+
+async function loadToken(force = false): Promise<void> {
+  if (tokenLoaded && !force) return;
+  if (tokenInflight) return tokenInflight;
+  tokenInflight = (async () => {
+    try {
+      const res = await fetch(`${BASE}/api/v1/session`);
+      if (res.ok) {
+        const body = (await res.json()) as { token?: unknown };
+        if (typeof body.token === "string" && body.token) token = body.token;
+      }
+      tokenLoaded = true;
+    } catch {
+      // 引擎尚未起来：不要把"领不到令牌"缓存成永久状态，
+      // 否则引擎稍后启动，界面仍然一直不带令牌。
+      tokenLoaded = token !== null;
+    } finally {
+      tokenInflight = null;
+    }
+  })();
+  return tokenInflight;
+}
+
+/** 401 是一个可恢复错误：令牌轮换/引擎重启后自动重领并重试一次。 */
+class Unauthorized extends Error {}
+
+async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
+  await loadToken();
+  const send = async (): Promise<T> => {
+    const headers = new Headers(init.headers);
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    const res = await fetch(`${BASE}${path}`, { ...init, headers });
+    if (res.status === 401) throw new Unauthorized("需要重新领取本机访问令牌");
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error((body as { error?: string }).error ?? `${res.status}`);
+    }
+    return res.json() as Promise<T>;
+  };
+  try {
+    return await send();
+  } catch (e) {
+    if (e instanceof Unauthorized) {
+      token = null;
+      await loadToken(true);
+      return await send();
+    }
+    throw e;
   }
-  return res.json() as Promise<T>;
+}
+
+async function get<T>(path: string): Promise<T> {
+  return call<T>(path);
+}
+
+/** 取二进制/文本文件（带鉴权，401 自动重领一次）。CSV 导出用。 */
+async function rawGet(path: string): Promise<Blob> {
+  await loadToken();
+  const send = async (): Promise<Blob> => {
+    const headers = new Headers();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    const res = await fetch(`${BASE}${path}`, { headers });
+    if (res.status === 401) throw new Unauthorized("需要重新领取本机访问令牌");
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error((body as { error?: string }).error ?? `${res.status}`);
+    }
+    return res.blob();
+  };
+  try {
+    return await send();
+  } catch (e) {
+    if (e instanceof Unauthorized) {
+      token = null;
+      await loadToken(true);
+      return await send();
+    }
+    throw e;
+  }
 }
 
 async function post<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  return call<T>(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
     signal,
   });
-  if (!res.ok) {
-    const b = await res.json().catch(() => ({}));
-    throw new Error((b as { error?: string }).error ?? `${res.status}`);
-  }
-  return res.json() as Promise<T>;
 }
 
 async function del<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { method: "DELETE" });
-  if (!res.ok) {
-    const b = await res.json().catch(() => ({}));
-    throw new Error((b as { error?: string }).error ?? `${res.status}`);
-  }
-  return res.json() as Promise<T>;
+  return call<T>(path, { method: "DELETE" });
 }
 
 async function put<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  return call<T>(path, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!res.ok) {
-    const b = await res.json().catch(() => ({}));
-    throw new Error((b as { error?: string }).error ?? `${res.status}`);
-  }
-  return res.json() as Promise<T>;
 }
 
 export interface WorkspaceInfo {
@@ -433,15 +500,50 @@ export interface WeightScore {
   hasUsage: boolean;
 }
 
+export interface InboxItem {
+  name: string;
+  size: number;
+  modified: string;
+  status: "waiting" | "processing" | "failed";
+  attempts?: number;
+  error?: string;
+  errorAt?: string;
+  claimedAt?: string;
+  claimStale?: boolean;
+}
+
+export interface InboxData {
+  items: InboxItem[];
+  count: number;
+}
+
 export const agentApi = {
   health: () => get<{ ok: boolean; workspace: string }>("/api/v1/health"),
   workspace: () => get<WorkspaceInfo>("/api/v1/workspace"),
   files: () => get<WorkspaceFiles>("/api/v1/workspace/files"),
+  // 收件箱队列：状态 / 手动处理 / 跳过
+  inbox: () => get<InboxData>("/api/v1/inbox"),
+  inboxRun: (file?: string) =>
+    post<{ ok: boolean; items?: InboxItem[]; count?: number; file?: string; claimed?: boolean; error?: string }>(
+      "/api/v1/inbox/run",
+      file ? { file } : {},
+    ),
+  inboxSkip: (file: string, reason?: string) =>
+    post<{ ok: boolean; file: string }>("/api/v1/inbox/skip", { file, reason }),
   graph: (node?: string) =>
     get<GraphData>(`/api/v1/graph${node ? `?node=${encodeURIComponent(node)}` : ""}`),
   scan: () => get<ScanResult>("/api/v1/scan"),
   scanRun: () => post<{ ok: boolean; errors: number; warns: number; report: ScanReport }>("/api/v1/scan/run"),
   ledger: (limit = 50) => get<{ entries: LedgerEntry[]; limit: number }>(`/api/v1/ledger?limit=${limit}`),
+  /** 账目 CSV 导出（带鉴权）。筛选参数与后端 /ledger/export 一致。 */
+  ledgerExport: (params: { table?: string; status?: string; op?: string; since?: string; until?: string; source?: string; zone?: string } = {}) => {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      if (v) q.set(k, String(v));
+    }
+    const qs = q.toString();
+    return rawGet(`/api/v1/ledger/export${qs ? `?${qs}` : ""}`);
+  },
   sheets: (file?: string) =>
     get<{ file: string; sheets: string[] }>(`/api/v1/sheets${file ? `?file=${encodeURIComponent(file)}` : ""}`),
   // 批量取所有表的"形状"（行/列/公式数）——给左栏微缩缩略图用。
@@ -548,8 +650,8 @@ export const agentApi = {
     post<{ conversationId: string; conversation: ConvoDto; trace?: TraceData }>("/api/v1/chat", { message, conversationId, images }),
   conversations: () => get<{ items: ConvoSummary[] }>("/api/v1/conversations"),
   conversation: (id: string) => get<ConvoDto>(`/api/v1/conversation?id=${encodeURIComponent(id)}`),
-  /** 追加一条 agent/system 消息（应用改动后把“这次做了什么”写回对话）。 */
-  appendConversation: (conversationId: string, text: string, role?: "agent" | "system") =>
+  /** 追加一条消息（user 用于把界面里的反馈写回对话而不触发模型；agent/system 用于确定性回执）。 */
+  appendConversation: (conversationId: string, text: string, role?: "user" | "agent" | "system") =>
     post<{ ok: boolean; conversation: ConvoDto }>("/api/v1/conversation/append", { conversationId, text, role }),
   acceptProposal: (conversationId: string, index: number) =>
     post<{ ok: boolean; kind: string; note?: string }>("/api/v1/conversation/accept", { conversationId, index }),

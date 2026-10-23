@@ -1,0 +1,29 @@
+/* 收件箱队列（复用 ledger.css 的浮层骨架，这里只加行样式） */
+
+.ib-list { list-style: none; margin: 0; padding: 0; }
+
+.ib-row {
+  padding: var(--sp-3) var(--sp-5);
+  border-bottom: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: var(--sp-1);
+}
+.ib-row:last-child { border-bottom: none; }
+
+.ib-main { display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; }
+.ib-name { font-size: var(--fs-2xs); color: var(--ink); font-weight: var(--fw-medium); }
+.ib-meta { font-size: var(--fs-2xs); color: var(--text-3); margin-left: auto; }
+.ib-attempts { font-size: var(--fs-2xs); color: var(--text-3); }
+
+.ib-badge {
+  font-size: var(--fs-2xs); padding: 1px var(--sp-1); border-radius: var(--r-ctl);
+  background: var(--surface-2); color: var(--text-3);
+}
+.ib-badge.processing { color: var(--brand); }
+.ib-badge.failed { color: var(--danger, #b42318); }
+
+.ib-err {
+  margin: 0; font-size: var(--fs-2xs); color: var(--danger, #b42318);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
+}
+
+.ib-actions { display: flex; gap: var(--sp-2); justify-content: flex-end; }

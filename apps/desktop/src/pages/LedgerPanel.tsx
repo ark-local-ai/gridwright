@@ -20,6 +20,13 @@ export default function LedgerPanel({ onClose, onChanged, onBusyChange }: {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [load, setLoad] = useState(true);
+  // 筛选：前端作用于已加载条目（回滚 ID 仍是原始下标，不能重排）；
+  // 导出走后端同条件，避免“看到的”和“导出的”不是同一批。
+  const [fTable, setFTable] = useState("");
+  const [fStatus, setFStatus] = useState("");
+  const [fOp, setFOp] = useState("");
+  const [fSince, setFSince] = useState("");
+  const [exportBusy, setExportBusy] = useState(false);
 
   const refresh = async () => {
     setLoad(true);
@@ -76,6 +83,41 @@ export default function LedgerPanel({ onClose, onChanged, onBusyChange }: {
 
   const rollbackable = items.filter((i) => i.canRollback);
 
+  const filtered = items.filter((i) => {
+    if (fTable && !i.table.toLowerCase().includes(fTable.toLowerCase()) &&
+        !i.table.toLowerCase().replace(/\.xlsx$/, "").includes(fTable.toLowerCase().replace(/\.xlsx$/, ""))) return false;
+    if (fStatus && i.status !== fStatus) return false;
+    if (fOp && i.op !== fOp) return false;
+    // 账目时间是本地墙上时间 "YYYY-MM-DD HH:MM"，与 <input type=date> 的字典序比较即可。
+    if (fSince && i.ts.slice(0, 10) < fSince) return false;
+    return true;
+  });
+  const hiddenSel = [...sel].filter((id) => !filtered.some((i) => i.id === id)).length;
+
+  const doExport = async () => {
+    setExportBusy(true);
+    setMsg("");
+    try {
+      const blob = await agentApi.ledgerExport({
+        table: fTable || undefined, status: fStatus || undefined,
+        op: fOp || undefined, since: fSince || undefined,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `gridwright-ledger-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setMsg(`已导出 ${filtered.length} 条（UTF-8 BOM，可用 Excel/WPS 直接打开）`);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
   return (
     <div className="lg-overlay" onClick={onClose}>
       <div className="lg-panel" onClick={(e) => e.stopPropagation()}>
@@ -90,7 +132,10 @@ export default function LedgerPanel({ onClose, onChanged, onBusyChange }: {
 
         <div className="lg-bar">
           <span className="lg-count">
-            {items.length} 条改动 · 可回滚 {rollbackable.length} 条
+            {filtered.length === items.length
+              ? `${items.length} 条改动 · 可回滚 ${rollbackable.length} 条`
+              : `筛选 ${filtered.length}/${items.length} 条 · 可回滚 ${rollbackable.length} 条`}
+            {hiddenSel > 0 ? ` · 已选中 ${hiddenSel} 条被筛选隐藏` : ""}
           </span>
           <button className="btn ghost sm" onClick={() => void refresh()}><IconRefresh size={12} />刷新</button>
           <button
@@ -99,6 +144,28 @@ export default function LedgerPanel({ onClose, onChanged, onBusyChange }: {
             onClick={() => void doRollback()}
           >
             {busy ? "回滚中…" : `回滚选中的 ${sel.size} 处`}
+          </button>
+        </div>
+
+        {/* 筛选 + 导出：财务对账需要把账目交出去；没有导出这道工序做不完。 */}
+        <div className="lg-filter">
+          <input className="lg-input" placeholder="表名" value={fTable}
+            onChange={(e) => setFTable(e.target.value)} />
+          <select className="lg-input" value={fStatus} onChange={(e) => setFStatus(e.target.value)}>
+            <option value="">全部状态</option>
+            <option value="ok">成功</option>
+            <option value="rejected">被拒</option>
+          </select>
+          <select className="lg-input" value={fOp} onChange={(e) => setFOp(e.target.value)}>
+            <option value="">全部操作</option>
+            <option value="set">改格</option>
+            <option value="append">新增行</option>
+            <option value="rollback">回滚</option>
+          </select>
+          <input className="lg-input" type="date" value={fSince} title="起始日期"
+            onChange={(e) => setFSince(e.target.value)} />
+          <button className="btn ghost sm lg-export" disabled={exportBusy} onClick={() => void doExport()}>
+            {exportBusy ? "导出中…" : "导出 CSV"}
           </button>
         </div>
 
@@ -111,7 +178,10 @@ export default function LedgerPanel({ onClose, onChanged, onBusyChange }: {
               还没有改动记录。让它改一次表，这里就会留下每一格的旧值。
             </p>
           )}
-          {!load && items.length > 0 && (
+          {!load && items.length > 0 && filtered.length === 0 && (
+            <p className="lg-empty">没有符合当前筛选的账目。清空表名/状态/日期再看。</p>
+          )}
+          {!load && items.length > 0 && filtered.length > 0 && (
             <table className="lg-table">
               <thead>
                 <tr>
@@ -124,7 +194,7 @@ export default function LedgerPanel({ onClose, onChanged, onBusyChange }: {
                 </tr>
               </thead>
               <tbody>
-                {items.map((it) => (
+                {filtered.map((it) => (
                   <tr key={it.id} className={it.canRollback ? "" : "no"}>
                     <td className="lg-c-check">
                       {it.canRollback ? (

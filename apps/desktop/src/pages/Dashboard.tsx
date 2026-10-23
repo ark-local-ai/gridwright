@@ -3,7 +3,7 @@ import "./dashboard.css";
 import "./dashboard-shell.css";
 import { agentApi, nodeId } from "../api-agent";
 import type { ScanReport, GraphData, GraphNode, LedgerEntry, WorkspaceFiles, WorkspaceListItem, Proposal, SafetyReport, SelfCheckReport, SheetDetail, TraceData, ApplyResult } from "../api-agent";
-import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark, IconClock } from "../components/icons";
+import { IconRefresh, IconCheck, IconXls, IconNote, IconChevD, IconGear, IconFolder, IconLink, IconX, IconSpark, IconClock, IconFiles } from "../components/icons";
 import AttentionList from "../components/AttentionList";
 import DropZone from "../components/DropZone";
 import LinkMap from "../components/LinkMap";
@@ -11,6 +11,7 @@ import SheetView from "./SheetView";
 import { SkPanel } from "../components/Skeleton";
 import Settings from "./Settings2";
 import LedgerPanel from "./LedgerPanel";
+import InboxPanel from "./InboxPanel";
 import TasksPanel from "./TasksPanel";
 import RulesPanel from "./RulesPanel";
 import GeneratePanel from "./GeneratePanel";
@@ -52,6 +53,8 @@ export default function Dashboard({ pickFolder, watchDrop }: {
   });
   const [activeResize, setActiveResize] = useState(false);
   const [ledgerOpen, setLedgerOpen] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [inboxCount, setInboxCount] = useState(0);
   const [tasksOpen, setTasksOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -101,8 +104,10 @@ export default function Dashboard({ pickFolder, watchDrop }: {
     setFeedbackErr("");
     try {
       const convoId = proposal.conversation;
-      // 把反馈落进原对话（逐字留痕，界面能看到自己怎么说、它怎么答）
-      if (convoId) await agentApi.chat(text, convoId);
+      // 把反馈落进原对话（逐字留痕，界面能看到自己怎么说）。
+      // 用确定性的 append，而不是 /chat：/chat 会先让模型回一句，
+      // 紧接着 /plan 又要读同一段历史再算一遍——同样的话白烧一次模型往返。
+      if (convoId) await agentApi.appendConversation(convoId, text, "user");
       // /plan 会读这条对话当上下文；无会话时退回“只给这句反馈”
       const r = await agentApi.plan(text, undefined, undefined, undefined, convoId || undefined);
       if (!r?.proposal) throw new Error("没有拿到新的清单");
@@ -163,16 +168,18 @@ export default function Dashboard({ pickFolder, watchDrop }: {
         setPartErr((p) => ({ ...p, [part]: msg }));
         return null;
       };
-      const [f, g, s, l] = await Promise.all([
+      const [f, g, s, l, ib] = await Promise.all([
         agentApi.files().catch(failed("文件清单")),
         agentApi.graph().catch(failed("表间关联")),
         agentApi.scanRun().catch(failed("体检")),
         agentApi.ledger(5).catch(failed("账目")),
+        agentApi.inbox().catch(failed("收件箱")),
       ]);
       setFiles(f);
       setGraph(g);
       setScan(s?.report ?? null);
       setLedger(l?.entries ?? []);
+      setInboxCount(ib?.count ?? 0);
       // 安全报告：告诉用户"这张表能不能写"（含宏=硬拒绝）。确认改动前必须知道。
       // 读不到时不能静静留空——那会显示成“没有风险”，而实际是“没查成”。
       agentApi.safety()
@@ -348,6 +355,13 @@ export default function Dashboard({ pickFolder, watchDrop }: {
             {!isFirstRun && (
               <button className="mini-btn tone-gen" onClick={() => setGenerateOpen(true)} title="生成清单 / 文件（不动原表）" aria-label="生成">
                 <IconXls size={15} />
+              </button>
+            )}
+            {!isFirstRun && (
+              <button className="mini-btn tone-inbox" onClick={() => setInboxOpen(true)}
+                title={inboxCount > 0 ? `收件箱：${inboxCount} 个待处理` : "收件箱"} aria-label="收件箱">
+                <IconFiles size={15} />
+                {inboxCount > 0 && <span className="mini-badge">{inboxCount > 99 ? "99+" : inboxCount}</span>}
               </button>
             )}
             <button className="mini-btn tone-chat" onClick={() => setChatOpen((v) => !v)} title="对话" aria-label="对话">
@@ -589,6 +603,9 @@ export default function Dashboard({ pickFolder, watchDrop }: {
 
       {ledgerOpen && (
         <LedgerPanel onClose={() => setLedgerOpen(false)} onChanged={() => void refresh()} onBusyChange={setWriteBusy} />
+      )}
+      {inboxOpen && (
+        <InboxPanel onClose={() => setInboxOpen(false)} onChanged={() => void refresh()} />
       )}
       {selfCheckOpen && lastSelfCheck && (
         <SelfCheckModal report={lastSelfCheck} onClose={() => setSelfCheckOpen(false)} />

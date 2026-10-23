@@ -75,8 +75,19 @@
 .mini-btn.tone-task  { --mini-tone: #1f2937; }
 .mini-btn.tone-rules { --mini-tone: #b7791f; }
 .mini-btn.tone-gen   { --mini-tone: #1f9d6b; }
+.mini-btn.tone-inbox { --mini-tone: #2f6fb2; }
 .mini-btn.tone-chat  { --mini-tone: #7c5cbf; }
 .mini-btn.tone-set   { --mini-tone: #5f6a7a; }
+
+/* 收件箱角标：只在有等待文件时出现，超过 99 显示 99+。 */
+.mini-badge {
+  position: absolute; top: -3px; right: -3px;
+  min-width: 14px; height: 14px; padding: 0 3px;
+  display: grid; place-items: center;
+  border-radius: 999px; background: var(--brand); color: #fff;
+  font-size: 9px; line-height: 1; font-weight: var(--fw-med);
+  box-shadow: 0 0 0 1px var(--surface);
+}
 
 /* 工作区切换器 */
 .ws-switch {
