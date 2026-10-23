@@ -185,6 +185,9 @@ apps/
 ├─ *.xlsx             # 被看管的表（可多张）
 ├─ inbox/             # 新数据丢这里 → 处理完移入 inbox/done/
 ├─ inbox/done/        # 处理完的归档
+├─ inbox/skipped/     # 人工跳过（不是已处理，不记账）
+├─ zones.json         # 作业区（输入源 / 目标表 / 规则 / dryRun）
+├─ inbox_failures.json # 收件箱失败原因（界面直接读）
 ├─ rules.yaml         # 规则（记事本可改）
 ├─ ledger.csv         # 账目（append-only，含旧值 → 可回滚）
 ├─ conversations.json # 对话逐字流水
@@ -196,7 +199,8 @@ apps/
 
 ### 技术选型里的几个"不"
 
-- **不用 WebSocket，用 SSE**：进度是"服务器单向推给浏览器"，SSE 够用且更轻
+- **不用 WebSocket，用短轮询**：进度是单向的，当前由界面在动作完成后主动重拉；
+  没有长连接就没有断线重连、心跳与代理超时问题。若以后要推进度，再上 SSE
 - **不重算公式**：excelize 不算公式，界面显示的是 Excel 上次保存的值 —— 并在界面上**明说**
 - **不碰含宏的表**：excelize 写回会丢宏，所以**硬拒绝**并说明原因，而不是冒险写
 - **定时任务只做只读体检**：定时改表仍要你确认，不无人值守
@@ -204,7 +208,7 @@ apps/
 ## 测试
 
 ```bash
-cd apps/agent && go test ./...                      # 229 个用例，覆盖 23 个包（共 33 个包）
+cd apps/agent && go test ./...                      # 278 个用例，覆盖 25 个包（共 36 个包）
 bash apps/agent/scripts/test-race.sh                # 竞态检测（需 gcc，见 CONTRIBUTING）
 ```
 

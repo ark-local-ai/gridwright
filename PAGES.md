@@ -21,9 +21,13 @@
 | 待确认清单 | `pages/Pending.tsx` · `PendingList` | 有改动提案待确认 |
 | 对话抽屉 | `pages/Pending.tsx` · `ChatPane` | 点顶栏的对话图标 |
 | 表格预览（整屏） | `pages/SheetView.tsx` | 点格子或问题条目 |
-| 账目 / 回滚 | `pages/LedgerPanel.tsx` | 折叠块"账目"里的查看 |
+| 账目 / 回滚 | `pages/LedgerPanel.tsx` | 折叠块“账目”里的查看；支持筛选与 CSV 导出 |
+| 收件箱队列 | `pages/InboxPanel.tsx` | 顶栏收件箱图标（有等待文件时带角标） |
 | 定时任务 | `pages/TasksPanel.tsx` | 顶栏时钟图标 |
 | 规则（rules.yaml） | `pages/RulesPanel.tsx` | 顶栏规则图标 |
+| 生成（草稿/清单，不动原表） | `pages/GeneratePanel.tsx` | 顶栏生成图标 |
+| 快捷任务沉淀 | `pages/PromptDistillPanel.tsx` | 对话面板里的“存为快捷任务” |
+| 术语映射 | `pages/TermsPanel.tsx` | 设置 → 术语 |
 | 设置 | `pages/Settings2.tsx` | 顶栏齿轮 |
 | 记忆 | `pages/MemoryPanel.tsx` | 由设置页进入 |
 | 联动图 | `Dashboard` 内的 `GraphOverlay` | 折叠块"表的连接"展开 |

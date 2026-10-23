@@ -66,7 +66,10 @@ gridwright/
 │  │  │  ├─ safety/         # 写前检查：宏 / 透视 / 图表会被 excelize 破坏
 │  │  │  ├─ notify/         # 通知出口（console / serverchan / pushplus / webhook）
 │  │  │  ├─ trace/          # 单次运行每步轨迹，随响应回给界面
-│  │  │  ├─ workspace/      # 工作区约定（inbox/done/archive）+ 注册表
+│  │  │  ├─ workspace/      # 工作区约定（inbox/done/skipped/archive）+ 注册表
+│  │  │  ├─ zones/          # 作业区 zones.json（工作区内的派单作用域，不是新工作区）
+│  │  │  ├─ pathsafe/       # 路径白名单：自动监听/连接器只能碰已授权根目录
+│  │  │  ├─ filelock/       # 同一张表的进程内串行写锁（apply/回滚/inbox 共用）
 │  │  │  ├─ proc/           # 监视父进程，壳没了就退出，不留孤儿占端口
 │  │  │  ├─ llm/            # 模型调用（请求/响应摘要日志，密钥脱敏）
 │  │  │  ├─ logx/           # 日志：slog → stdout、单时间戳、级别可调
@@ -136,7 +139,7 @@ gridwright/
 
 | 端口 | 谁在听 | 什么时候 | 说明 |
 |---|---|---|---|
-| `7700` | Go 引擎 | 引擎运行时（桌面版由壳拉起；单文件版就是进程本身） | `-api 127.0.0.1:7700`。**只绑 127.0.0.1**：单机单人、无鉴权层，不对外 |
+| `7700` | Go 引擎 | 引擎运行时（桌面版由壳拉起；单文件版就是进程本身） | `-api 127.0.0.1:7700`。**只绑 127.0.0.1**，且除 `/health`、`/session` 外的接口都要求本机访问令牌（见下） |
 | `5174` | Vite dev server | 只在 `npm run tauri dev` 开发时 | 官网的开发端口是 `5173`，两者错开以免撞车 |
 
 官网**不占任何端口**：公网上只有静态文件，没有后端可代理。
@@ -148,6 +151,8 @@ gridwright/
 | 文件 | 内容 |
 |---|---|
 | `config.yaml` | 模型配置、上次选的工作区 |
+| `engine.token` | 本机 API 访问令牌（0600；界面通过 `GET /api/v1/session` 领取） |
+| `grants.json` | 路径白名单（自动监听/连接器可碰的根目录） |
 | `gridwright-workspaces.json` | 最近打开过的工作区列表 |
 | `engine.log` | 引擎日志（8 MiB × 3 轮转） |
 | `shell.log` | 桌面壳自己的日志 |
@@ -163,9 +168,24 @@ gridwright/
 | `conversations.json` | 对话逐字流水（全自动写，不做判断） |
 | `memory.json` | 沉淀下来的记忆（要精炼、会过期、**必须人点头**） |
 | `sheet_notes.json` | 工作表描述缓存（模型生成） |
+| `zones.json` | 作业区定义（输入源 / 目标表 / 规则 / dryRun） |
+| `inbox_failures.json` | 收件箱失败原因（界面读它，不靠日志解析） |
 | `inbox/`、`inbox/done/` | 新数据入口、处理完的归档 |
+| `inbox/skipped/` | 人工跳过的文件（不是“已处理”，不记账） |
 | `archive/` | 备份归档 |
 
 一句话：**安装目录里没有任何用户数据**。换版本、卸载、重装都不会动工作区与 `%APPDATA%`。
+
+### 本机 API 的沙箱边界
+
+回环地址不等于安全：同机任意进程、任意网页都能向 `127.0.0.1:7700` 发请求。
+因此引擎启动时生成 `engine.token`，所有业务接口都要求
+`Authorization: Bearer <token>`；界面首次请求前向 `/session` 领一次并缓存在内存。
+另外每次请求都校验 `Host` 必须是回环地址（防 DNS rebinding），CORS 只回显本机
+Origin，并放行 `Authorization` 预检。令牌本身**不写日志**。
+
+这仍是“单机单人”信任模型：能读 `%APPDATA%` 的本机进程本来就能读令牌。
+它挡的是浏览器跨站请求与“随手 curl 就能读盘”的误用，不是同机提权。
+路径白名单（只允许用户显式授权的根目录）留给下一步的“作业区/连接器”。
 
 日志的契约（谁写哪个文件、格式、级别、脱敏）见 `docs/agent-architecture/31-日志与可观测.md`。
