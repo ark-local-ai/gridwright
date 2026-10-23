@@ -22,6 +22,7 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/locate"
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 )
 
 // DirName 是生成物的固定目录名。
@@ -79,12 +80,18 @@ func Extract(f *excelize.File, spec Spec) (header []string, rows [][]string, sum
 	if sheet == "" {
 		sheet = f.GetSheetName(0)
 	}
+	// 进入：筛哪张表、几个条件、指定了哪几列。生成类任务"产物错了"
+	// 要么是筛错表/列、要么是条件理解错，这三项正是区分点。
+	logx.Step("generate", "提取 enter", "kind", spec.Kind, "sheet", sheet,
+		"filters", len(spec.Filter), "columns", len(spec.Columns))
 	s, err := locate.LoadSheet(f, sheet)
 	if err != nil {
+		logx.Step("generate", "提取 exit", "sheet", sheet, "err", err.Error())
 		return nil, nil, nil, fmt.Errorf("读取工作表「%s」: %w", sheet, err)
 	}
 	hdrIdx, hdr := s.FindHeader(10)
 	if len(hdr) == 0 {
+		logx.Step("generate", "提取 exit", "sheet", sheet, "err", "没找到表头")
 		return nil, nil, nil, fmt.Errorf("工作表「%s」没找到表头", sheet)
 	}
 
@@ -104,6 +111,7 @@ func Extract(f *excelize.File, spec Spec) (header []string, rows [][]string, sum
 		for _, want := range spec.Columns {
 			i := locate.ColByHeader(hdr, want)
 			if i < 0 {
+				logx.Step("generate", "提取 exit", "sheet", sheet, "err", "找不到列「"+want+"」")
 				return nil, nil, nil, fmt.Errorf("找不到列「%s」", want)
 			}
 			real := strings.TrimSpace(hdr[i])
@@ -117,6 +125,7 @@ func Extract(f *excelize.File, spec Spec) (header []string, rows [][]string, sum
 	for _, c := range spec.Filter {
 		i := locate.ColByHeader(hdr, c.Column)
 		if i < 0 {
+			logx.Step("generate", "提取 exit", "sheet", sheet, "err", "筛选条件里的列「"+c.Column+"」不存在")
 			return nil, nil, nil, fmt.Errorf("筛选条件里的列「%s」不存在", c.Column)
 		}
 		condIdx[c.Column] = i
@@ -144,6 +153,7 @@ func Extract(f *excelize.File, spec Spec) (header []string, rows [][]string, sum
 		}
 		rows = append(rows, out)
 	}
+	logx.Step("generate", "提取 exit", "sheet", sheet, "rows", len(rows), "columns", len(cols), "sums", len(sum))
 	return cols, rows, sum, nil
 }
 
@@ -254,6 +264,7 @@ func WriteTable(root string, spec Spec, cols []string, rows [][]string, sum map[
 	if err := f.SaveAs(path); err != nil {
 		return nil, fmt.Errorf("写出生成文件: %w", err)
 	}
+	logx.Step("generate", "写表", "path", name, "rows", len(rows), "columns", len(cols))
 
 	preview := rows
 	if len(preview) > 10 {
@@ -288,6 +299,7 @@ func WriteDoc(root, title, content string) (*Result, error) {
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		return nil, fmt.Errorf("写出生成文件: %w", err)
 	}
+	logx.Step("generate", "写文书", "path", name, "chars", len([]rune(content)))
 	return &Result{
 		OK: true, Kind: KindDoc, Title: title, Path: path, File: name, Content: content,
 		Notes: []string{"这是草稿，请审阅后再使用", "生成不改动原表"},

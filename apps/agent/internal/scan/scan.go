@@ -14,11 +14,14 @@ package scan
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/xuri/excelize/v2"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/locate"
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 )
 
 // Severity 是问题严重度。
@@ -86,14 +89,22 @@ type Options struct {
 
 // Run 扫一张工作簿，只读。绝不写文件。
 func Run(path string, opt Options) (*Report, error) {
+	start := time.Now()
+	// 进入就记参数摘要：体检是用户手动/定时触发的一次完整流程，事后要能回答
+	// "这次扫的是哪张表、开没开跨月核对"。
+	logx.Step("scan", "enter", "file", filepathBase(path),
+		"crossMonth", opt.CrossMonthCheck, "monthSheets", len(opt.MonthSheets))
+
 	f, err := excelize.OpenFile(path)
 	if err != nil {
+		logx.Step("scan", "exit", "file", filepathBase(path), "err", err.Error())
 		return nil, fmt.Errorf("打开 %s: %w", path, err)
 	}
 	defer f.Close()
 
 	sheets := f.GetSheetList()
 	rep := &Report{File: path, Sheets: len(sheets)}
+	logx.Step("scan", "打开工作簿", "file", filepathBase(path), "sheets", len(sheets))
 	// 给每条发现补上文件名（跨文件体检时界面靠它定位到具体表）
 	base := filepathBase(path)
 
@@ -119,7 +130,26 @@ func Run(path string, opt Options) (*Report, error) {
 			rep.Issues[i].File = base
 		}
 	}
+	// 退出只汇总计数，不逐条打：退出日志是给人扫一眼的，逐条发现走下面的 debug 块。
+	errs, warns, infos := rep.CountBySeverity()
+	logx.Step("scan", "exit", "file", filepathBase(path), "sheets", rep.Sheets, "cells", rep.Cells,
+		"errors", errs, "warns", warns, "infos", infos,
+		"elapsed", time.Since(start).Round(time.Millisecond).String())
+	// 逐条发现（坐标 + 原因）放到 Debug：默认级别下几百条会把 engine.log 淹没，
+	// 而真要排"为什么报了这条/为什么没报那条"时，只有这份完整清单能回答。
+	if logx.Enabled(slog.LevelDebug) {
+		logx.Block("体检发现", dumpIssues(rep.Issues))
+	}
 	return rep, nil
+}
+
+// dumpIssues 把发现渲染成一行一条的文本，供 Block 在 Debug 级输出。
+func dumpIssues(issues []Issue) string {
+	var b strings.Builder
+	for _, it := range issues {
+		fmt.Fprintf(&b, "[%s] %s!%s %s\n", it.Severity, it.Sheet, it.Ref, it.Message)
+	}
+	return b.String()
 }
 
 func filepathBase(p string) string {

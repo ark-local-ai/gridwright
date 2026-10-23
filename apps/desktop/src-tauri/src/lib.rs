@@ -309,7 +309,12 @@ fn spawn_engine(app: &tauri::App) -> Option<Spawned> {
             "-parent-pid",
             &std::process::id().to_string(),
         ])
-        .env("GRIDWRIGHT_CONFIG_DIR", cfg_dir.to_string_lossy().to_string());
+        .env("GRIDWRIGHT_CONFIG_DIR", cfg_dir.to_string_lossy().to_string())
+        // 引擎的按天日志（<日志目录>/engine-YYYY-MM-DD.log）跟着本壳的日志目录走：
+        // 壳在「设置 → 日志」里改过目录时引擎也得跟着改，否则同一台机器上两份日志
+        // 落在两个地方。不设时引擎自己回落到「exe 旁边的 logs/」，也就是安装目录。
+        // 变量名与 apps/agent/internal/logx 的 EnvDir 必须一致。
+        .env("GRIDWRIGHT_LOG_DIR", current_log_dir().to_string_lossy().to_string());
     match cmd.spawn() {
         Ok((rx, child)) => {
             log_line(&format!("引擎已拉起 pid={}", child.pid()));

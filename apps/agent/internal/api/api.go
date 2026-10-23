@@ -1,7 +1,8 @@
 // Package api 提供本地 HTTP 接口（见 docs/agent-architecture/13-接口契约.md）。
 //
-// 设计原则：只监听 127.0.0.1（单机单人，无鉴权）；JSON 收、JSON 回；
-// 只读能力（工作区/联动图/体检/账目）与"改表"严格分离——改表走 /plan → /apply 两步。
+// 设计原则：只监听 127.0.0.1；除 health/session 外的接口都要求本机访问令牌
+// （见 auth.go），避免同机其它进程或网页借回环地址读写工作区。
+// JSON 收、JSON 回；只读能力（工作区/联动图/体检/账目）与"改表"严格分离——改表走 /plan → /apply 两步。
 //
 // 这一层是"通用契约"的落点：Win10/11 的 Tauri 外壳与 Win7 的内嵌页面
 // 都通过它访问同一个引擎，所以两端行为天然一致，不需要维护两套逻辑。
@@ -32,12 +33,15 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/graph"
 	"github.com/ark-local-ai/ark/apps/agent/internal/ledger"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory"
+	"github.com/ark-local-ai/ark/apps/agent/internal/pathsafe"
 	"github.com/ark-local-ai/ark/apps/agent/internal/propose"
 	"github.com/ark-local-ai/ark/apps/agent/internal/scan"
 	"github.com/ark-local-ai/ark/apps/agent/internal/sheetnotes"
 	"github.com/ark-local-ai/ark/apps/agent/internal/webui"
 	"github.com/ark-local-ai/ark/apps/agent/internal/workspace"
+	"github.com/ark-local-ai/ark/apps/agent/internal/zones"
 )
 
 // Server 持有工作区与账目等运行时依赖。
@@ -50,10 +54,28 @@ type Server struct {
 	Ledger *ledger.Ledger
 	Reg    *workspace.Registry
 	Addr   string
+	// Token 非空时，除 health/session 外的所有接口都必须携带它（见 auth.go）。
+	// 为空只用于单元测试与显式关闭鉴权的开发场景。
+	Token string
+	// OnWorkspaceSwitch 在工作区切换成功后调用（由 main 用来重建 inbox 监听）。
+	// 可为 nil；回调在工作区锁之外执行，不要在里面做耗时操作。
+	OnWorkspaceSwitch func(root string)
+	// Grants 是路径白名单。nil = 未启用（单元测试/旧引擎），不强制。
+	Grants *pathsafe.Store
 	props  *propose.Store
 	brain  *llm.Client
 	notes  *sheetnotes.Store // 工作表描述缓存（sheet_notes.json），随工作区切换重建
 	convos *convo.Store      // 会话存储（conversations.json），随工作区切换重建；全局共享一份
+	zones  *zones.Store      // 作业区（zones.json），随工作区切换重建
+
+	// 只读结果缓存（见 cache.go）。cacheMu 与 mu 分开：缓存不该阻塞工作区切换。
+	cacheMu      sync.Mutex
+	gSig         string
+	gCache       *graph.Graph
+	scanSig      string
+	scanCache    *scan.Report
+	describeBusy bool
+	describeAt   time.Time
 }
 
 // New 构造 server。Addr 形如 "127.0.0.1:7700"。
@@ -67,6 +89,7 @@ func New(cfg *config.Config, layout *workspace.Layout, led *ledger.Ledger, addr 
 		brain:  llm.New(cfg.LLM),
 		notes:  openSheetNotes(layout),
 		convos: openConvoStore(layout),
+		zones:  openZonesStore(layout),
 	}
 }
 
@@ -94,6 +117,19 @@ func openConvoStore(layout *workspace.Layout) *convo.Store {
 	st, err := convo.Open(layout.Root)
 	if err != nil {
 		log.Printf("[convo] 打开会话存储失败（对话功能降级）：%v", err)
+		return nil
+	}
+	return st
+}
+
+// openZonesStore 打开工作区根下的作业区存储；打不开就返回 nil（作业区功能降级）。
+func openZonesStore(layout *workspace.Layout) *zones.Store {
+	if layout == nil {
+		return nil
+	}
+	st, err := zones.Open(layout.Root)
+	if err != nil {
+		log.Printf("[zones] 打开作业区失败（功能降级）：%v", err)
 		return nil
 	}
 	return st
@@ -145,12 +181,17 @@ func (s *Server) cur() (*config.Config, *workspace.Layout, *ledger.Ledger, *work
 // SwitchWorkspace 切换当前工作区：建目录结构、开新账目、登记。
 // 供 handleWorkspaceOpen / handleWorkspaceCreate 调用。
 func (s *Server) SwitchWorkspace(dir string) error {
+	// 切工作区会换掉 Layout/Ledger/会话存储这几份共享状态，是状态变化最大的一步；
+	// 记下"从哪切到哪"，事后翻日志才能解释"为什么账目突然换了文件"。
+	logx.Step("workspace", "切换 enter", "dir", dir)
 	layout, err := workspace.LayoutOf(dir)
 	if err != nil {
+		logx.Step("workspace", "切换 exit", "dir", dir, "err", err.Error())
 		return err
 	}
 	led, err := ledger.Open(layout.Ledger)
 	if err != nil {
+		logx.Step("workspace", "切换 exit", "dir", dir, "err", err.Error())
 		return err
 	}
 	s.mu.Lock()
@@ -158,6 +199,7 @@ func (s *Server) SwitchWorkspace(dir string) error {
 	s.Ledger = led
 	s.notes = openSheetNotes(layout)
 	s.convos = openConvoStore(layout)
+	s.zones = openZonesStore(layout)
 	s.Cfg.Workspace = layout.Root
 	s.Cfg.MarkWorkspaceChosen() // 用户显式选了 → 不再是"首次运行"
 	cfg := s.Cfg
@@ -171,14 +213,26 @@ func (s *Server) SwitchWorkspace(dir string) error {
 			tables, _ := layout.DataFiles()
 			_, _ = reg.Touch(layout.Root, len(tables))
 		}
+		logx.Step("workspace", "切换 exit", "root", layout.Root, "err", "写配置失败："+err.Error())
 		return fmt.Errorf("已切换工作区，但写入配置失败（下次打开需重选）：%w", err)
 	}
 
 	if reg != nil {
 		tables, _ := layout.DataFiles()
 		if _, err := reg.Touch(layout.Root, len(tables)); err != nil {
+			logx.Step("workspace", "切换 exit", "root", layout.Root, "err", err.Error())
 			return err
 		}
+	}
+	logx.Step("workspace", "切换 exit", "root", layout.Root)
+	// 用户显式选中一个目录 → 视为一次授权（只影响自动监听，不扩大 token 权限）。
+	if s.Grants != nil {
+		if _, err := s.Grants.Allow(layout.Root, "工作区"); err != nil {
+			logx.Step("workspace", "授权失败", "root", layout.Root, "err", err.Error())
+		}
+	}
+	if s.OnWorkspaceSwitch != nil {
+		s.OnWorkspaceSwitch(layout.Root)
 	}
 	return nil
 }
@@ -192,6 +246,17 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/workspace/create", s.handleWorkspaceCreate)
 	mux.HandleFunc("/api/v1/workspace/import", s.handleWorkspaceImport)
 	mux.HandleFunc("/api/v1/workspace/forget", s.handleWorkspaceForget)
+	// 路径白名单（自动监听/连接器只能碰到已授权根目录）
+	mux.HandleFunc("/api/v1/grants", s.handleGrants)
+	mux.HandleFunc("/api/v1/grants/revoke", s.handleGrantRevoke)
+	// 作业区（工作区内部的派单作用域；执行器待前端定稿）
+	mux.HandleFunc("/api/v1/zones", s.handleZones)
+	mux.HandleFunc("/api/v1/zones/delete", s.handleZoneDelete)
+	mux.HandleFunc("/api/v1/zones/runs", s.handleZoneRuns)
+	// 收件箱队列（列出状态 / 手动处理 / 跳过）
+	mux.HandleFunc("/api/v1/inbox", s.handleInbox)
+	mux.HandleFunc("/api/v1/inbox/run", s.handleInboxRun)
+	mux.HandleFunc("/api/v1/inbox/skip", s.handleInboxSkip)
 	mux.HandleFunc("/api/v1/workspaces", s.handleWorkspaces)
 	mux.HandleFunc("/api/v1/settings", s.handleSettings)
 	mux.HandleFunc("/api/v1/plan", s.handlePlanOrGet)
@@ -236,6 +301,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/scan", s.handleScan)
 	mux.HandleFunc("/api/v1/scan/run", s.handleScanRun)
 	mux.HandleFunc("/api/v1/ledger", s.handleLedger)
+	mux.HandleFunc("/api/v1/ledger/export", s.handleLedgerExport)
 	mux.HandleFunc("/api/v1/sheets", s.handleListSheets)
 	mux.HandleFunc("/api/v1/sheets/preview", s.handleSheetPreview)
 	mux.HandleFunc("/api/v1/sheets/detail", s.handleSheetDetail)
@@ -245,13 +311,17 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/open/targets", s.handleOpenTargets)
 	mux.HandleFunc("/api/v1/open", s.handleOpenFile)
 	mux.HandleFunc("/api/v1/health", s.handleHealth)
+	// 本机界面拿访问令牌（见 auth.go）。
+	mux.HandleFunc("/api/v1/session", s.handleSession)
 
 	// 界面：把前端产物嵌进二进制（Win7/8 单文件版靠它自带界面，无需 WebView2）。
 	// 未嵌入时返回 nil → 只提供 API，不影响运行。
 	if ui := webui.Handler(); ui != nil {
 		mux.Handle("/", ui)
 	}
-	return withCommon(mux)
+	// 顺序要紧：withCommon 先处理 CORS 与 OPTIONS 预检，withAuth 再校验令牌。
+	// 反过来会让预检请求被 401 挡下，浏览器只会报 CORS 错误、看不到真正原因。
+	return withCommon(s.withAuth(mux))
 }
 
 // ListenAndServe 启动服务（阻塞）。
@@ -324,7 +394,7 @@ func withCommon(next http.Handler) http.Handler {
 		if origin := r.Header.Get("Origin"); origin != "" && isLocalOrigin(origin) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 			w.Header().Add("Vary", "Origin")
 		}
 		if r.Method == http.MethodOptions {
@@ -507,8 +577,10 @@ func (s *Server) handleGraph(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusMethodNotAllowed, "只支持 GET")
 		return
 	}
-	// 扫整个工作区（所有 xlsx），产出跨文件联动图
-	g, err := s.scanGraph()
+	// 扫整个工作区（所有 xlsx），产出跨文件联动图。
+	// 同一批文件 + 规则不变时复用上次结果（见 cache.go）。
+	sig := s.workspaceSig()
+	g, err := s.ensureGraph(sig)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
@@ -653,9 +725,9 @@ func (s *Server) handleScanRun(w http.ResponseWriter, r *http.Request) {
 
 // runScan 对工作区**所有**表做只读体检，合并成一份报告（报告按文件分组）。
 //
-// ctx 会传给描述生成（体检顺带补齐缺失的描述，见 backfillSheetNotes）。
-// 没配模型时 backfillSheetNotes 直接返回，体检照常离线可用。
-func (s *Server) runScan(ctx context.Context) (*scan.Report, error) {
+// 结果按文件签名缓存；描述回填放后台单飞执行（见 cache.go），不阻塞响应。
+// 没配模型时回填直接返回，体检照常离线可用。
+func (s *Server) runScan(_ context.Context) (*scan.Report, error) {
 	_, layout, _, _ := s.cur()
 	tables, err := layout.DataFiles()
 	if err != nil {
@@ -664,6 +736,19 @@ func (s *Server) runScan(ctx context.Context) (*scan.Report, error) {
 	if len(tables) == 0 {
 		return nil, fmt.Errorf("工作区没有 .xlsx 表（%s）", layout.Root)
 	}
+	// 整体体检：同一批文件没变就直接复用上次报告。
+	// 缓存命中也要尝试回填描述（单飞 + 节流，见 cache.go）。
+	sig := s.workspaceSig()
+	if rep, ok := s.cachedScan(sig); ok {
+		// 只在图缓存也在时才排回填；否则为了回填再扫一次图等于白扫。
+		if g, ok := s.cachedGraph(sig); ok {
+			s.startBackfill(tables, g)
+		}
+		return rep, nil
+	}
+	// 整体体检的一条 enter：单张表的细节在 scan.Run 里（flow=scan），
+	// 这里记"这次一共要扫几张"，否则只看到很多条 scan 记录、不知共几张。
+	logx.Step("api.scan", "enter", "tables", len(tables))
 	start := time.Now()
 	merged := &scan.Report{File: layout.Root}
 	for _, t := range tables {
@@ -690,8 +775,16 @@ func (s *Server) runScan(ctx context.Context) (*scan.Report, error) {
 		merged.Issues = append(merged.Issues, rep.Issues...)
 	}
 	merged.Elapsed = time.Since(start).String()
+	// 整体退出：汇总计数（每张表的明细已在各自的 scan 记录里）。
+	errs, warns, infos := merged.CountBySeverity()
+	logx.Step("api.scan", "exit", "tables", len(tables), "cells", merged.Cells,
+		"errors", errs, "warns", warns, "infos", infos, "elapsed", merged.Elapsed)
 	// 体检顺带补齐缺失/过期的“大概描述”。失败不影响体检结果（单张失败只记日志）。
-	s.backfillSheetNotes(ctx, tables)
+	// 放后台：扫描结果先返回，不让人等模型（见 cache.go）。
+	s.storeScan(sig, merged)
+	if g, gerr := s.ensureGraph(sig); gerr == nil {
+		s.startBackfill(tables, g)
+	}
 	return merged, nil
 }
 
@@ -708,11 +801,22 @@ func (s *Server) handleLedger(w http.ResponseWriter, r *http.Request) {
 			limit = n
 		}
 	}
+	filter, ferr := ledgerFilter(r)
+	if ferr != nil {
+		writeErr(w, http.StatusBadRequest, ferr.Error())
+		return
+	}
 	_, _, led, _ := s.cur()
-	entries, err := led.Entries(limit)
+	// 先全量读再筛选：账目量是“一台机器一本台账”，足够；
+	// 若先截断再筛选，用户会被“筛选后只剩几条”误导。
+	entries, err := led.Entries(0)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	entries = ledger.FilterEntries(entries, filter)
+	if limit > 0 && len(entries) > limit {
+		entries = entries[len(entries)-limit:]
 	}
 	if entries == nil {
 		entries = []ledger.Entry{}

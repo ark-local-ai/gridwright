@@ -13,13 +13,16 @@ package rollback
 
 import (
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/xuri/excelize/v2"
 
+	"github.com/ark-local-ai/ark/apps/agent/internal/filelock"
 	"github.com/ark-local-ai/ark/apps/agent/internal/ledger"
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 	"github.com/ark-local-ai/ark/apps/agent/internal/safety"
 	"github.com/ark-local-ai/ark/apps/agent/internal/xl"
 )
@@ -40,6 +43,8 @@ type Item struct {
 	// SourceTitle 是 API 层把会话 id 译回的标题，供界面显示「哪次对话改的」。
 	Source      string `json:"source,omitempty"`
 	SourceTitle string `json:"sourceTitle,omitempty"`
+	// Zone 是作业区 id（空 = 工作区级）。回滚时写回账目，保持筛选可追溯。
+	Zone string `json:"zone,omitempty"`
 	// CanRollback / WhyNot 让界面能明确告诉用户"为什么这条不能倒"
 	CanRollback bool   `json:"canRollback"`
 	WhyNot      string `json:"whyNot,omitempty"`
@@ -72,8 +77,8 @@ func List(led *ledger.Ledger, limit int) ([]Item, error) {
 		it := Item{
 			ID: i, Ts: e.Ts, Table: e.Table, Sheet: e.Sheet, Cell: e.Cell,
 			Op: e.Op, Old: e.Old, New: e.New, Reason: e.Reason, Status: e.Status,
-			Source: e.Source,
-			Group:  e.Ts, // 同一时间戳视为一次操作
+			Source: e.Source, Zone: e.Zone,
+			Group: e.Ts, // 同一时间戳视为一次操作
 		}
 		switch {
 		case e.Status != "ok":
@@ -118,20 +123,31 @@ func RollbackByID(led *ledger.Ledger, root, target string, ids []int, model stri
 	if len(picked) == 0 {
 		return nil, fmt.Errorf("没有找到要回滚的账目")
 	}
+	// 选中了多少条：ID 是界面行号，可能已过期（账目文件被手工编辑过），
+	// 这里记下"请求 N 条、真的选中 M 条"，对不上时一眼能看出来。
+	logx.Step("rollback", "选中账目", "ids", len(ids), "picked", len(picked))
 	return Rollback(led, root, target, picked, model)
 }
 
 // Rollback 执行回滚：把 old 值写回，并为每条写一条 op=rollback 的账目。
 func Rollback(led *ledger.Ledger, root, target string, items []Item, model string) (*Result, error) {
 	res := &Result{Details: []string{}}
+	// 与 apply 共用同一把表级锁：回滚也不能与写回交错。
+	unlock := filelock.Lock(target)
+	defer unlock()
+	// 进入：把哪张表、几条旧值倒回去。回滚是不可逆主路径（回滚本身也记账），
+	// 日志与账目要能对得上。
+	logx.Step("rollback", "enter", "target", base(target), "items", len(items), "model", model)
 
 	// 写前安全检查：含宏这类会被 excelize 破坏的表，不碰
 	if rep, err := safety.Check(target); err == nil && !rep.CanWrite {
+		logx.Step("rollback", "exit", "target", base(target), "err", "安全拒绝："+rep.Describe())
 		return nil, fmt.Errorf("这张表含程序无法安全处理的内容，已拒绝回滚：%s", rep.Describe())
 	}
 
 	f, err := excelize.OpenFile(target)
 	if err != nil {
+		logx.Step("rollback", "exit", "target", base(target), "err", "打开目标表失败："+err.Error())
 		return nil, fmt.Errorf("打开目标表: %w", err)
 	}
 	defer f.Close()
@@ -171,6 +187,7 @@ func Rollback(led *ledger.Ledger, root, target string, items []Item, model strin
 
 	if len(done) == 0 {
 		res.Note = "没有可回滚的条目，未改动文件"
+		logx.Step("rollback", "exit", "target", base(target), "rolled", 0, "skipped", res.Skipped)
 		return res, nil
 	}
 
@@ -179,6 +196,7 @@ func Rollback(led *ledger.Ledger, root, target string, items []Item, model strin
 		res.Details = append(res.Details, "备份失败（已继续回滚）："+err.Error())
 	}
 	if err := f.SaveAs(target); err != nil {
+		logx.Step("rollback", "exit", "target", base(target), "err", "保存失败："+err.Error())
 		return nil, fmt.Errorf("写回失败: %w", err)
 	}
 
@@ -188,13 +206,20 @@ func Rollback(led *ledger.Ledger, root, target string, items []Item, model strin
 	for _, a := range done {
 		_ = led.Append(now, table, a.it.Sheet, a.it.Cell, "rollback",
 			a.it.New, a.it.Old, // 回滚后：旧值变新值，原新值成为"旧值"
-			"撤销："+tidy(a.it.Reason), "rollback", "", model, "ok")
+			"撤销："+tidy(a.it.Reason), "rollback", "", model, "ok", a.it.Zone)
 		res.Rolled++
 		res.Details = append(res.Details, fmt.Sprintf("已还原 %s!%s：%s → %s",
 			a.it.Sheet, a.it.Cell, a.it.New, a.it.Old))
 	}
 	res.OK = true
 	res.Note = fmt.Sprintf("已回滚 %d 处；回滚本身也记了账，可以再倒回去", res.Rolled)
+	// 退出：回滚条数 + 跳过条数（跳过的原因在明细里，默认级别下不看）。
+	logx.Step("rollback", "exit", "target", base(target), "rolled", res.Rolled, "skipped", res.Skipped)
+	// 逐条明细（含"为什么跳过"）放 Debug：回滚最常见的坑是"以为全倒了、其实有几条 SKIPPED"，
+	// 排查时需要这份完整明细，但它是 O(条数) 的，不该占默认日志。
+	if logx.Enabled(slog.LevelDebug) {
+		logx.Block("回滚明细", strings.Join(res.Details, "\n"))
+	}
 	return res, nil
 }
 

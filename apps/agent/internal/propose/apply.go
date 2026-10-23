@@ -2,13 +2,16 @@ package propose
 
 import (
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/xuri/excelize/v2"
 
+	"github.com/ark-local-ai/ark/apps/agent/internal/filelock"
 	"github.com/ark-local-ai/ark/apps/agent/internal/ledger"
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 	"github.com/ark-local-ai/ark/apps/agent/internal/safety"
 	"github.com/ark-local-ai/ark/apps/agent/internal/xl"
 )
@@ -36,8 +39,17 @@ func Apply(p *Proposal, led *ledger.Ledger, model string) ([]ApplyResult, error)
 	if p == nil {
 		return nil, fmt.Errorf("清单不存在或已过期")
 	}
+	// 同一张表同一时刻只允许一个写回：apply / 回滚 / inbox 自动处理
+	// 都可能命中同一个 xlsx，excelize 整本重写会互相覆盖（见 filelock 包）。
+	unlock := filelock.Lock(p.Target)
+	defer unlock()
+	// 进入：清单落到哪张表、几条改动、谁批的。改表主路径上，账目回答"改了什么"，
+	// 这里回答"哪一次 apply 在跑、跑到了哪一步"。
+	base := lastBase(p.Target)
+	logx.Step("apply", "enter", "target", base, "items", len(p.Items), "model", model)
 	// 防盲改：确认期间文件被换过就不动
 	if Changed(p.Target, p.Finger) {
+		logx.Step("apply", "exit", "target", base, "err", "目标表在确认期间被改动过")
 		return nil, fmt.Errorf("目标表在确认期间被改动过，为避免覆盖你的修改，已取消本次操作；请重新体检再改")
 	}
 
@@ -45,12 +57,14 @@ func Apply(p *Proposal, led *ledger.Ledger, model string) ([]ApplyResult, error)
 	// （见 docs/agent-architecture/24-语义映射与安全边界.md）
 	if rep, err := safety.Check(p.Target); err == nil {
 		if !rep.CanWrite {
+			logx.Step("apply", "exit", "target", base, "err", "安全拒绝："+rep.Describe())
 			return nil, fmt.Errorf("这张表含程序无法安全处理的内容，已拒绝写入：%s", rep.Describe())
 		}
 	}
 
 	f, err := excelize.OpenFile(p.Target)
 	if err != nil {
+		logx.Step("apply", "exit", "target", base, "err", "打开目标表失败："+err.Error())
 		return nil, fmt.Errorf("打开目标表: %w", err)
 	}
 	defer f.Close()
@@ -116,6 +130,7 @@ func Apply(p *Proposal, led *ledger.Ledger, model string) ([]ApplyResult, error)
 
 	// 一条都没成功：不备份、不保存（避免留下无意义备份）
 	if applied == 0 {
+		logx.Step("apply", "exit", "target", base, "ok", 0, "rejected", len(results))
 		recordAll(led, p, results, model)
 		return results, nil
 	}
@@ -127,13 +142,32 @@ func Apply(p *Proposal, led *ledger.Ledger, model string) ([]ApplyResult, error)
 	// 只读文件（微信收到的那种）先解除只读，否则 SaveAs 报 Access is denied。
 	// 放在备份之后：万一解除失败，至少副本已落下。
 	if err := xl.EnsureWritable(p.Target); err != nil {
+		logx.Step("apply", "exit", "target", base, "err", "解除只读失败："+err.Error())
 		return results, fmt.Errorf("写回失败: %w", err)
 	}
 	if err := f.SaveAs(p.Target); err != nil {
+		logx.Step("apply", "exit", "target", base, "err", "保存失败："+err.Error())
 		return results, fmt.Errorf("写回失败: %w", err)
 	}
 	recordAll(led, p, results, model)
+	// 退出：为什么只看"成功/被拒"两个数——它们与账目行数一一对应，
+	// 对不上时能立刻看出"外层以为 5 条、账目只有 3 条"这种断点。
+	logx.Step("apply", "exit", "target", base, "ok", applied, "rejected", len(results)-applied)
+	// 逐条改动（格/旧值/新值/状态）放 Debug：这就是"改动清单"本体，
+	// 默认级别下它已经在响应与界面上给人看过了，engine.log 不必再发一份。
+	if logx.Enabled(slog.LevelDebug) {
+		logx.Block("改动清单", dumpApplyResults(base, results))
+	}
 	return results, nil
+}
+
+// dumpApplyResults 把本次 apply 的逐条结果渲染成 Debug 块。
+func dumpApplyResults(target string, results []ApplyResult) string {
+	var b strings.Builder
+	for _, r := range results {
+		fmt.Fprintf(&b, "%s!%s %s %v -> %v [%s] %s\n", target, r.Sheet, r.Ref, r.Old, r.New, r.Status, r.Note)
+	}
+	return b.String()
 }
 
 // recordAll 逐条记账（每格一条，含旧值 → 可回滚）。
@@ -175,7 +209,7 @@ func recordAll(led *ledger.Ledger, p *Proposal, results []ApplyResult, model str
 		}
 		_ = led.Append(now, table, r.Sheet, r.Ref, op,
 			fmt.Sprint(r.Old), fmt.Sprint(r.New),
-			reason, source, "", model, status)
+			reason, source, "", model, status, p.Zone)
 	}
 }
 
@@ -200,4 +234,13 @@ func lastSlash(s string) int {
 		}
 	}
 	return -1
+}
+
+// lastBase 取路径的文件名。日志里用短名（表名才是给人看的），
+// 完整路径已经在 Proposal.Target 上，不必每条记录重复一遍。
+func lastBase(s string) string {
+	if i := lastSlash(s); i >= 0 {
+		return s[i+1:]
+	}
+	return s
 }

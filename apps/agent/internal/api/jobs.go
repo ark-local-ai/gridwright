@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/jobs"
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 	"github.com/ark-local-ai/ark/apps/agent/internal/notify"
 )
 
@@ -172,6 +173,8 @@ func (s *Server) handleJobRuns(w http.ResponseWriter, r *http.Request) {
 func (s *Server) ExecuteJob(ctx context.Context, st *jobs.Store, j jobs.Job) jobs.Run {
 	started := time.Now().Format("2006-01-02 15:04")
 	run := jobs.Run{JobID: j.ID, Name: j.Name, Started: started}
+	// 定时任务没有用户在旁边看，engine.log 是唯一能回答"该跑的任务到底跑没跑、结果如何"的地方。
+	logx.Step("job", "enter", "name", j.Name, "kind", j.Kind, "schedule", jobs.Describe(j.Schedule))
 
 	switch j.Kind {
 	case jobs.KindScan, "":
@@ -191,6 +194,7 @@ func (s *Server) ExecuteJob(ctx context.Context, st *jobs.Store, j jobs.Job) job
 	}
 
 	_ = st.RecordRun(run)
+	logx.Step("job", "exit", "name", j.Name, "ok", run.OK, "summary", run.Summary)
 	// 定时跑完也通知一声（用户要的是"下班前体检，有问题告诉我"）
 	cfg, _, _, _ := s.cur()
 	if err := notify.Send(cfg.Notify, notify.Message{

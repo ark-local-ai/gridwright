@@ -20,6 +20,7 @@ import (
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/graph"
 	"github.com/ark-local-ai/ark/apps/agent/internal/locate"
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 )
 
 // Kind 是新表的判断类型。
@@ -60,7 +61,15 @@ type Input struct {
 
 // Detect 找出所有孤岛表并逐个评估。
 func Detect(in Input) []Assessment {
+	// 与 impact.Infer 一致：没有图也要留 enter/exit 一对，否则日志里这条流程
+	// 会凭空消失，读的人分不清"没跑"还是"跑了但没图"。
+	nodes := 0
+	if in.Graph != nil {
+		nodes = len(in.Graph.Nodes)
+	}
+	logx.Step("newtable", "enter", "nodes", nodes, "files", len(in.Files))
 	if in.Graph == nil {
+		logx.Step("newtable", "exit", "isolated", 0, "note", "没有联动图，无法识别孤岛")
 		return nil
 	}
 	// 孤岛 = 图上没有任何 high 置信边相连
@@ -93,6 +102,14 @@ func Detect(in Input) []Assessment {
 		}
 		return out[i].Node.ID() < out[j].Node.ID()
 	})
+	// 退出：孤岛几张、其中几张要问人。重复表会算重，是最该被看见的一类。
+	need := 0
+	for _, a := range out {
+		if a.NeedAsk {
+			need++
+		}
+	}
+	logx.Step("newtable", "exit", "isolated", len(out), "needAsk", need)
 	return out
 }
 

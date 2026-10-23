@@ -20,6 +20,8 @@ import (
 	"strings"
 
 	"github.com/xuri/excelize/v2"
+
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 )
 
 // Kind 是边的来源类型。
@@ -110,6 +112,9 @@ var externalRefRe = regexp.MustCompile(`'?\[(\d+)\]([^'!]+)'?!`)
 // ScanWorkspace 扫一个工作区里的所有 xlsx，产出跨文件联动图。
 func ScanWorkspace(root string, files []string, opt Options) (*Graph, error) {
 	g := &Graph{Root: root, Anchors: map[string][]string{}}
+	// 扫图是多条流程共用的重活（plan/自检/新表识别/图接口都会走），
+	// 进出各一条，才能把后面的"几张表/几条边"与前面的"拿到几张文件"对应上。
+	logx.Step("graph", "enter", "files", len(files), "semantic", opt.IncludeSemantic)
 
 	type opened struct {
 		name   string
@@ -214,6 +219,7 @@ func ScanWorkspace(root string, files []string, opt Options) (*Graph, error) {
 		g.Edges = append(g.Edges, semanticEdges(g, edgeMeta)...)
 	}
 	sortEdges(g.Edges)
+	logx.Step("graph", "exit", "files", len(g.Files), "nodes", len(g.Nodes), "edges", len(g.Edges))
 	return g, nil
 }
 

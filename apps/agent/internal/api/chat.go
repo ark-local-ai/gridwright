@@ -9,7 +9,9 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/agent"
 	"github.com/ark-local-ai/ark/apps/agent/internal/convo"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 	"github.com/ark-local-ai/ark/apps/agent/internal/trace"
+	"github.com/ark-local-ai/ark/apps/agent/internal/zones"
 )
 
 // 会话接口（见 docs/agent-architecture/7-对话与自动化任务.md）。
@@ -75,6 +77,9 @@ type chatReq struct {
 	// 走 JSON 而不是 multipart：一张截图通常几百 KB，data URL 足够；
 	// 而且要跟着会话一起落库才能"回看当时给的是什么图"。
 	Images []string `json:"images,omitempty"`
+	// ZoneID 是当前派单的作业区（可选）。作用只是给模型一行上下文，
+	// 真正的写操作仍走 /plan → /apply 并带 zone_id。
+	ZoneID string `json:"zoneId,omitempty"`
 }
 
 // imgsForStore 过滤出合法的图片 data URL。
@@ -104,19 +109,25 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "缺少 message")
 		return
 	}
+	// 接口层只记"带了什么"（字数/图数/会话），具体步骤在 agent 层 flow=chat 里。
+	logx.Step("api.chat", "enter", "conversation", req.ConversationID,
+		"chars", len([]rune(req.Message)), "images", len(req.Images), "zone", req.ZoneID)
 	cfg, layout, led, _ := s.cur()
 	if !cfg.BrainReady() {
+		logx.Step("api.chat", "exit", "err", "未配置模型")
 		writeErr(w, http.StatusBadRequest, "还没配置模型（脑）：请在设置里填 base_url 与 api_key 后就能对话了")
 		return
 	}
 	store, err := s.convoStore()
 	if err != nil {
+		logx.Step("api.chat", "exit", "conversation", req.ConversationID, "err", "打开会话存储失败："+err.Error())
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	// 取或建会话，先把用户的话记下来
 	c, err := store.Ensure(req.ConversationID, "")
 	if err != nil {
+		logx.Step("api.chat", "exit", "conversation", req.ConversationID, "err", "准备会话失败："+err.Error())
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -127,6 +138,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	// 的、用户刚说的话”被当成上一轮，那正是重复追问的成因。所以先剪好再追加。
 	history := append([]convo.Message(nil), c.Messages...)
 	if _, err := store.Append(c.ID, convo.Message{Role: convo.RoleUser, Text: req.Message, Images: imgsForStore(req.Images)}); err != nil {
+		logx.Step("api.chat", "exit", "conversation", c.ID, "err", "存用户消息失败："+err.Error())
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -147,18 +159,36 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	for _, d := range imgsForStore(req.Images) {
 		imgs = append(imgs, llm.ImageInput{DataURL: d})
 	}
-	reply, err := ag.ChatWithImages(ctx, req.Message, names, imgs, history)
+	// 作业区上下文只加在**送给模型**的这句里，不写进会话原文：
+	// 用户说的是“补一下这个月的”，历史里不该多出一句自己没说过的话。
+	chatText := req.Message
+	if req.ZoneID != "" {
+		st := s.zonesStore()
+		z, ok := zones.Zone{}, false
+		if st != nil {
+			z, ok = st.Get(req.ZoneID)
+		}
+		if !ok {
+			writeErr(w, http.StatusNotFound, "zone 不存在："+req.ZoneID)
+			return
+		}
+		chatText = fmt.Sprintf("（当前作业区：%s；目标表：%s）\n%s", z.Name, z.Target.File, req.Message)
+	}
+	reply, err := ag.ChatWithImages(ctx, chatText, names, imgs, history)
 	if err != nil {
 		// 记下失败，避免对话看起来"没反应"
 		_, _ = store.Append(c.ID, convo.Message{Role: convo.RoleSystem, Text: "出错：" + err.Error()})
+		logx.Step("api.chat", "exit", "conversation", c.ID, "err", err.Error())
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	updated, err := store.Append(c.ID, *reply)
 	if err != nil {
+		logx.Step("api.chat", "exit", "conversation", c.ID, "err", "存回话失败："+err.Error())
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	logx.Step("api.chat", "exit", "conversation", c.ID, "messages", len(updated.Messages))
 	writeJSON(w, http.StatusOK, map[string]any{"conversationId": c.ID, "conversation": updated, "trace": tr})
 }
 
@@ -227,14 +257,17 @@ func (s *Server) handleDistill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ag := agent.New(cfg, layout, led, s.brainClient())
+	logx.Step("api.chat", "提炼记忆 enter", "conversation", c.ID)
 	cands, err := ag.Distill(r.Context(), c)
 	if err != nil {
+		logx.Step("api.chat", "提炼记忆 exit", "conversation", c.ID, "err", err.Error())
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if cands == nil {
 		cands = []agent.DistillCandidate{}
 	}
+	logx.Step("api.chat", "提炼记忆 exit", "conversation", c.ID, "candidates", len(cands))
 	writeJSON(w, http.StatusOK, map[string]any{
 		"conversationId": c.ID,
 		"title":          c.Title,

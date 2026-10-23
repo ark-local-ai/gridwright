@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 )
 
 // 导入文件到工作区。
@@ -45,17 +47,23 @@ func (s *Server) handleWorkspaceImport(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "还没有工作区")
 		return
 	}
+	logx.Step("api.import", "enter", "paths", len(req.Paths))
 
 	results := make([]importResult, 0, len(req.Paths))
+	okN := 0
 	for _, src := range req.Paths {
 		res := importResult{Name: filepath.Base(src)}
 		if err := s.importOne(layout.Root, src); err != nil {
 			res.Err = err.Error()
 		} else {
 			res.OK = true
+			okN++
 		}
 		results = append(results, res)
 	}
+	// 逐个文件的成败在 results 里回给了界面，这里只记总数；
+	// 失败的具体原因用户在界面上直接看得到（不必再抄进 engine.log）。
+	logx.Step("api.import", "exit", "paths", len(req.Paths), "ok", okN)
 	// 不用在这里刷新图/体检：前端拿到结果会自己重新拉一遍
 	// （服务端缓存图反而会拿到复制完成前的旧状态）
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "results": results})

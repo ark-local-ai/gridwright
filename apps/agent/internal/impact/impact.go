@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/graph"
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory2"
 )
 
@@ -68,8 +69,12 @@ const (
 // Infer 推断影响面。
 func Infer(in Input) Result {
 	res := Result{Kind: in.Kind, Candidates: []Candidate{}}
+	// 进入：从哪个节点、按什么语义类别推断。影响面是"改一张表要同步看哪几张"，
+	// 事后必须能复现：同一个改动点在"收租"与"卖房"下候选表本来就不同。
+	logx.Step("impact", "enter", "from", in.From.ID(), "kind", in.Kind)
 	if in.Graph == nil {
 		res.Note = "没有联动图，无法推断影响面"
+		logx.Step("impact", "exit", "candidates", 0, "note", res.Note)
 		return res
 	}
 	if in.Kind == "" {
@@ -165,6 +170,9 @@ func Infer(in Input) Result {
 		}
 		return res.Candidates[i].Node.ID() < res.Candidates[j].Node.ID()
 	})
+	// 退出：候选几张、类别从哪来（memory/llm/none）。只报数不逐个打分，
+	// 打分过程对复查没帮助，要看得看每条 Candidate.Score。
+	logx.Step("impact", "exit", "kind", res.Kind, "source", res.Source, "candidates", len(res.Candidates))
 	return res
 }
 

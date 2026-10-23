@@ -8,6 +8,7 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/locate"
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory"
 	"github.com/ark-local-ai/ark/apps/agent/internal/plan"
 	"github.com/ark-local-ai/ark/apps/agent/internal/rules"
@@ -19,6 +20,7 @@ import (
 // ——包括"这行定不到位"也要如实报出来。若试跑另写一套简化逻辑，它会报出一堆
 // "看起来能改、其实定不到行"的假结果，那比不给试跑更坏。
 func (a *Agent) DryRun(inboxFile string, rf memory.RulesFile) (*plan.Plan, []string) {
+	logx.Step("rules", "dry-run enter", "file", filepath.Base(inboxFile))
 	// 先算"哪些规则命中"（给人看的一句话），再走真实定位拿到逐条结果。
 	var hits []string
 	if d, err := rules.Load(inboxFile); err == nil {
@@ -29,6 +31,12 @@ func (a *Agent) DryRun(inboxFile string, rf memory.RulesFile) (*plan.Plan, []str
 		}
 	}
 	p, _ := a.runRulesOn(inboxFile, rf)
+	// 退出：命中了几条规则、算出几处改动。试跑的价值就是这几个数能与真跑对上。
+	edits := 0
+	if p != nil {
+		edits = len(p.Edits)
+	}
+	logx.Step("rules", "dry-run exit", "file", filepath.Base(inboxFile), "hits", len(hits), "edits", edits)
 	return p, hits
 }
 

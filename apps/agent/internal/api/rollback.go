@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 	"github.com/ark-local-ai/ark/apps/agent/internal/rollback"
 )
 
@@ -75,12 +76,15 @@ func (s *Server) handleRollback(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	logx.Step("api.rollback", "enter", "ids", len(req.IDs), "table", req.Table)
 	cfg, _, led, _ := s.cur()
 	res, err := rollback.RollbackByID(led, "", target, req.IDs, cfg.LLM.Model)
 	if err != nil {
+		logx.Step("api.rollback", "exit", "ids", len(req.IDs), "err", err.Error())
 		writeErr(w, http.StatusConflict, err.Error())
 		return
 	}
+	logx.Step("api.rollback", "exit", "rolled", res.Rolled, "skipped", res.Skipped)
 	writeJSON(w, http.StatusOK, res)
 }
 

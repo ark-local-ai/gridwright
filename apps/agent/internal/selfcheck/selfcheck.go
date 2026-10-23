@@ -14,6 +14,7 @@ package selfcheck
 
 import (
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
@@ -23,6 +24,7 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/graph"
 	"github.com/ark-local-ai/ark/apps/agent/internal/impact"
 	"github.com/ark-local-ai/ark/apps/agent/internal/locate"
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory2"
 )
 
@@ -80,6 +82,10 @@ type Input struct {
 func Run(in Input) *Report {
 	start := time.Now()
 	rep := &Report{Level: LevelOK, Findings: []Finding{}, Correctable: true}
+	// 进入：改动点 + 语义类别 + 本次实际动过的表数。自检是"改完自动跑"的，
+	// 没有用户交互，日志是唯一能回答"它到底查了哪次改动"的地方。
+	logx.Step("selfcheck", "enter", "changed", in.Changed.ID(), "kind", in.Kind,
+		"touched", len(in.Touched), "files", len(in.Files))
 
 	// ① 相关表（复用影响面推断）
 	res := impact.Infer(impact.Input{
@@ -127,7 +133,24 @@ func Run(in Input) *Report {
 		rep.Summary = fmt.Sprintf("检查了 %d 张相关表：%d 处需处理、%d 处请核对", rep.Checked, issues, notices)
 	}
 	rep.Elapsed = time.Since(start).String()
+	// 退出：等级 + 查了几张 + 发现几条。这三项决定界面上"要不要人看"。
+	logx.Step("selfcheck", "exit", "level", rep.Level, "checked", rep.Checked,
+		"findings", len(rep.Findings), "elapsed", rep.Elapsed)
+	// 逐条发现放 Debug：自检会报"该同步动的表没动"这类需要人判断的项，
+	// 默认级别只报等级与条数（界面上已有完整列表），排查时才展开。
+	if logx.Enabled(slog.LevelDebug) {
+		logx.Block("自检发现", dumpFindings(rep.Findings))
+	}
 	return rep
+}
+
+// dumpFindings 把自检发现渲染成 Debug 块。
+func dumpFindings(fs []Finding) string {
+	var b strings.Builder
+	for _, f := range fs {
+		fmt.Fprintf(&b, "[%s] %s %s %s score=%.2f\n", f.Level, f.Kind, f.Node.ID(), f.Message, f.Score)
+	}
+	return b.String()
 }
 
 // inspect 查一张相关表，产出发现。

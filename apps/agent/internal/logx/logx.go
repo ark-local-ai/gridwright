@@ -15,6 +15,7 @@
 package logx
 
 import (
+	"io"
 	"log"
 	"log/slog"
 	"os"
@@ -24,15 +25,37 @@ import (
 // EnvLevel 是日志级别的环境变量名。桌面壳与命令行都可用它覆盖。
 const EnvLevel = "GRIDWRIGHT_LOG_LEVEL"
 
+// EnvDir 是按天分文件的日志目录的环境变量名。桌面壳拉起引擎时会设它
+// （壳在「设置 → 日志」里能改日志目录）；不设时由调用方回落到「exe 旁边的 logs/」。
+// 名字写在这里而不是散在壳里，是为了让 Rust 侧与 Go 侧指向同一个字面量。
+const EnvDir = "GRIDWRIGHT_LOG_DIR"
+
 // Setup 安装全局 logger。level 为空时回落到环境变量，再回落到 info。
 //
 // 输出一律走 **stdout**：引擎跑在 GUI 里，屏幕上看不到任何东西，唯一的排障通道
 // 就是桌面壳把 stdout 落成的 engine.log。
+//
+// 只打印、不落文件；要同时按天写文件用 SetupWithFile（见 file.go）。
 func Setup(level string) {
+	install(level, nil)
+}
+
+// install 是 Setup 与 SetupWithFile 共用的装配点，保证两条入口的 stdout 行为一模一样。
+// file 为 nil 表示只写 stdout；非 nil 时用 io.MultiWriter 让同一条记录**同步**落到两处。
+func install(level string, file *dailyWriter) {
 	if strings.TrimSpace(level) == "" {
 		level = os.Getenv(EnvLevel)
 	}
-	h := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: ParseLevel(level)})
+	// 先把上一个文件句柄交出去关掉：install 会被反复调用（测试每个用例一次、改级别时一次）。
+	setActiveFile(file)
+
+	// stdout 一定排在第一位：io.MultiWriter 遇到第一个错误就不再往后写，
+	// 所以「文件写不进去」绝不会连累 stdout —— stdout 是 GUI 下唯一的排障通道。
+	var out io.Writer = os.Stdout
+	if file != nil {
+		out = io.MultiWriter(os.Stdout, file)
+	}
+	h := slog.NewTextHandler(out, &slog.HandlerOptions{Level: ParseLevel(level)})
 	slog.SetDefault(slog.New(h))
 
 	// 把标准库 log 也接到 slog 上，让现存的上百处 log.Printf 自动获得

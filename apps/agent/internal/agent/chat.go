@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/convo"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 	"github.com/ark-local-ai/ark/apps/agent/internal/trace"
 )
 
@@ -34,6 +36,10 @@ func (a *Agent) ChatWithImages(ctx context.Context, userText string, files []str
 		return nil, fmt.Errorf("还没配置模型（脑）：请在设置里填 base_url 与 api_key 后就能对话了")
 	}
 	tr := trace.From(ctx)
+	// 进入只记长度与张数，不记原文：回话里可能有用户的业务原话，
+	// 默认日志不必留存全文（要看全文有 Debug 块与 trace 响应）。
+	logx.Step("chat", "enter", "chars", len([]rune(userText)), "files", len(files),
+		"images", len(imgs), "history", len(history))
 	donePrompt := tr.Step("组装提示")
 	prompt := assembleChatPrompt(userText, files, history)
 	if len(imgs) > 0 {
@@ -41,6 +47,11 @@ func (a *Agent) ChatWithImages(ctx context.Context, userText string, files []str
 		prompt += fmt.Sprintf("\n\n（用户随消息附了 %d 张图，通常是截图或照片里的数据；请从中读数。）", len(imgs))
 	}
 	tr.SetPrompt(prompt)
+	// 提示词全文只在 Debug 出：它是几百到几千字，平时不需要，
+	// 但"模型为什么这么答"的排查只能从这里入手。
+	if logx.Enabled(slog.LevelDebug) {
+		logx.Block("会话提示词", prompt)
+	}
 	donePrompt(fmt.Sprintf("%d 字 · 历史 %d 条 · 工作区表 %d 张 · 附图 %d 张",
 		len([]rune(prompt)), len(history), len(files), len(imgs)))
 
@@ -48,6 +59,7 @@ func (a *Agent) ChatWithImages(ctx context.Context, userText string, files []str
 	content, err := a.Brain.ChatJSONWithImages(ctx, prompt, imgs)
 	if err != nil {
 		doneBrain("失败：" + err.Error())
+		logx.Step("chat", "exit", "err", "调模型失败："+err.Error())
 		return nil, err
 	}
 	doneBrain(fmt.Sprintf("模型 %s", a.Brain.Model()))
@@ -68,7 +80,15 @@ func (a *Agent) ChatWithImages(ctx context.Context, userText string, files []str
 	if err := json.Unmarshal([]byte(content), &raw); err != nil {
 		// 模型没按格式回：退回纯文本回话，不让整轮失败
 		doneParse("模型没按 JSON 回，退回纯文本")
+		if logx.Enabled(slog.LevelDebug) {
+			logx.Block("模型原始返回", content)
+		}
+		logx.Step("chat", "exit", "model", a.Brain.Model(), "note", "模型未按 JSON 回，退回纯文本")
 		return &convo.Message{Role: convo.RoleAgent, Text: strings.TrimSpace(content)}, nil
+	}
+	// 模型原始 JSON 放 Debug：它含完整 proposal，是"为什么界面弹出这个建议"的底稿。
+	if logx.Enabled(slog.LevelDebug) {
+		logx.Block("模型原始返回", content)
 	}
 	msg := &convo.Message{Role: convo.RoleAgent, Text: raw.Reply}
 	if raw.Proposal != nil && raw.Proposal.Kind != "" {
@@ -78,8 +98,10 @@ func (a *Agent) ChatWithImages(ctx context.Context, userText string, files []str
 			Tools: raw.Proposal.Tools, Options: raw.Proposal.Options,
 		}
 		doneParse("proposal=" + raw.Proposal.Kind)
+		logx.Step("chat", "exit", "model", a.Brain.Model(), "proposal", raw.Proposal.Kind, "title", raw.Proposal.Title)
 	} else {
 		doneParse("无 proposal（纯回话）")
+		logx.Step("chat", "exit", "model", a.Brain.Model(), "proposal", "")
 	}
 	return msg, nil
 }

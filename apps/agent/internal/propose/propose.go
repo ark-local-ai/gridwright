@@ -16,8 +16,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 )
 
 // Item 是清单里的一条改动。
@@ -42,19 +45,19 @@ type Item struct {
 	Month string            `json:"month,omitempty"`
 	Field string            `json:"field"` // 字段列名
 
-	Op     string `json:"op"`  // set | add | append
+	Op string `json:"op"` // set | add | append
 	// HeaderRow 是表头所在行（1 基），op=append 时必须。
 	// 真实台账的表头常在第 2–4 行（前面是标题），传 1 会把表头认成标题行。
-	HeaderRow int    `json:"header_row,omitempty"`
-	Old    any    `json:"old"` // 旧值（算出来的）
-	New    any    `json:"new"` // 新值（将写入）
+	HeaderRow int `json:"header_row,omitempty"`
+	Old       any `json:"old"` // 旧值（算出来的）
+	New       any `json:"new"` // 新值（将写入）
 	// Values 是新增行时要写入的「列名 → 值」（op=append 时用）。
 	//
 	// 为什么不能挤进 New：新增一行是多列，而 New 是单个值。硬塞进去
 	// 就只能存成一张 map 的字符串，界面既显示不了也回不了滚。
 	Values map[string]any `json:"values,omitempty"`
 	Reason string         `json:"reason,omitempty"`
-	Source string `json:"source,omitempty"` // 这条来自哪份新数据 / 哪句指令
+	Source string         `json:"source,omitempty"` // 这条来自哪份新数据 / 哪句指令
 
 	// 联动：改这一格会牵动哪些 文件!工作表（来自联动图）
 	Affects []string `json:"affects,omitempty"`
@@ -76,6 +79,9 @@ type Proposal struct {
 	// 为什么要留：用户改完表回头看账目，要能回答"这是哪次对话让我改的"。
 	// 账目里的 source 列据此写成 "对话:<id>"，看板/账目再译回标题。
 	Conversation string `json:"conversation,omitempty"`
+	// Zone 是产生这份清单的作业区 id（空 = 工作区级指令）。
+	// 写进账目 zone 列，界面可“只看本区”。
+	Zone string `json:"zone,omitempty"`
 	// 被挡下的条目（命中 forbid / 定位失败等），要让人看见，不静默
 	Blocked []Blocked `json:"blocked,omitempty"`
 	Created time.Time `json:"created"`
@@ -112,6 +118,10 @@ func (s *Store) Put(p *Proposal) string {
 	p.ID = newID()
 	p.Created = time.Now()
 	s.items[p.ID] = p
+	// 清单入暂存区记一条：用户说"我已经确认了"但 apply 报"清单不存在/已过期"时，
+	// 这条日志能回答"到底存没存进去、ID 是什么、当时有几条改动"。
+	logx.Step("propose", "存清单", "id", p.ID, "target", filepath.Base(p.Target),
+		"items", len(p.Items), "blocked", len(p.Blocked))
 	return p.ID
 }
 

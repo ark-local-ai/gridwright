@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/graph"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
 	"github.com/ark-local-ai/ark/apps/agent/internal/locate"
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory"
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory2"
 	"github.com/ark-local-ai/ark/apps/agent/internal/propose"
@@ -72,12 +74,12 @@ type PlanOptions struct {
 
 // semanticEdit 是模型返回的一条"业务语义"编辑（**不含坐标**）。
 type semanticEdit struct {
-	File  string  `json:"file"`
-	Sheet string  `json:"sheet"`
-	Key   strMap  `json:"key"`   // 定位行的键列（如 物业位置: B31）
-	Month string  `json:"month"` // 2026-08（列是月份的汇总表用）
-	Field string  `json:"field"` // 字段列名
-	Op    string  `json:"op"`    // set | add | upsert
+	File  string `json:"file"`
+	Sheet string `json:"sheet"`
+	Key   strMap `json:"key"`   // 定位行的键列（如 物业位置: B31）
+	Month string `json:"month"` // 2026-08（列是月份的汇总表用）
+	Field string `json:"field"` // 字段列名
+	Op    string `json:"op"`    // set | add | upsert
 	// Row 是 upsert 时要写入的「列名 → 值」。
 	//
 	// 为什么 upsert 需要它：新增一行是多列，field+value 只能表达一列。
@@ -97,21 +99,30 @@ type semanticEdit struct {
 // 需要配好模型；但**规则命中时不需要**——这正是短路的收益：断网也能按规矩办事。
 func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) (*propose.Proposal, error) {
 	tr := trace.From(ctx)
+	// 进入只记摘要（目标表 + 指令长度 + 附图/历史条数）：指令原文可能很长，
+	// 完整原文走 Debug 块，默认级别留一行能看出"这次计划打的是什么"即可。
+	logx.Step("plan", "enter", "file", opts.File, "chars", len([]rune(instruction)),
+		"images", len(opts.Images), "history", len(opts.History))
 	// 规则短路优先：命中即返回，不调模型。
 	doneRules := tr.Step("规则短路")
 	if prop, err := a.planFromRules(instruction, opts); err == nil && prop != nil {
 		doneRules("命中规则，未调用模型")
+		logx.Step("plan", "规则短路", "hit", true, "items", len(prop.Items), "blocked", len(prop.Blocked))
 		return prop, nil
 	}
 	doneRules("无规则命中")
+	logx.Step("plan", "规则短路", "hit", false)
 	if a.Brain == nil || !a.Brain.Ready() {
+		logx.Step("plan", "exit", "err", "未配置模型或规则未命中")
 		return nil, fmt.Errorf("还没配置模型（脑）：请在设置里填 base_url 与 api_key，之后才能让它判断该改哪些格")
 	}
 	files, err := a.Layout.DataFiles()
 	if err != nil {
+		logx.Step("plan", "exit", "err", "读工作区表失败："+err.Error())
 		return nil, err
 	}
 	if len(files) == 0 {
+		logx.Step("plan", "exit", "err", "工作区没有 .xlsx 表")
 		return nil, fmt.Errorf("工作区没有 .xlsx 表")
 	}
 	target := files[0]
@@ -128,14 +139,17 @@ func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) 
 	doneStruct := tr.Step("读表结构")
 	f, err := excelize.OpenFile(target)
 	if err != nil {
+		logx.Step("plan", "exit", "err", "打开目标表失败："+err.Error())
 		return nil, fmt.Errorf("打开目标表: %w", err)
 	}
 	structs, err := a.collectStructures(f)
 	f.Close()
 	if err != nil {
+		logx.Step("plan", "exit", "err", "读表结构失败："+err.Error())
 		return nil, err
 	}
 	doneStruct(fmt.Sprintf("%d 张工作表（%s）", len(structs), filepath.Base(target)))
+	logx.Step("plan", "读表结构", "target", filepath.Base(target), "sheets", len(structs))
 
 	doneGraph := tr.Step("扫联动图")
 	g, _ := graph.ScanWorkspace(a.Layout.Root, files, graph.Options{})
@@ -144,6 +158,7 @@ func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) 
 		edges = len(g.Edges)
 	}
 	doneGraph(fmt.Sprintf("%d 个文件 · %d 条边", len(files), edges))
+	logx.Step("plan", "扫联动图", "files", len(files), "edges", edges)
 
 	doneMem := tr.Step("记忆 / 术语")
 	memText := ""
@@ -160,16 +175,27 @@ func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) 
 		}
 	}
 	doneMem(fmt.Sprintf("术语命中 %d 条 · 记忆 %d 字", termHits, len([]rune(memText))))
+	logx.Step("plan", "记忆 / 术语", "terms", termHits, "memoryChars", len([]rune(memText)))
 
 	donePrompt := tr.Step("组装提示")
 	prompt := assemblePlanPrompt(instruction, structs, g, memText, formatHistory(opts.History, instruction), len(opts.Images) > 0)
 	tr.SetPrompt(prompt)
 	donePrompt(fmt.Sprintf("%d 字 · 附图 %d 张", len([]rune(prompt)), len(opts.Images)))
+	logx.Step("plan", "组装提示", "chars", len([]rune(prompt)), "images", len(opts.Images))
+	// 提示词全文只在 Debug 出：它是这次计划发给模型的完整依据，
+	// 平常几百字、带记忆时更长，但"定位错列/选了错表"的排查只能靠它。
+	if logx.Enabled(slog.LevelDebug) {
+		logx.Block("计划提示词", prompt)
+	}
 
 	doneBrain := tr.Step("调模型")
+	// 调用前就记一条：模型最快也要几百毫秒、慢的要几十秒，
+	// 日志里得先看到"已经开始调"，否则出问题时看不出卡在哪一步。
+	logx.Step("plan", "调模型", "model", a.Brain.Model())
 	resp, err := a.Brain.PlanSemanticWithImages(ctx, prompt, opts.Images)
 	if err != nil {
 		doneBrain("失败：" + err.Error())
+		logx.Step("plan", "exit", "err", "调模型失败："+err.Error())
 		return nil, err
 	}
 	doneBrain(fmt.Sprintf("模型 %s", a.Brain.Model()))
@@ -179,10 +205,17 @@ func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) 
 	var edits []semanticEdit
 	if len(resp.Edits) > 0 {
 		if err := json.Unmarshal(resp.Edits, &edits); err != nil {
+			logx.Step("plan", "exit", "err", "解析编辑指令失败："+err.Error())
 			return nil, fmt.Errorf("解析编辑指令: %w", err)
 		}
 	}
 	doneParse(fmt.Sprintf("%d 条语义指令 · 澄清 %d · 跳过说明 %d", len(edits), len(resp.Questions), len(resp.SkipReasons)))
+	logx.Step("plan", "解析指令", "edits", len(edits), "questions", len(resp.Questions), "skips", len(resp.SkipReasons))
+	// 模型给的原始语义指令放 Debug：定位失败时，到底是模型给错了还是代码翻错了，
+	// 只能对着这份原始 JSON 判。
+	if logx.Enabled(slog.LevelDebug) {
+		logx.Block("模型原始指令", string(resp.Edits))
+	}
 
 	prop := &propose.Proposal{Root: a.Layout.Root, Target: target, Summary: resp.Summary}
 	for _, q := range resp.Questions {
@@ -195,6 +228,7 @@ func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) 
 	// 重新打开用于取值/定位（resolveEdit 会读旧值）
 	f2, err := excelize.OpenFile(target)
 	if err != nil {
+		logx.Step("plan", "exit", "err", "打开目标表失败（定位取值）："+err.Error())
 		return nil, err
 	}
 	defer f2.Close()
@@ -221,6 +255,7 @@ func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) 
 		}
 	}
 	doneResolve(fmt.Sprintf("命中改格 %d · 新增行 %d · 被拦 %d", setN, appendN, len(prop.Blocked)))
+	logx.Step("plan", "定位成格", "set", setN, "append", appendN, "blocked", len(prop.Blocked))
 
 	// forbid 护栏：模型也不能动"禁止修改列"。
 	//
@@ -233,8 +268,10 @@ func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) 
 		prop.Items = kept
 		prop.Blocked = append(prop.Blocked, blocked...)
 		doneGuard(fmt.Sprintf("拦下 %d 条", len(blocked)))
+		logx.Step("plan", "护栏（禁止列）", "blocked", len(blocked))
 	} else {
 		doneGuard("无规则")
+		logx.Step("plan", "护栏（禁止列）", "blocked", 0, "note", "无规则")
 	}
 
 	// 指纹：Apply 前据此确认文件没被换过
@@ -247,6 +284,8 @@ func (a *Agent) Plan(ctx context.Context, instruction string, opts PlanOptions) 
 	if len(prop.Items) == 0 && len(prop.Blocked) == 0 {
 		prop.Summary = "没有需要改动的地方"
 	}
+	// 退出：产出的清单最终形态——改几格、拦几条、能不能 apply。
+	logx.Step("plan", "exit", "target", filepath.Base(target), "items", len(prop.Items), "blocked", len(prop.Blocked))
 	return prop, nil
 }
 

@@ -11,9 +11,11 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/agent"
 	"github.com/ark-local-ai/ark/apps/agent/internal/convo"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 	"github.com/ark-local-ai/ark/apps/agent/internal/notify"
 	"github.com/ark-local-ai/ark/apps/agent/internal/propose"
 	"github.com/ark-local-ai/ark/apps/agent/internal/trace"
+	"github.com/ark-local-ai/ark/apps/agent/internal/zones"
 )
 
 // 待确认闭环（见 docs/agent-architecture/19-界面设计.md 阶段 4）。
@@ -35,6 +37,9 @@ type planReq struct {
 	// 数据本身就在截图里。不把图传到"出清单"这一步，模型只能反问"数据来自哪张表"，
 	// 把一件能做的事停成澄清（实测发生过）。
 	Images []string `json:"images,omitempty"`
+	// ZoneID 是本次指令所属的作业区。显式给错 → 404，不静默回退到当前区：
+	// “以为在改 A 区、实际改了 B 区”比直接报错危险得多。
+	ZoneID string `json:"zoneId,omitempty"`
 }
 
 // handlePlan POST /api/v1/plan
@@ -48,8 +53,31 @@ func (s *Server) handlePlan(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "缺少 instruction")
 		return
 	}
+	// 接口层 enter/exit 只记轻量参数：细节步骤由 agent.Plan 自己记（flow=plan）。
+	// 两端都用 flow + step 两个固定字段，? 查日志时一条 grep 就能拼出一次完整请求。
+	logx.Step("api.plan", "enter", "chars", len([]rune(req.Instruction)), "file", req.File,
+		"conversation", req.ConversationID, "images", len(req.Images), "zone", req.ZoneID)
 	cfg, layout, led, _ := s.cur()
+	// 作业区：校验存在性；target.file 作为默认目标表（用户显式给了 file 则以用户为准）。
+	zoneID := ""
+	if req.ZoneID != "" {
+		st := s.zonesStore()
+		var z zones.Zone
+		var ok bool
+		if st != nil {
+			z, ok = st.Get(req.ZoneID)
+		}
+		if !ok {
+			writeErr(w, http.StatusNotFound, "zone 不存在："+req.ZoneID)
+			return
+		}
+		zoneID = z.ID
+		if req.File == "" && z.Target.File != "" {
+			req.File = z.Target.File
+		}
+	}
 	if !cfg.BrainReady() {
+		logx.Step("api.plan", "exit", "err", "未配置模型")
 		writeErr(w, http.StatusBadRequest,
 			"还没配置模型（脑）：请在设置里填 base_url 与 api_key；只读的看表与体检不受影响")
 		return
@@ -76,12 +104,15 @@ func (s *Server) handlePlan(w http.ResponseWriter, r *http.Request) {
 	}
 	prop, err := ag.Plan(ctx, req.Instruction, agent.PlanOptions{File: req.File, Images: imgs, History: history})
 	if err != nil {
+		logx.Step("api.plan", "exit", "err", err.Error())
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	// 把会话标在清单上（Apply 时写进账目）。
+	// 把会话与作业区标在清单上（Apply 时写进账目）。
 	prop.Conversation = req.ConversationID
+	prop.Zone = zoneID
 	id := s.proposals().Put(prop)
+	logx.Step("api.plan", "exit", "id", id, "items", len(prop.Items), "blocked", len(prop.Blocked))
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "proposal": prop, "trace": tr})
 }
 
@@ -100,9 +131,11 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "缺少清单 id")
 		return
 	}
+	logx.Step("api.apply", "enter", "id", req.ID)
 	store := s.proposals()
 	prop := store.Get(req.ID)
 	if prop == nil {
+		logx.Step("api.apply", "exit", "id", req.ID, "err", "清单不存在或已过期")
 		writeErr(w, http.StatusNotFound, "清单不存在或已过期（请重新计划）")
 		return
 	}
@@ -110,6 +143,7 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 	results, err := propose.Apply(prop, led, cfg.LLM.Model)
 	if err != nil {
 		// 指纹不符 / 写回失败等：保留清单让用户重试或重新计划
+		logx.Step("api.apply", "exit", "id", req.ID, "err", err.Error())
 		writeErr(w, http.StatusConflict, err.Error())
 		return
 	}
@@ -184,6 +218,8 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 		"ok": true, "applied": applied, "rejected": rejected,
 		"results": results, "selfCheck": sc, "summaries": summaries,
 	})
+	// exit 放在写响应之后：这两个数就是这次接口的最终交代（与 flow=apply 的退出行一致）。
+	logx.Step("api.apply", "exit", "id", req.ID, "applied", applied, "rejected", rejected)
 }
 
 // handleProposalGet GET /api/v1/plan?id= —— 回看一份清单（可选）

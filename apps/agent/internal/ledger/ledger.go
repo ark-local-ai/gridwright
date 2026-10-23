@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-var headerCols = []string{"ts", "table", "sheet", "cell", "op", "old", "new", "reason", "source", "rule", "model", "status"}
+var headerCols = []string{"ts", "table", "sheet", "cell", "op", "old", "new", "reason", "source", "rule", "model", "status", "zone"}
 
 // Ledger 是线程安全的账目追加器。
 type Ledger struct {
@@ -40,7 +40,9 @@ func Open(path string) (*Ledger, error) {
 }
 
 // Append 追加一条账目。old/new 以字符串形式落账（数值/文本统一转字符串）。
-func (l *Ledger) Append(ts time.Time, table, sheet, cell, op string, old, new, reason, source, rule, model, status string) error {
+// zone 可选：作业区 id（空 = 工作区级改动）。变参是为了不打断已有调用方，
+// 但**写入时永远写满 headerCols 的列数**，避免 CSV 行宽不一致。
+func (l *Ledger) Append(ts time.Time, table, sheet, cell, op string, old, new, reason, source, rule, model, status string, zone ...string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	f, err := os.OpenFile(l.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
@@ -49,9 +51,13 @@ func (l *Ledger) Append(ts time.Time, table, sheet, cell, op string, old, new, r
 	}
 	defer f.Close()
 	w := csv.NewWriter(f)
+	z := ""
+	if len(zone) > 0 {
+		z = zone[0]
+	}
 	rec := []string{
 		ts.Format("2006-01-02 15:04"), table, sheet, cell, op,
-		old, new, reason, source, rule, model, status,
+		old, new, reason, source, rule, model, status, z,
 	}
 	if err := w.Write(rec); err != nil {
 		return err
@@ -103,6 +109,8 @@ type Entry struct {
 	Rule   string `json:"rule"`
 	Model  string `json:"model"`
 	Status string `json:"status"`
+	// Zone 是作业区 id（空 = 工作区级改动）。追加在 CSV 末尾，旧账目读出来为空。
+	Zone string `json:"zone,omitempty"`
 	// SourceTitle 是 source 里 "对话:<id>" 译回来的会话标题（由 API 层填，便于看板直接显示
 	// "哪次对话让我改的"）。账目文件里不存它：标题会改，id 不会。
 	SourceTitle string `json:"sourceTitle,omitempty"`
@@ -124,16 +132,15 @@ func (l *Ledger) Entries(n int) ([]Entry, error) {
 	if err != nil {
 		return nil, err
 	}
-	// 兼容旧账目：早期版本没有 sheet 列（11 列）。按表头判断是否含 sheet，
-	// 老文件按老下标读——**不因为加了列就读不了历史账目**。
-	hasSheet := true
+	// 兼容旧账目：早期版本没有 sheet 列（11 列），后来有 12 列，现在 13 列（+zone）。
+	// 一律**按表头名定位**，不按下标；行宽不一致也照读（FieldsPerRecord=-1），
+	// 因此旧文件、手改过的文件、未来再加列都不会读不了。
+	header := map[string]int{}
+	hasHeader := false
 	if len(records) > 0 && len(records[0]) > 0 && records[0][0] == "ts" {
-		hasSheet = false
-		for _, h := range records[0] {
-			if h == "sheet" {
-				hasSheet = true
-				break
-			}
+		hasHeader = true
+		for i, h := range records[0] {
+			header[h] = i
 		}
 		records = records[1:]
 	}
@@ -149,7 +156,29 @@ func (l *Ledger) Entries(n int) ([]Entry, error) {
 			}
 			return ""
 		}
-		if hasSheet {
+		if hasHeader {
+			e.Ts = get(header["ts"])
+			e.Table = get(header["table"])
+			e.Sheet = get(header["sheet"])
+			e.Cell = get(header["cell"])
+			e.Op = get(header["op"])
+			e.Old = get(header["old"])
+			e.New = get(header["new"])
+			e.Reason = get(header["reason"])
+			e.Source = get(header["source"])
+			e.Rule = get(header["rule"])
+			e.Model = get(header["model"])
+			e.Status = get(header["status"])
+			e.Zone = get(header["zone"])
+			out = append(out, e)
+			continue
+		}
+		// 无表头的老文件（极少）：按行宽回落。
+		if len(rec) >= 13 {
+			e.Ts, e.Table, e.Sheet, e.Cell, e.Op = get(0), get(1), get(2), get(3), get(4)
+			e.Old, e.New, e.Reason, e.Source = get(5), get(6), get(7), get(8)
+			e.Rule, e.Model, e.Status, e.Zone = get(9), get(10), get(11), get(12)
+		} else if len(rec) >= 12 {
 			e.Ts, e.Table, e.Sheet, e.Cell, e.Op = get(0), get(1), get(2), get(3), get(4)
 			e.Old, e.New, e.Reason, e.Source = get(5), get(6), get(7), get(8)
 			e.Rule, e.Model, e.Status = get(9), get(10), get(11)

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Layout 是工作区的目录结构。
@@ -14,6 +15,7 @@ type Layout struct {
 	Root    string // 工作区根目录
 	Inbox   string // 新数据入口
 	Done    string // 处理完的文件归档
+	Skipped string // 人工跳过的文件（不是"已处理"，不记账）
 	Rules   string // rules.yaml
 	State   string // state.yaml
 	Ledger  string // ledger.csv
@@ -36,6 +38,7 @@ func LayoutOf(root string) (*Layout, error) {
 		Root:    abs,
 		Inbox:   filepath.Join(abs, "inbox"),
 		Done:    filepath.Join(abs, "inbox", "done"),
+		Skipped: filepath.Join(abs, "inbox", "skipped"),
 		Rules:   filepath.Join(abs, "rules.yaml"),
 		State:   filepath.Join(abs, "state.yaml"),
 		Ledger:  filepath.Join(abs, "ledger.csv"),
@@ -95,6 +98,32 @@ func Locked(path string) bool {
 	lock := filepath.Join(dir, "~$"+name)
 	_, err := os.Stat(lock)
 	return err == nil
+}
+
+// MoveToSkipped 把人工跳过的文件移入 inbox/skipped（不是 done：它没被处理）。
+// 文件名带时间前缀避免重名；原因写进同名 .reason.txt，事后能回答"为什么没处理"。
+func (l *Layout) MoveToSkipped(src, reason string) error {
+	if err := os.MkdirAll(l.Skipped, 0o755); err != nil {
+		return err
+	}
+	base := filepath.Base(src)
+	dst := filepath.Join(l.Skipped, time.Now().Format("20060102-150405")+"-"+base)
+	for i := 1; ; i++ {
+		if _, err := os.Stat(dst); os.IsNotExist(err) {
+			break
+		}
+		dst = filepath.Join(l.Skipped, fmt.Sprintf("%s-%d-%s", time.Now().Format("20060102-150405"), i, base))
+	}
+	if err := os.Rename(src, dst); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if reason != "" {
+		_ = os.WriteFile(dst+".reason.txt", []byte(reason+"\n"), 0o644)
+	}
+	return nil
 }
 
 // MoveToDone 把处理完的文件移入 inbox/done（重名自动加序号）。

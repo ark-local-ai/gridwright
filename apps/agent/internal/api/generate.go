@@ -11,6 +11,7 @@ import (
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/generate"
 	"github.com/ark-local-ai/ark/apps/agent/internal/locate"
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 )
 
 // 生成类任务（见 docs/agent-architecture/27-生成类任务.md）。
@@ -38,10 +39,14 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "请求格式错误")
 		return
 	}
+	// 进入只记"给了什么"：给了规格就不调模型，只给指令才调。
+	logx.Step("api.generate", "enter", "instruction", strings.TrimSpace(req.Instruction) != "",
+		"spec", req.Spec != nil, "dryRun", req.DryRun)
 	cfg, layout, _, _ := s.cur()
 
 	files, err := layout.DataFiles()
 	if err != nil || len(files) == 0 {
+		logx.Step("api.generate", "exit", "err", "工作区没有 .xlsx 表")
 		writeErr(w, http.StatusBadRequest, "工作区没有 .xlsx 表")
 		return
 	}
@@ -50,10 +55,12 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 	spec := req.Spec
 	if spec == nil {
 		if strings.TrimSpace(req.Instruction) == "" {
+			logx.Step("api.generate", "exit", "err", "既没给 spec 也没给 instruction")
 			writeErr(w, http.StatusBadRequest, "需要 instruction 或 spec")
 			return
 		}
 		if !cfg.BrainReady() {
+			logx.Step("api.generate", "exit", "err", "未配置模型，且只给了 instruction")
 			writeErr(w, http.StatusBadRequest,
 				"还没配置模型（脑）：生成类任务需要它把需求翻成筛选规格。"+
 					"也可以直接给 spec（结构化规格），那样不需要模型。")
@@ -61,6 +68,7 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		}
 		got, err := s.specFromInstruction(r, req.Instruction, files)
 		if err != nil {
+			logx.Step("api.generate", "exit", "err", "翻规格失败："+err.Error())
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -79,17 +87,20 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 	// ③ 执行（代码）
 	f, err := excelize.OpenFile(target)
 	if err != nil {
+		logx.Step("api.generate", "exit", "err", "打开源表失败："+err.Error())
 		writeErr(w, http.StatusInternalServerError, "打开源表失败："+err.Error())
 		return
 	}
 	cols, rows, sum, err := generate.Extract(f, *spec)
 	f.Close()
 	if err != nil {
+		logx.Step("api.generate", "exit", "err", err.Error())
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	if req.DryRun {
+		logx.Step("api.generate", "exit", "dryRun", true, "rows", len(rows))
 		writeJSON(w, http.StatusOK, map[string]any{
 			"ok": true, "dryRun": true, "spec": spec,
 			"columns": cols, "rows": len(rows),
@@ -103,23 +114,28 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 	case generate.KindDoc:
 		content, err := s.writeDocContent(r, *spec, cols, rows)
 		if err != nil {
+			logx.Step("api.generate", "exit", "err", "生成文书内容失败："+err.Error())
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		res, err := generate.WriteDoc(layout.Root, titleOf(*spec), content)
 		if err != nil {
+			logx.Step("api.generate", "exit", "err", "写文书失败："+err.Error())
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		res.Total = len(rows)
+		logx.Step("api.generate", "exit", "kind", generate.KindDoc, "path", res.File)
 		writeJSON(w, http.StatusOK, res)
 	default:
 		res, err := generate.WriteTable(layout.Root, *spec, cols, rows, sum)
 		if err != nil {
+			logx.Step("api.generate", "exit", "err", "写表失败："+err.Error())
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		res.Total = len(rows)
+		logx.Step("api.generate", "exit", "kind", generate.KindTable, "path", res.File, "rows", len(rows))
 		writeJSON(w, http.StatusOK, res)
 	}
 }

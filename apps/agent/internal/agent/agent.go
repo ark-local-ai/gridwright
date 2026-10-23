@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,8 +15,10 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/config"
+	"github.com/ark-local-ai/ark/apps/agent/internal/filelock"
 	"github.com/ark-local-ai/ark/apps/agent/internal/ledger"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
+	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory"
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory2"
 	"github.com/ark-local-ai/ark/apps/agent/internal/notify"
@@ -59,6 +62,12 @@ func (a *Agent) RunInboxFiles(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// 只有真有文件时才记 enter/exit：这个函数被轮询器每几秒调一次，
+	// 无事可做的轮次也打日志会把 engine.log 变成心跳噪音。
+	if len(files) > 0 {
+		logx.Step("inbox", "enter", "files", len(files))
+	}
+	processed := 0
 	for _, f := range files {
 		claimed, err := claim(f)
 		if err != nil {
@@ -70,12 +79,16 @@ func (a *Agent) RunInboxFiles(ctx context.Context) error {
 		}
 		if err := a.RunInboxFile(ctx, claimed); err != nil {
 			log.Printf("处理 %s 失败: %v", displayName(claimed), err)
+			// 失败原因落到 inbox_failures.json：界面要能回答"这个文件为什么还在"。
+			a.recordFailure(displayName(claimed), "process", err)
 			// 失败：**释放锁**，下轮重试（不静默丢数据）
 			if rerr := release(claimed); rerr != nil {
 				log.Printf("释放认领锁 %s 失败: %v", displayName(claimed), rerr)
 			}
 			continue
 		}
+		processed++
+		a.clearFailure(displayName(claimed))
 		// 成功：文件已移入 done，锁也该撤掉（否则会留下孤儿锁文件）
 		if rerr := release(claimed); rerr != nil {
 			log.Printf("释放认领锁 %s 失败: %v", displayName(claimed), rerr)
@@ -83,6 +96,11 @@ func (a *Agent) RunInboxFiles(ctx context.Context) error {
 	}
 	// 顺带清理上次运行崩溃留下的认领残留（超过 10 分钟没动过的）
 	a.reapStaleClaims()
+	if len(files) > 0 {
+		// 退出只报"进来几个、真正处理完几个"：差出来的那些要么被别人认领、要么失败了，
+		// 失败的具体原因在上面各自的日志里。
+		logx.Step("inbox", "exit", "files", len(files), "processed", processed)
+	}
 	return nil
 }
 
@@ -155,14 +173,17 @@ func (a *Agent) reapStaleClaims() {
 // 没有规则命中才走"问脑"那条路。
 func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
 	source := displayName(inboxFile)
+	logx.Step("inbox", "enter", "source", source)
 	data, err := readInbox(inboxFile)
 	if err != nil {
+		logx.Step("inbox", "exit", "source", source, "err", "读取新数据失败："+err.Error())
 		return fmt.Errorf("读取新数据: %w", err)
 	}
 
 	// 1) 记忆文件
 	rules, state, _, _, err := memory.Load(a.Layout.Rules, a.Layout.State)
 	if err != nil {
+		logx.Step("inbox", "exit", "source", source, "err", "读规则/状态失败："+err.Error())
 		return err
 	}
 	forbid := rules.ForbidSet()
@@ -171,6 +192,9 @@ func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
 	rulePlan, ruleNote := a.runRulesOn(inboxFile, rules)
 	if rulePlan != nil && len(rulePlan.Edits) > 0 {
 		log.Printf("规则短路：%s", ruleNote)
+		logx.Step("inbox", "规则短路", "source", source, "hit", true, "edits", len(rulePlan.Edits))
+	} else {
+		logx.Step("inbox", "规则短路", "source", source, "hit", false)
 	}
 
 	// 3) 目标表（spec §5.4）：
@@ -178,9 +202,11 @@ func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
 	//    多张且没声明 → 先把所有表头发给脑分诊"数据该进哪张"。
 	targets, err := a.Layout.DataFiles()
 	if err != nil {
+		logx.Step("inbox", "exit", "source", source, "err", "读工作区表失败："+err.Error())
 		return err
 	}
 	if len(targets) == 0 {
+		logx.Step("inbox", "exit", "source", source, "err", "工作区没有 .xlsx 表")
 		return fmt.Errorf("工作区没有 .xlsx 表（%s）", a.Layout.Root)
 	}
 	target := targets[0]
@@ -198,8 +224,11 @@ func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
 	}
 
 	// 4) 锁检测：目标表被 Excel 占用则跳过本次（spec §4）
+	// 选表结果记一条：自动链路没人在旁边看，事后只能靠日志回答"这笔数据进了哪张表"。
+	logx.Step("inbox", "选目标表", "source", source, "target", filepath.Base(target), "candidates", len(targets))
 	if workspace.Locked(target) {
 		log.Printf("目标表 %s 被 Excel 占用（存在锁文件），跳过本次", filepath.Base(target))
+		logx.Step("inbox", "exit", "source", source, "note", "目标表被 Excel 占用，跳过")
 		return nil
 	}
 
@@ -209,6 +238,7 @@ func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
 	// （见 docs/agent-architecture/24-语义映射与安全边界.md）
 	if rep, err := safety.Check(target); err == nil {
 		if !rep.CanWrite {
+			logx.Step("inbox", "exit", "source", source, "err", "安全拒绝："+rep.Describe())
 			return fmt.Errorf("这张表含程序无法安全处理的内容，已拒绝写入：%s", rep.Describe())
 		}
 	}
@@ -216,11 +246,13 @@ func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
 	// 5) 读结构 + 组 prompt
 	f, err := excelize.OpenFile(target)
 	if err != nil {
+		logx.Step("inbox", "exit", "source", source, "err", "打开目标表失败："+err.Error())
 		return fmt.Errorf("打开目标表: %w", err)
 	}
 	structures, err := a.collectStructures(f)
 	if err != nil {
 		f.Close()
+		logx.Step("inbox", "exit", "source", source, "err", "读表结构失败："+err.Error())
 		return err
 	}
 	recentLedger, _ := a.Ledger.Recent(20)
@@ -234,6 +266,7 @@ func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
 		// 不要发一个必然 401 的请求，也不要静默把数据当"处理过了"。
 		if a.Brain == nil || !a.Brain.Ready() {
 			f.Close()
+			logx.Step("inbox", "exit", "source", source, "err", "没有规则命中，且未配置模型")
 			return fmt.Errorf("没有规则命中，且未配置模型：%s 留在 inbox 待处理", source)
 		}
 		// 相关记忆：按**这批新数据的内容**检索（而不是按用户指令——
@@ -248,9 +281,16 @@ func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
 		}
 		prompt := assemblePrompt(a.Cfg, structures, source, data, recentLedger, rules, state, memText)
 		log.Printf("调用脑（%s）…", a.Brain.Model())
+		logx.Step("inbox", "调模型", "source", source, "model", a.Brain.Model())
+		// 整段提示词只在 Debug 出：它很长，而且平时没人看；
+		// 一旦答非所问，又只能靠它才能知道"到底给模型看了什么"。
+		if logx.Enabled(slog.LevelDebug) {
+			logx.Block("inbox 提示词", prompt)
+		}
 		p, err = a.Brain.Plan(ctx, prompt)
 		if err != nil {
 			f.Close()
+			logx.Step("inbox", "exit", "source", source, "err", "问脑失败："+err.Error())
 			return fmt.Errorf("问脑: %w", err)
 		}
 	}
@@ -262,6 +302,11 @@ func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
 	}
 	guarded, blocked := guardEdits(p, forbid, headers)
 	p.Edits = guarded
+	logx.Step("inbox", "护栏（禁止列）", "source", source, "edits", len(p.Edits), "blocked", len(blocked))
+	// 定位后的逐条 edit（格/值/原因）放 Debug：这是"到底改了哪几格"的完整清单。
+	if logx.Enabled(slog.LevelDebug) {
+		logx.Block("inbox 改动", dumpEdits(p.Edits))
+	}
 
 	// 7) 执行 edits（改内存工作簿）
 	results := xl.ApplyEdits(f, p.Edits)
@@ -276,18 +321,28 @@ func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
 	}
 	// blocked 的也算需要记账（rejected），但没改工作簿 → 不需要保存
 	if applied > 0 {
-		if _, err := xl.Backup(target, 5); err != nil {
-			log.Printf("备份失败（继续写回）: %v", err)
-		}
-		// 只读文件（微信收到的那种）先解除只读，否则 SaveAs 报 Access is denied。
-		// 放在备份之后：万一解除失败，至少副本已落下。
-		if err := xl.EnsureWritable(target); err != nil {
+		// 与 apply / 回滚共用表级锁：后台 inbox 处理与人工确认可能同时命同一张表。
+		// 注意：工作簿是在取锁**之前**读入的，所以本锁只保证“保存”不交错；
+		// 真正的防覆盖仍靠 apply 的指纹校验与 Excel 自身的锁文件。
+		if werr := func() error {
+			unlock := filelock.Lock(target)
+			defer unlock()
+			if _, err := xl.Backup(target, 5); err != nil {
+				log.Printf("备份失败（继续写回）: %v", err)
+			}
+			// 只读文件（微信收到的那种）先解除只读，否则 SaveAs 报 Access is denied。
+			// 放在备份之后：万一解除失败，至少副本已落下。
+			if err := xl.EnsureWritable(target); err != nil {
+				return fmt.Errorf("解除只读失败：%w", err)
+			}
+			if err := f.SaveAs(target); err != nil {
+				return fmt.Errorf("保存失败：%w", err)
+			}
+			return nil
+		}(); werr != nil {
 			f.Close()
-			return fmt.Errorf("写回失败: %w", err)
-		}
-		if err := f.SaveAs(target); err != nil {
-			f.Close()
-			return fmt.Errorf("写回失败: %w", err)
+			logx.Step("inbox", "exit", "source", source, "err", "写回失败："+werr.Error())
+			return fmt.Errorf("写回失败: %w", werr)
 		}
 	}
 	f.Close()
@@ -348,6 +403,9 @@ func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
 		Rejected:       len(blocked) + countRejected(results) + len(p.SkipReasons),
 		RejectedDetail: detail,
 	})
+	// 退出：自动链路的最终交代——改了几格、拒了几格、跳过几条。
+	logx.Step("inbox", "exit", "source", source, "target", table,
+		"applied", applied, "rejected", len(blocked)+countRejected(results)+len(p.SkipReasons))
 	return nil
 }
 
@@ -411,4 +469,14 @@ func countRejected(results []plan.Result) int {
 		}
 	}
 	return n
+}
+
+// dumpEdits 把定位后的逐条改动渲染成 Debug 块。append 的 Row 是 map，
+// 直接 fmt 够了——它只是给排障看的，不参与程序判断。
+func dumpEdits(edits []plan.Edit) string {
+	var b strings.Builder
+	for _, e := range edits {
+		fmt.Fprintf(&b, "%s %s!%s value=%v row=%v reason=%s\n", e.Op, e.Sheet, e.Cell, e.Value, e.Row, e.Reason)
+	}
+	return b.String()
 }

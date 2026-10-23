@@ -58,16 +58,30 @@ func TestConversationAppend(t *testing.T) {
 		t.Fatalf("消息内容不对：%+v", msgs[0])
 	}
 
-	// 非法角色降级为 agent（禁止借接口伪造用户话）
-	body = `{"conversationId":"` + c.ID + `","text":"伪造","role":"user"}`
+	// user 角色是允许的：界面把“复核反馈”写回原对话时走这里，
+	// 不再为了留痕先调一次 /chat 白烧一轮模型。接口已有本机令牌保护，
+	// 只有界面能调用；非法角色仍降级为 agent。
+	body = `{"conversationId":"` + c.ID + `","text":"b30 那行不该累加","role":"user"}`
 	rec = httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/conversation/append", strings.NewReader(body)))
 	if rec.Code != 200 {
 		t.Fatalf("状态 %d", rec.Code)
 	}
 	msgs = readConvo(t, s, c.ID)
-	if msgs[1].Role != "agent" {
-		t.Fatalf("user 角色应被降级为 agent，得到 %q", msgs[1].Role)
+	if msgs[1].Role != "user" || msgs[1].Text != "b30 那行不该累加" {
+		t.Fatalf("user 反馈应原样记录，得到 %+v", msgs[1])
+	}
+
+	// 未知角色仍降级为 agent，避免接口接受任意 role 字符串。
+	body = `{"conversationId":"` + c.ID + `","text":"伪造","role":"root"}`
+	rec = httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/conversation/append", strings.NewReader(body)))
+	if rec.Code != 200 {
+		t.Fatalf("状态 %d", rec.Code)
+	}
+	msgs = readConvo(t, s, c.ID)
+	if msgs[2].Role != "agent" {
+		t.Fatalf("非法角色应被降级为 agent，得到 %q", msgs[2].Role)
 	}
 
 	// 缺参数 → 400

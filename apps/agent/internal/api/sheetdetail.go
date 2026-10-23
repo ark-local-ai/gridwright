@@ -14,6 +14,7 @@ import (
 
 	"github.com/xuri/excelize/v2"
 
+	"github.com/ark-local-ai/ark/apps/agent/internal/graph"
 	"github.com/ark-local-ai/ark/apps/agent/internal/ledger"
 	"github.com/ark-local-ai/ark/apps/agent/internal/sheetnotes"
 	"github.com/ark-local-ai/ark/apps/agent/internal/weight"
@@ -316,7 +317,7 @@ func nodeKeyForFile(fileBase, sheet string) string {
 //
 // 只在配了模型时做；单张失败只记日志、绝不连累体检；每次最多 maxDescribePerScan 张，
 // 按权重（注意力）从高到低取——最重要的表先有描述。
-func (s *Server) backfillSheetNotes(ctx context.Context, tables []string) {
+func (s *Server) backfillSheetNotes(ctx context.Context, tables []string, g *graph.Graph) {
 	cfg, _, led, _ := s.cur()
 	if !cfg.BrainReady() {
 		return // 没配模型：体检照常，描述留空（离线可用是产品底线）
@@ -325,9 +326,12 @@ func (s *Server) backfillSheetNotes(ctx context.Context, tables []string) {
 	if store == nil {
 		return
 	}
-	g, err := s.scanGraph()
-	if err != nil || g == nil {
-		return
+	if g == nil {
+		var err error
+		g, err = s.scanGraph()
+		if err != nil || g == nil {
+			return
+		}
 	}
 	activity, _ := led.ActivityByNode(0)
 	scores := weight.Compute(weight.Input{Graph: g, Activity: activity})

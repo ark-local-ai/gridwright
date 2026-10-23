@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/config"
+	"github.com/ark-local-ai/ark/apps/agent/internal/pathsafe"
 	"github.com/ark-local-ai/ark/apps/agent/internal/workspace"
 )
 
@@ -103,6 +104,14 @@ func (s *Server) handleWorkspaceCreate(w http.ResponseWriter, r *http.Request) {
 	base := req.Base
 	if base == "" {
 		base = s.defaultWorkspacesDir()
+	}
+	// 非默认位置必须先获得路径授权：新建工作区会写目录结构，
+	// 不能让调用方（哪怕拿到 token）在任意位置落文件。
+	if s.Grants != nil && req.Base != "" {
+		if err := s.Grants.Check(base, pathsafe.ModeRW); err != nil {
+			writeErr(w, http.StatusForbidden, "这个位置尚未授权："+err.Error())
+			return
+		}
 	}
 	if err := os.MkdirAll(base, 0o755); err != nil {
 		writeErr(w, http.StatusInternalServerError, "无法创建目录："+err.Error())

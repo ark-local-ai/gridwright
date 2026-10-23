@@ -34,7 +34,7 @@ func (s *Server) handleConversationAppend(w http.ResponseWriter, r *http.Request
 		return
 	}
 	role := req.Role
-	if role != convo.RoleAgent && role != convo.RoleSystem {
+	if role != convo.RoleUser && role != convo.RoleAgent && role != convo.RoleSystem {
 		role = convo.RoleAgent
 	}
 	store, err := s.convoStore()
