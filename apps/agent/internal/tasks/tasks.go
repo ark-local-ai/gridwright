@@ -753,3 +753,32 @@ func newID() (string, error) {
 	}
 	return "t_" + hex.EncodeToString(b[:]), nil
 }
+
+// ClearProposal 从任务上摘掉一个已应用的清单 id。清单被 apply 后会 Drop，
+// 卡片的「查看待确认」若还挂着这个 id，再点就只能拿到 404。
+func (q *Queue) ClearProposal(proposalID string) {
+	if proposalID == "" {
+		return
+	}
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	changed := false
+	for _, e := range q.tasks {
+		if len(e.task.ProposalIDs) == 0 {
+			continue
+		}
+		out := make([]string, 0, len(e.task.ProposalIDs))
+		for _, id := range e.task.ProposalIDs {
+			if id != proposalID {
+				out = append(out, id)
+			}
+		}
+		if len(out) != len(e.task.ProposalIDs) {
+			e.task.ProposalIDs = out
+			changed = true
+		}
+	}
+	if changed {
+		_ = q.persistLocked()
+	}
+}

@@ -159,6 +159,9 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	store.Drop(req.ID) // 已应用，防重复
+	if q := s.tasksQueue(); q != nil {
+		q.ClearProposal(req.ID) // 卡片上的「查看待确认」不该再指向已应用清单
+	}
 	applied, rejected := 0, 0
 	touched := []string{}
 	for _, x := range results {
