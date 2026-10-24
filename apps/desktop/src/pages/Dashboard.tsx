@@ -539,8 +539,8 @@ export default function Dashboard({ pickFolder, watchDrop }: {
           )}
 
           {/* ⑥ 作业区：替换原来的「最近改动」整卡。
-              卡片本身就是运行入口；任务状态在这里实时刷新，历史在抽屉里。 */}
-          <ZoneBoard onOpenLedger={() => setLedgerOpen(true)} onChanged={() => void refresh()} syncToken={zoneTick} />
+              看板只展示**对话创建**的任务；运行入口统一在对话里，卡片负责显示状态。 */}
+          <ZoneBoard onOpenLedger={() => setLedgerOpen(true)} syncToken={zoneTick} onOpenChat={() => setChatOpen(true)} />
         </div>
       </div>
 

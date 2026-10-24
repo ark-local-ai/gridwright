@@ -28,7 +28,6 @@
 | 定时任务 | `pages/TasksPanel.tsx` | 顶栏时钟图标 |
 | 规则（rules.yaml） | `pages/RulesPanel.tsx` | 顶栏规则图标 |
 | 生成（草稿/清单，不动原表） | `pages/GeneratePanel.tsx` | 顶栏生成图标 |
-| 快捷任务沉淀 | `pages/PromptDistillPanel.tsx` | 对话面板里的“存为快捷任务” |
 | 术语映射 | `pages/TermsPanel.tsx` | 设置 → 术语 |
 | 设置 | `pages/Settings2.tsx` | 顶栏齿轮 |
 | 记忆 | `pages/MemoryPanel.tsx` | 由设置页进入 |

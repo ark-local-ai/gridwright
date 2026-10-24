@@ -3,7 +3,6 @@ import "./confirm.css";
 import { agentApi } from "../api-agent";
 import type { Proposal, ApplyResult, ImpactResult, SafetyReport, SelfCheckReport, ConvoSummary, DistillCandidate, TraceData, ProposalRows } from "../api-agent";
 import RunTrace from "../components/RunTrace";
-import PromptDistillPanel from "./PromptDistillPanel";
 import { IconCheck, IconSpark, IconSend, IconNote, IconLink, IconShield, IconX, IconClock, IconPlus, IconTrash, IconRename, IconAssistant } from "../components/icons";
 
 /* 待确认（A）+ 会话（B）（见 docs/agent-architecture/19-界面设计.md 阶段 3-4）
@@ -467,7 +466,6 @@ export function ChatPane({ onPlanReady, wsKey, syncToken, syncConvoId, externalR
   const [distilling, setDistilling] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedNote, setSavedNote] = useState("");
-  const [distillOpen, setDistillOpen] = useState(false);
   const convoTitle = history.find((h) => h.id === convoId)?.title ?? "当前对话";
   // 「停在上次那条」：打开对话时不再总是新开，而是回到上次用的那条。
   // 会话多数是"接着上次说"，每次从零开始等于每次把上下文丢掉。
@@ -899,10 +897,6 @@ export function ChatPane({ onPlanReady, wsKey, syncToken, syncConvoId, externalR
           disabled={distilling || !convoId} title="从这条记录里提炼值得长期记住的东西">
           <IconAssistant size={13} />{distilling ? "正在提炼…" : "提炼记忆"}
         </button>
-        {/* 沉淀为快捷任务：勾选对话消息 → 总结/选模板 → 存成可复用的快捷任务 */}
-        <button className="cb-btn" onClick={() => setDistillOpen(true)} title="把勾选的对话消息沉淀成快捷任务">
-          <IconSpark size={13} />沉淀为快捷
-        </button>
         {savedNote && <span className="cb-saved"><IconCheck size={12} />{savedNote}</span>}
         {/* 判断标识：现在在跟哪条会话说话（打开时会自动续上上次那条）。 */}
         <span className="cb-now" title="当前会话">{convoId ? convoTitle : "新对话"}</span>
@@ -1154,16 +1148,6 @@ export function ChatPane({ onPlanReady, wsKey, syncToken, syncConvoId, externalR
       <p className="chat-foot">
         <IconNote size={12} /> 它只建议，不会自己改表；要改的会进「待确认」等你点头。
       </p>
-
-      {distillOpen && (
-        <PromptDistillPanel msgs={msgs} convoId={convoId}
-          onClose={() => setDistillOpen(false)}
-          onSaved={(name) => {
-            setDistillOpen(false);
-            setSavedNote("已存入快捷任务：" + name);
-            setTimeout(() => setSavedNote(""), 4000);
-          }} />
-      )}
     </div>
   );
 }

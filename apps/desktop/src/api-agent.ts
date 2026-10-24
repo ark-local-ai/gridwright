@@ -262,6 +262,9 @@ export interface Task {
   id: string;
   zoneId: string;
   title: string;
+  /** chat = 对话采纳创建；manual = 接口/界面直跑。看板只展示 chat。 */
+  source?: "chat" | "manual" | string;
+  conversationId?: string;
   status: "queued" | "running" | "ok" | "failed" | "canceled";
   dryRun: boolean;
   steps: TaskStep[];

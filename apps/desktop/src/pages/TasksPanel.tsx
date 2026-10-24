@@ -193,7 +193,7 @@ export default function TasksPanel({ onClose, onRunPrompt }: {
           <>
             <p className="tk-hint">
               快捷任务把一次成功的做法存成模板，下次一点即用；触发后仍会<b>出改动清单等你确认</b>。
-              要新建：在<b>对话</b>里点「沉淀为快捷」——勾选对话消息总结，或选内置模板。
+              要新建：直接编辑工作区的 prompts.yaml，或从下方内置模板开始。
             </p>
             <ul className="tk-list">
               {prompts.map((p) => (
@@ -234,7 +234,7 @@ export default function TasksPanel({ onClose, onRunPrompt }: {
                 </li>
               ))}
               {prompts.length === 0 && (
-                <li className="tk-empty">还没有快捷任务。在「对话」里点「沉淀为快捷」新建一个。</li>
+                <li className="tk-empty">还没有快捷任务。编辑工作区的 prompts.yaml，或使用内置模板。</li>
               )}
             </ul>
           </>

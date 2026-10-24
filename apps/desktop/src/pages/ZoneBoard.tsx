@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { agentApi } from "../api-agent";
 import type { Task, TaskStep, Zone } from "../api-agent";
-import { IconClock, IconNote, IconPlus, IconRefresh, IconX, IconCheck } from "../components/icons";
+import { IconClock, IconNote, IconPlus, IconRefresh, IconX, IconCheck, IconSpark } from "../components/icons";
 import "./ledger.css";
 import "./zone.css";
 
@@ -25,11 +25,12 @@ const defaultSteps: TaskStep[] = [
   { key: "done", label: "归档", status: "pending" },
 ];
 
-export default function ZoneBoard({ onOpenLedger, onChanged, syncToken }: {
+export default function ZoneBoard({ onOpenLedger, syncToken, onOpenChat }: {
   onOpenLedger: () => void;
-  onChanged?: () => void;
   /** 外部（对话采纳任务）递增：立刻重拉一次，不等下一轮轮询。 */
   syncToken?: number;
+  /** 看板只展示对话创建的任务；没有时给一个去对话的入口。 */
+  onOpenChat?: () => void;
 }) {
   const [zones, setZones] = useState<Zone[]>([]);
   const [snap, setSnap] = useState<{ runningId: string; items: Task[]; queued: number }>({
@@ -68,38 +69,25 @@ export default function ZoneBoard({ onOpenLedger, onChanged, syncToken }: {
     return () => window.clearInterval(id);
   }, [active, load]);
 
-  // 每个作业区取最近一条任务：运行中/排队优先，其次才是最近完成。
+  // 看板只展示**对话创建**的任务：手动触发的运行只进历史，不占卡片。
+  const chatTasks = useMemo(
+    () => [...snap.items, ...history].filter((t) => t.source === "chat"),
+    [snap.items, history],
+  );
+
+  // 每个作业区取最近一条对话任务：运行中/排队优先，其次才是最近完成。
   const latest = useMemo(() => {
     const m = new Map<string, Task>();
-    for (const t of snap.items) if (!m.has(t.zoneId)) m.set(t.zoneId, t);
-    for (const t of history) if (!m.has(t.zoneId)) m.set(t.zoneId, t);
-    // 运行中/排队中的任务永远覆盖已完成的同区任务。
+    for (const t of chatTasks) if (!m.has(t.zoneId)) m.set(t.zoneId, t);
     const live = new Map<string, Task>();
-    for (const t of [...snap.items, ...history]) {
+    for (const t of chatTasks) {
       if (t.status === "running" || t.status === "queued") {
         if (!live.has(t.zoneId)) live.set(t.zoneId, t);
       }
     }
     for (const [k, v] of live) m.set(k, v);
     return m;
-  }, [snap.items, history]);
-
-  const run = async (z: Zone) => {
-    setBusy(z.id);
-    setMsg("");
-    try {
-      const dry = z.mode !== "apply";
-      const r = await agentApi.runZone(z.id, dry);
-      setMsg(`${dry ? "试运行" : "运行"}已加入队列：${z.name}`);
-      setSnap((s) => ({ ...s, items: [r.task, ...s.items.filter((x) => x.id !== r.task.id)].slice(0, 6), queued: s.queued + 1 }));
-      await load();
-      onChanged?.();
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy("");
-    }
-  };
+  }, [chatTasks]);
 
   const cancel = async (id: string) => {
     setBusy(id);
@@ -126,7 +114,8 @@ export default function ZoneBoard({ onOpenLedger, onChanged, syncToken }: {
         <button className="btn ghost sm" onClick={onOpenLedger}><IconNote size={13} />账目 / 回滚</button>
         <button className="btn ghost sm" onClick={() => setHistOpen(true)}><IconClock size={13} />历史工作</button>
         <button className="btn ghost sm" onClick={() => void load()}><IconRefresh size={12} />刷新</button>
-        <button className="btn primary sm" onClick={() => setFormOpen((v) => !v)}><IconPlus size={12} />新建</button>
+        <button className="btn primary sm" onClick={() => onOpenChat?.()}><IconSpark size={12} />去对话派单</button>
+        <button className="btn ghost sm" onClick={() => setFormOpen((v) => !v)}><IconPlus size={12} />新建</button>
       </div>
 
       {msg && <p className="zone-msg">{msg}</p>}
@@ -134,7 +123,7 @@ export default function ZoneBoard({ onOpenLedger, onChanged, syncToken }: {
       {formOpen && <ZoneForm onDone={() => { setFormOpen(false); void load(); }} onErr={setMsg} />}
 
       {zones.length === 0 && !formOpen && (
-        <p className="dash-muted">还没有作业区。新建一个，把“哪个文件夹的新文件 → 哪张表”定下来，就能点卡片运行。</p>
+        <p className="dash-muted">还没有作业区。新建一个，把“哪个文件夹的新文件 → 哪张表”定下来；之后在对话里说“把某个区跑一次”，任务会出现在这里。</p>
       )}
 
       <div className="zone-grid">
@@ -177,8 +166,8 @@ export default function ZoneBoard({ onOpenLedger, onChanged, syncToken }: {
                     {task!.status === "queued" ? "取消排队" : "停止"}
                   </button>
                 ) : (
-                  <button className="btn primary sm" disabled={busy === z.id} onClick={() => void run(z)}>
-                    {busy === z.id ? "提交中…" : z.mode === "apply" ? "运行" : "试运行"}
+                  <button className="btn ghost sm" onClick={() => onOpenChat?.()} title="在对话里说：把这个区跑一次">
+                    去对话派单
                   </button>
                 )}
               </footer>
