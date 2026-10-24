@@ -412,7 +412,15 @@ type ConvoMsg = {
     /** kind=task 且带 zoneId：采纳后立即入队跑一次作业区。 */
     zoneId?: string;
     mode?: string;
-    /** 人点过"采纳"（task/rule/tool_request）。落盘了，重启后仍在。 */
+    /** kind=zone：新建/修改作业区的字段。 */
+    zoneName?: string;
+    zoneInputType?: string;
+    zoneInputPath?: string;
+    zoneInputPattern?: string;
+    zoneTargetFile?: string;
+    zoneTargetSheet?: string;
+    zoneTargetNewTable?: string;
+    /** 人点过"采纳"（task/rule/tool_request/zone）。落盘了，重启后仍在。 */
     accepted?: boolean;
   };
 };
@@ -1081,8 +1089,18 @@ export function ChatPane({ onPlanReady, wsKey, syncToken, syncConvoId, externalR
                 <div className="mp-kind">{kindLabel(m.proposal.kind, m.proposal.zoneId)}</div>
                 <div className="mp-title">{m.proposal.title}</div>
                 {m.proposal.detail && <div className="mp-detail">{m.proposal.detail}</div>}
-                {m.proposal.zoneId && (
+                {m.proposal.zoneId && m.proposal.kind === "task" && (
                   <div className="mp-meta">将运行：{m.proposal.title.replace(/^(试运行|运行)：/, "")}（{m.proposal.mode === "apply" ? "写入" : "试运行"}）</div>
+                )}
+                {m.proposal.kind === "zone" && (
+                  <div className="mp-meta">
+                    {m.proposal.zoneInputPath && <>输入：{m.proposal.zoneInputPath}（{m.proposal.zoneInputPattern || "默认表格文件"}）</>}
+                    {(m.proposal.zoneTargetFile || m.proposal.zoneTargetNewTable) && (
+                      <> → 目标：{m.proposal.zoneTargetFile || m.proposal.zoneTargetNewTable}
+                        {m.proposal.zoneTargetSheet ? "!" + m.proposal.zoneTargetSheet : ""}</>
+                    )}
+                    <br />下次运行：{m.proposal.mode === "apply" ? "出清单后确认写入" : "只试运行（不改文件）"}
+                  </div>
                 )}
                 {m.proposal.schedule && <div className="mp-meta">时间：{m.proposal.schedule}</div>}
                 {m.proposal.options && m.proposal.options.length > 0 && (
@@ -1094,7 +1112,7 @@ export function ChatPane({ onPlanReady, wsKey, syncToken, syncConvoId, externalR
                 )}
                 {/* 改动清单改由待确认面板（整行预览）呈现，对话里不再重复。 */}
                 {/* 非 plan 类提案（定时任务 / 规则 / 工具申请）：给一个明确的「采纳」。 */}
-                {(m.proposal.kind === "task" || m.proposal.kind === "rule" || m.proposal.kind === "tool_request") && (
+                {(m.proposal.kind === "task" || m.proposal.kind === "rule" || m.proposal.kind === "tool_request" || m.proposal.kind === "zone") && (
                   <div className="mp-opts">
                     {m.proposal.accepted
                       ? <span className="mp-wait">已采纳</span>
@@ -1252,6 +1270,7 @@ function kindLabel(k: string, zoneId?: string): string {
   switch (k) {
     case "task": return zoneId ? "运行任务" : "自动化任务提案";
     case "rule": return "规则提案";
+    case "zone": return zoneId ? "修改作业区" : "新建作业区";
     case "tool_request": return "工具申请";
     case "clarify": return "需要你确认";
     case "plan": return "改动清单提案";

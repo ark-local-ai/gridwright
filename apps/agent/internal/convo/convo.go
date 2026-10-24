@@ -53,6 +53,15 @@ type Proposal struct {
 	// Mode 空 = dryRun（安全默认）；schedule 为空 = 立即入队跑一次。
 	ZoneID string `json:"zoneId,omitempty"`
 	Mode   string `json:"mode,omitempty"`
+	// kind=zone：新建/修改作业区。ZoneID 为空=新建，非空=修改；
+	// 只填模型从用户话里真拿到的字段，空字段不改动原值。
+	ZoneName           string `json:"zoneName,omitempty"`
+	ZoneInputType      string `json:"zoneInputType,omitempty"`
+	ZoneInputPath      string `json:"zoneInputPath,omitempty"`
+	ZoneInputPattern   string `json:"zoneInputPattern,omitempty"`
+	ZoneTargetFile     string `json:"zoneTargetFile,omitempty"`
+	ZoneTargetSheet    string `json:"zoneTargetSheet,omitempty"`
+	ZoneTargetNewTable string `json:"zoneTargetNewTable,omitempty"`
 	// 是否已被采纳（人点过确认）
 	Accepted bool `json:"accepted,omitempty"`
 }

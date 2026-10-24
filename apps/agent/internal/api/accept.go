@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ark-local-ai/ark/apps/agent/internal/jobs"
+	"github.com/ark-local-ai/ark/apps/agent/internal/zones"
 )
 
 // 采纳一条提案（见 docs/agent-architecture/29-UI升级与剩余功能.md 第 6 项）。
@@ -77,6 +78,24 @@ func (s *Server) handleConversationAccept(w http.ResponseWriter, r *http.Request
 		if t.DryRun {
 			resp["note"] = "已加入任务队列（试运行：只扫描与去重，不改任何文件）"
 		}
+		writeJSON(w, http.StatusOK, resp)
+		return
+	case p.Kind == "zone":
+		z, zerr := s.zoneFromProposal(p)
+		if zerr != nil {
+			if errors.Is(zerr, zones.ErrNotFound) {
+				writeErr(w, http.StatusNotFound, "提案里的作业区不存在："+p.ZoneID)
+				return
+			}
+			writeErr(w, http.StatusBadRequest, zerr.Error())
+			return
+		}
+		if _, aerr := store.Accept(req.ConversationID, req.Index); aerr != nil {
+			writeErr(w, http.StatusInternalServerError, "作业区已保存，但采纳记录写入失败："+aerr.Error())
+			return
+		}
+		resp["zone"] = z
+		resp["note"] = "作业区已保存（运行仍需在对话里说，且只出待确认清单）"
 		writeJSON(w, http.StatusOK, resp)
 		return
 	case p.Kind == "task":

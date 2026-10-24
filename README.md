@@ -212,7 +212,7 @@ apps/
 ## 测试
 
 ```bash
-cd apps/agent && go test ./...                      # 319 个用例，覆盖 28 个包（共 39 个包）
+cd apps/agent && go test ./...                      # 320 个用例，覆盖 28 个包（共 39 个包）
 bash apps/agent/scripts/test-race.sh                # 竞态检测（需 gcc，见 CONTRIBUTING）
 ```
 

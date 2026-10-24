@@ -77,6 +77,14 @@ func (a *Agent) ChatWithImages(ctx context.Context, userText string, files []str
 			Options  []string `json:"options"`
 			ZoneID   string   `json:"zoneId"`
 			Mode     string   `json:"mode"`
+			// kind=zone：新建/修改作业区
+			ZoneName           string `json:"zoneName"`
+			ZoneInputType      string `json:"zoneInputType"`
+			ZoneInputPath      string `json:"zoneInputPath"`
+			ZoneInputPattern   string `json:"zoneInputPattern"`
+			ZoneTargetFile     string `json:"zoneTargetFile"`
+			ZoneTargetSheet    string `json:"zoneTargetSheet"`
+			ZoneTargetNewTable string `json:"zoneTargetNewTable"`
 		} `json:"proposal"`
 	}
 	if err := json.Unmarshal([]byte(content), &raw); err != nil {
@@ -99,6 +107,10 @@ func (a *Agent) ChatWithImages(ctx context.Context, userText string, files []str
 			Schedule: raw.Proposal.Schedule, Action: raw.Proposal.Action,
 			Tools: raw.Proposal.Tools, Options: raw.Proposal.Options,
 			ZoneID: raw.Proposal.ZoneID, Mode: raw.Proposal.Mode,
+			ZoneName: raw.Proposal.ZoneName, ZoneInputType: raw.Proposal.ZoneInputType,
+			ZoneInputPath: raw.Proposal.ZoneInputPath, ZoneInputPattern: raw.Proposal.ZoneInputPattern,
+			ZoneTargetFile: raw.Proposal.ZoneTargetFile, ZoneTargetSheet: raw.Proposal.ZoneTargetSheet,
+			ZoneTargetNewTable: raw.Proposal.ZoneTargetNewTable,
 		}
 		doneParse("proposal=" + raw.Proposal.Kind)
 		logx.Step("chat", "exit", "model", a.Brain.Model(), "proposal", raw.Proposal.Kind, "title", raw.Proposal.Title)
@@ -203,9 +215,13 @@ func assembleChatPrompt(userText string, files []string, history []convo.Message
 # 输出要求
 只输出一个 JSON 对象，不要解释、不要 markdown：
 {"reply":"给用户看的回话（中文，简洁）",
- "proposal": {"kind":"task|rule|tool_request|clarify|plan","title":"一句话标题",
+ "proposal": {"kind":"task|rule|zone|tool_request|clarify|plan","title":"一句话标题",
    "detail":"展开说明","schedule":"cron 表达式（kind=task 时）","action":"要做什么",
-   "tools":["read_sheet"],"options":["澄清选项1","澄清选项2"]}}
+   "tools":["read_sheet"],"options":["澄清选项1","澄清选项2"],
+   "zoneId":"kind=zone 修改时填；新建留空","mode":"dryRun|apply",
+   "zoneName":"作业区名","zoneInputType":"folder","zoneInputPath":"用户给出的目录",
+   "zoneInputPattern":"*.csv（可空）","zoneTargetFile":"工作区内的表名",
+   "zoneTargetSheet":"工作表名","zoneTargetNewTable":"要新建的表名（可空）"}}
 
 规则：
 - 如果用户是在下达**改动表**的指令（如"记一笔收款"），kind 用 plan，reply 里说明你会先出清单让他确认。
@@ -241,6 +257,13 @@ func assembleChatPrompt(userText string, files []string, history []convo.Message
 - **不能新增工作表、不能建公式、不能动被禁止的列**。
 - 说不出清楚的地方，用 clarify 并把**可选项**给出来（options），让人点一下就能回答。
 - 如果只是**问问题**，proposal 可以为 null，直接 reply 回答。
+- 如果用户要**创建作业区**（“把发票目录设成一个区，改到发票台账”）：kind=zone，
+  填 zoneName / zoneInputPath / zoneTargetFile（工作表能确定就填 zoneTargetSheet），
+  mode 默认 dryRun；title 写“新建作业区：<名>”。
+- 如果用户要**修改已有作业区**（改名/换目录/换目标表）：kind=zone，zoneId 取上面清单里的 id，
+  **只填他要改的字段**，没提到的字段留空（留空=不改）。
+- 输入目录必须是**用户在这句话里明确给出的路径或上面清单里已有的路径**。没给路径就 kind=clarify，
+  问“要盯哪个文件夹”，**不要编路径**。授权由系统校验，未授权的目录会被拒绝。
 - 如果用户要**现在把某个作业区跑一遍**（"把发票目录跑一次""试一下系统导出"）：kind=task，
   zoneId 填上面作业区清单里的 id，mode 填 dryRun；**schedule 必须留空**（留空=立即入队跑一次）。
   title 写"运行：<区名>"，detail 一句话说明依据（他哪句话/哪个目录让你跑这个区）。

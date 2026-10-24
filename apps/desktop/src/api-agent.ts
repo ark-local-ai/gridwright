@@ -897,6 +897,17 @@ export interface ConvoMsgDto {
   proposal?: {
     kind: string; title: string; detail: string; schedule?: string;
     action?: string; tools?: string[]; options?: string[];
+    /** kind=task：跑哪区区；kind=zone：修改哪区区（空=新建）。 */
+    zoneId?: string;
+    mode?: string;
+    zoneName?: string;
+    zoneInputType?: string;
+    zoneInputPath?: string;
+    zoneInputPattern?: string;
+    zoneTargetFile?: string;
+    zoneTargetSheet?: string;
+    zoneTargetNewTable?: string;
+    accepted?: boolean;
   };
 }
 
