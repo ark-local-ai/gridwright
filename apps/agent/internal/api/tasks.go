@@ -22,7 +22,8 @@ import (
 // 任务队列与作业区执行（见 internal/tasks、internal/zoneingest）。
 //
 // 语义：
-//   - 点一次运行 / 对话里采纳一次 = 提交一个任务；队列**串行**，一次只跑一个。
+//   - 点一次运行 / 对话里采纳一次 = 提交一个任务；队列按目标表并发，
+//     同一本工作簿仍串行（见 internal/tasks）。
 //   - dryRun（作业区 mode=dryRun 或显式要求）= 只扫描与去重，不投递、不处理。
 //   - apply = 把输入目录的新文件投递到 inbox，然后**停下等人确认**，
 //     不在任务里调用 agent.ProcessInboxFile。
@@ -118,8 +119,11 @@ func (s *Server) submitZoneTask(zoneID string, dryRun bool, source, conversation
 		title = "试运行：" + z.Name
 	}
 	task := tasks.Task{
-		ZoneID:         z.ID,
-		Title:          title,
+		ZoneID: z.ID,
+		Title:  title,
+		// TargetKey 只取文件名（不含路径）：同一本 xlsx 同时只能有一个任务在写，
+		// 否则 excelize 整本 SaveAs 会互相覆盖。
+		TargetKey:      z.Target.File,
 		Source:         source,
 		ConversationID: conversationID,
 		DryRun:         dry,
@@ -150,7 +154,7 @@ type taskOpts struct {
 	IdempotencyKey string
 }
 
-// runZoneTask 在 tasks 的 worker 里执行。一次只跑一个任务由 Queue 保证。
+// runZoneTask 在 tasks 的 worker 里执行。同一目标表不并发由 Queue 的 TargetKey 保证。
 func (s *Server) runZoneTask(ctx context.Context, layout *workspace.Layout, q *tasks.Queue, t *tasks.Task) error {
 	if q == nil || layout == nil {
 		return fmt.Errorf("任务队列未就绪")

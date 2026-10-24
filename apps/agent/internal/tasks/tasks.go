@@ -2,11 +2,13 @@
 // 让模型「帮我建个任务」，最终都落到这里的一条 Task 上，共用同一套排队、进度、
 // 取消与历史。
 //
-// 为什么一次只跑一个：一本 Excel 台账只有一个写者。两个任务同时改同一批工作簿，
-// 轻则互相覆盖、重则留下半写的文件；工作区本来就有 filelock，争锁只会变成
-// 「随机一个任务失败」。串行虽然慢一点，但顺序可预期、进度条说得清、失败原因
-// 也能归到具体某一步上。界面同时展示最近 6 条，其余进历史，是为了不让「跑了
-// 一下午的 200 条」把界面撑爆。
+// 为什么按目标表串行、跨目标并行：一本 Excel 台账只有一个写者。excelize 是
+// 整本 SaveAs，两个任务同时改同一本工作簿会互相覆盖、留下半写的文件。但不同
+// 工作簿互不相干——用户开着两个对话，一个改发票表、一个改商铺表，没必要排队。
+// 所以并发度按「目标表」（Task.TargetKey）算：同一 TargetKey 同时只跑一个，
+// 不同 TargetKey 最多并行 maxWorkers 个。TargetKey 为空的是扫描/只读任务，
+// 不占目标，可以自由并行。界面同时展示最近 6 条，其余进历史，是为了不让
+// 「跑了一下午的 200 条」把界面撑爆。
 //
 // 为什么持久化：任务往往跑几分钟到几十分钟，期间用户会刷新页面、切工作区、
 // 甚至重启进程。没有 tasks.json，刷新一次就「任务不见了」，用户会重复点运行。
@@ -59,6 +61,9 @@ const (
 	maxHistory = 200
 	// snapshotSize 是界面一次展示的条数（运行中优先）。
 	snapshotSize = 6
+	// maxWorkers 是同时 running 的任务数上限。再高也不会更快：瓶颈是磁盘与
+	// 模型调用，而每多一个 worker 就多一份内存与锁竞争。
+	maxWorkers = 4
 	// timeLayout 固定毫秒精度：RFC3339Nano 会省掉尾部零，字符串排序就不再等于时间排序。
 	timeLayout = "2006-01-02T15:04:05.000Z07:00"
 	// cancelWait 是 Cancel 等待 running 任务真正停下的上限；runner 不响应 ctx 时
@@ -87,6 +92,10 @@ type Task struct {
 	ID     string `json:"id"`
 	ZoneID string `json:"zoneId"`
 	Title  string `json:"title"`
+	// TargetKey 是任务要写的那本工作簿（只文件名，不含路径）。同一 key 同时
+	// 只允许一个 running，避免 excelize 整本 SaveAs 互相覆盖。空 = 不占目标
+	// （扫描/只读任务），可并行。
+	TargetKey string `json:"targetKey,omitempty"`
 	// Source 标记任务从哪里来：chat（对话采纳）/ manual（接口/界面直跑）。
 	// 看板只展示 chat，避免“我没在对话里说过，怎么多了一次运行”。
 	Source         string `json:"source,omitempty"`
@@ -111,11 +120,14 @@ type Task struct {
 	EndedAt     string         `json:"endedAt"`
 }
 
-// Snapshot 是给界面的一帧快照。Items 最多 6 条，运行中的排第一，其余按创建时间倒序。
+// Snapshot 是给界面的一帧快照。Items 最多 6 条，运行中的排前面，其余按创建时间倒序。
 type Snapshot struct {
+	// RunningID 是最近启动的 running id（没有则空），保留给只认识单任务的旧界面。
 	RunningID string `json:"runningId"`
-	Items     []Task `json:"items"`
-	Queued    int    `json:"queued"`
+	// RunningIDs 是当前全部 running，按启动先后排列，最多 maxWorkers 个。
+	RunningIDs []string `json:"runningIds,omitempty"`
+	Items      []Task   `json:"items"`
+	Queued     int      `json:"queued"`
 }
 
 // file 是 tasks.json 的形状。
@@ -133,22 +145,32 @@ type taskEntry struct {
 	seq         int64
 	done        chan struct{}
 	doneOnce    sync.Once
+	ctx         context.Context    // 仅在 running 期间非 nil
 	cancel      context.CancelFunc // 仅在 running 期间非 nil
 	cancelAsked bool               // 用户显式 Cancel 过（区别于 Close 的取消）
+	// patches 是这条任务 running 期间 Update 打的补丁，结束时补到 runner 的
+	// 副本上。必须逐任务存放：并发下共享一个大切片会把补丁串到别的任务上。
+	patches []func(*Task)
 }
 
-// Queue 是串行任务队列。零值不可用，请用 New。
+// Queue 是按目标表并发的任务队列。零值不可用，请用 New。
 type Queue struct {
 	path   string
 	runner func(context.Context, *Task) error
 
-	mu        sync.Mutex
-	tasks     map[string]*taskEntry
-	fifo      []string // 待跑任务的 id，FIFO
-	seq       int64
+	mu     sync.Mutex
+	tasks  map[string]*taskEntry
+	fifo   []string // 待跑任务的 id，FIFO
+	seq    int64
+	closed bool
+
+	running map[string]bool // 正在跑的 id 集合
+	// runningOrder 记录启动先后，Snapshot.RunningIDs 与 runningID 都按它取。
+	runningOrder []string
+	// runningTargets 是每个 TargetKey 当前的 running 数；同一 key 必须为 0 才能再取。
+	runningTargets map[string]int
+	// runningID 仅用于兼容旧界面：最近启动的 running id，没有则空。
 	runningID string
-	patches   []func(*Task) // 运行期间 Update 打的补丁，任务结束时补到 runner 的副本上
-	closed    bool
 
 	ctx       context.Context
 	cancelAll context.CancelFunc
@@ -159,7 +181,7 @@ type Queue struct {
 	closeErr  error
 }
 
-// New 打开（或创建）工作区根目录下的任务队列，并启动唯一的 worker。
+// New 打开（或创建）工作区根目录下的任务队列，并启动调度 loop。
 // runner 负责真正干活：它拿到的 *Task 是私有副本，可以随意改 Steps/Counts/Summary，
 // 返回后由队列决定最终 Status、EndedAt 并落盘。
 func New(root string, runner func(context.Context, *Task) error) (*Queue, error) {
@@ -173,11 +195,13 @@ func New(root string, runner func(context.Context, *Task) error) (*Queue, error)
 		return nil, fmt.Errorf("创建任务目录 %s: %w", root, err)
 	}
 	q := &Queue{
-		path:   filepath.Join(root, fileName),
-		runner: runner,
-		tasks:  make(map[string]*taskEntry),
-		wake:   make(chan struct{}, 1),
-		done:   make(chan struct{}),
+		path:           filepath.Join(root, fileName),
+		runner:         runner,
+		tasks:          make(map[string]*taskEntry),
+		running:        make(map[string]bool),
+		runningTargets: make(map[string]int),
+		wake:           make(chan struct{}, 1),
+		done:           make(chan struct{}),
 	}
 	q.ctx, q.cancelAll = context.WithCancel(context.Background())
 
@@ -339,14 +363,28 @@ func (q *Queue) Snapshot() Snapshot {
 			s.Queued++
 		}
 	}
-	if e, ok := q.tasks[q.runningID]; ok && q.runningID != "" {
-		s.Items = append(s.Items, cloneTask(e.task))
+	// running 按启动先后排前面；runningID 兼容字段优先，坏了也不能出现空。
+	for _, id := range q.runningOrder {
+		if _, ok := q.tasks[id]; ok {
+			s.RunningIDs = append(s.RunningIDs, id)
+			if s.RunningID == "" {
+				s.RunningID = id
+			}
+		}
+	}
+	for _, id := range s.RunningIDs {
+		if len(s.Items) >= snapshotSize {
+			break
+		}
+		if e, ok := q.tasks[id]; ok {
+			s.Items = append(s.Items, cloneTask(e.task))
+		}
 	}
 	for _, e := range desc {
 		if len(s.Items) >= snapshotSize {
 			break
 		}
-		if e.task.ID == q.runningID {
+		if q.running[e.task.ID] {
 			continue
 		}
 		s.Items = append(s.Items, cloneTask(e.task))
@@ -382,9 +420,10 @@ func (q *Queue) Update(id string, fn func(*Task)) {
 		return
 	}
 	fn(&e.task)
-	if id == q.runningID {
-		// runner 手里的是副本，这里改的是盘上那份；打补丁保证两边一致。
-		q.patches = append(q.patches, fn)
+	if e.task.Status == StatusRunning {
+		// runner 手里的是副本，这里改的是盘上那份；打补丁到这条任务自己身上，
+		// 保证两边一致且不会串到别的任务。
+		e.patches = append(e.patches, fn)
 	}
 	_ = q.persistLocked()
 }
@@ -411,6 +450,8 @@ func (q *Queue) Close() error {
 // ---------------------------------------------------------------------------
 // worker
 
+// loop 是调度器：醒一次就把能跑的都拉起来（受 maxWorkers 与 TargetKey 限制），
+// 然后等 runOne 结束的 signal —— 一个任务结束可能解放一个目标或一个 worker 名额。
 func (q *Queue) loop() {
 	defer q.wg.Done()
 	for {
@@ -419,90 +460,156 @@ func (q *Queue) loop() {
 			return
 		case <-q.wake:
 		}
-		// 醒来后把能跑的跑完；一次一个，天然串行。
 		for {
-			e, ok := q.takeNext()
-			if !ok {
+			started := q.dispatch()
+			if started > 0 {
+				continue // 可能还有名额，继续取
+			}
+			// 没有能跑的了：还有 running 就等它们的 signal（结束/取消会唤醒）。
+			q.mu.Lock()
+			active := len(q.running) > 0
+			q.mu.Unlock()
+			if !active {
 				break
 			}
-			q.runOne(e)
 			select {
 			case <-q.done:
 				return
-			default:
+			case <-q.wake:
 			}
 		}
 	}
 }
 
-// takeNext 取出队首 queued 任务（不置 running，置状态在 runOne 里做，
-// 保证 running 与 runningID 同一次加锁完成）。
-func (q *Queue) takeNext() (*taskEntry, bool) {
+// dispatch 把当前所有符合条件的 queued 任务拉起来，返回启动个数。
+// 每次取任务都在锁内标记 running 并登记目标占用，所以同一 TargetKey 不会被
+// 取两次（即使前一个 goroutine 还没真正开始跑）。
+func (q *Queue) dispatch() int {
+	started := 0
 	q.mu.Lock()
-	defer q.mu.Unlock()
-	if q.closed {
-		return nil, false
+	for {
+		e, ok := q.takeNextEligibleLocked()
+		if !ok {
+			break
+		}
+		q.wg.Add(1)
+		started++
+		go q.runOne(e)
 	}
-	return q.popLocked()
+	q.mu.Unlock()
+	return started
 }
 
-func (q *Queue) popLocked() (*taskEntry, bool) {
-	for len(q.fifo) > 0 {
-		id := q.fifo[0]
-		q.fifo = q.fifo[1:]
+// takeNextEligibleLocked 从 FIFO 里取第一个可跑的任务：queued、目标未被占用、
+// running 数未达 maxWorkers。被目标挡住的留在队列里，不丢。
+func (q *Queue) takeNextEligibleLocked() (*taskEntry, bool) {
+	if q.closed || len(q.running) >= maxWorkers {
+		return nil, false
+	}
+	for i := 0; i < len(q.fifo); i++ {
+		id := q.fifo[i]
 		e, ok := q.tasks[id]
-		if !ok {
+		if !ok || e.task.Status != StatusQueued {
+			q.removeFIFOAtLocked(i)
+			i--
 			continue
 		}
-		if e.task.Status != StatusQueued {
+		if e.task.TargetKey != "" && q.runningTargets[e.task.TargetKey] > 0 {
 			continue
 		}
-		if len(q.fifo) == 0 {
-			q.fifo = nil
-		}
+		q.removeFIFOAtLocked(i)
+		q.markRunningLocked(e)
 		return e, true
 	}
-	q.fifo = nil
 	return nil, false
 }
 
-func (q *Queue) runOne(e *taskEntry) {
-	q.mu.Lock()
-	if q.closed || e.task.Status != StatusQueued {
-		q.mu.Unlock()
-		return
+func (q *Queue) removeFIFOAtLocked(i int) {
+	q.fifo = append(q.fifo[:i], q.fifo[i+1:]...)
+	if len(q.fifo) == 0 {
+		q.fifo = nil
 	}
+}
+
+// markRunningLocked 把任务置 running 并登记并发占用。ctx 也在这里建：
+// 从取走到 goroutine 真正跑之间还有窗口，Cancel 必须能立即生效。
+func (q *Queue) markRunningLocked(e *taskEntry) {
 	ctx, cancel := context.WithCancel(q.ctx)
-	e.cancel = cancel
+	e.ctx, e.cancel = ctx, cancel
 	e.cancelAsked = false
+	e.patches = nil
 	e.task.Status = StatusRunning
 	e.task.StartedAt = now()
 	e.task.EndedAt = ""
 	e.task.Error = ""
-	q.runningID = e.task.ID
-	q.patches = nil
+	id := e.task.ID
+	q.running[id] = true
+	q.runningOrder = append(q.runningOrder, id)
+	if e.task.TargetKey != "" {
+		q.runningTargets[e.task.TargetKey]++
+	}
+	q.runningID = id
+}
+
+// releaseRunningLocked 抹掉 running 登记（id、启动顺序、目标计数、兼容 runningID）。
+func (q *Queue) releaseRunningLocked(e *taskEntry) {
+	id := e.task.ID
+	delete(q.running, id)
+	for i, v := range q.runningOrder {
+		if v == id {
+			q.runningOrder = append(q.runningOrder[:i], q.runningOrder[i+1:]...)
+			break
+		}
+	}
+	if len(q.runningOrder) == 0 {
+		q.runningOrder = nil
+	}
+	if key := e.task.TargetKey; key != "" {
+		if n := q.runningTargets[key]; n <= 1 {
+			delete(q.runningTargets, key)
+		} else {
+			q.runningTargets[key] = n - 1
+		}
+	}
+	if q.runningID == id {
+		q.runningID = ""
+		if len(q.runningOrder) > 0 {
+			q.runningID = q.runningOrder[len(q.runningOrder)-1]
+		}
+	}
+}
+
+func (q *Queue) runOne(e *taskEntry) {
+	defer q.wg.Done()
+
+	q.mu.Lock()
+	ctx, cancel := e.ctx, e.cancel
 	work := cloneTask(e.task) // runner 只碰副本：读者永远拿锁内的快照，-race 干净
 	id := e.task.ID
-	_ = q.persistLocked()
+	_ = q.persistLocked() // 状态在 takeNextEligibleLocked 里已置 running，这里落盘
 	q.mu.Unlock()
 
 	err := q.runner(ctx, &work)
 
 	q.mu.Lock()
-	// 运行期间通过 Update 打的补丁补到副本上（runner 的直接修改优先于早先的补丁）。
-	for _, p := range q.patches {
+	// 运行期间通过 Update 打的补丁补到这条任务的副本上（runner 的直接修改优先）。
+	for _, p := range e.patches {
 		p(&work)
 	}
-	q.patches = nil
-	cancel()
-	e.cancel = nil
+	e.patches = nil
+	if cancel != nil {
+		cancel()
+	}
+	e.ctx, e.cancel = nil, nil
 
 	cur, ok := q.tasks[id]
 	if !ok {
 		// 理论上不会发生（running 不会被淘汰），真发生了也不能 panic。
-		q.runningID = ""
-		q.mu.Unlock()
+		q.releaseRunningLocked(e)
 		q.finishLocked(e)
+		_ = q.persistLocked()
+		q.mu.Unlock()
+		q.signal()
 		return
 	}
 	stored := cur.task
@@ -533,11 +640,13 @@ func (q *Queue) runOne(e *taskEntry) {
 		stored.StartedAt = stored.EndedAt
 	}
 	cur.task = stored
-	q.runningID = ""
+	q.releaseRunningLocked(cur)
 	q.finishLocked(cur)
 	q.trimLocked()
 	_ = q.persistLocked()
 	q.mu.Unlock()
+	// 唤醒调度器：释放的目标或 worker 名额可能让排队任务立即可跑。
+	q.signal()
 }
 
 // ---------------------------------------------------------------------------
