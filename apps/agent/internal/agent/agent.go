@@ -23,6 +23,7 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory2"
 	"github.com/ark-local-ai/ark/apps/agent/internal/notify"
 	"github.com/ark-local-ai/ark/apps/agent/internal/plan"
+	"github.com/ark-local-ai/ark/apps/agent/internal/propose"
 	"github.com/ark-local-ai/ark/apps/agent/internal/safety"
 	"github.com/ark-local-ai/ark/apps/agent/internal/workspace"
 	"github.com/ark-local-ai/ark/apps/agent/internal/xl"
@@ -172,6 +173,25 @@ func (a *Agent) reapStaleClaims() {
 // 直接按规则产出改动，不问模型（省 token、可复现、断网也能办事）。
 // 没有规则命中才走"问脑"那条路。
 func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
+	return a.runInboxFile(ctx, inboxFile, inboxRunOpts{})
+}
+
+// inboxRunOpts 是 runInboxFile 的行为开关。
+//
+// 唯一的差异点是"算完清单之后写不写盘"：自动链路（默认）一路写到底；
+// 作业区链路（onPlan 非空）在 ApplyEdits **之前**就交回清单，
+// 由用户确认后再走既有 /apply。除此之外两条路完全同源——同一套读取、
+// 规则短路、问脑、forbid 护栏、定位。
+// 各写一套"算"的逻辑才是真危险：迟早算出不同的结果。
+type inboxRunOpts struct {
+	// zoneID 是产生清单的作业区 id（写进 Proposal.Zone，进账目 zone 列）。
+	zoneID string
+	// onPlan 非空 = 只出待确认清单、不落盘。
+	onPlan func(*propose.Proposal)
+}
+
+// runInboxFile 是 RunInboxFile / PlanInboxFile 共用的受控内部入口。
+func (a *Agent) runInboxFile(ctx context.Context, inboxFile string, opts inboxRunOpts) error {
 	source := displayName(inboxFile)
 	logx.Step("inbox", "enter", "source", source)
 	data, err := readInbox(inboxFile)
@@ -226,7 +246,7 @@ func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
 	// 4) 锁检测：目标表被 Excel 占用则跳过本次（spec §4）
 	// 选表结果记一条：自动链路没人在旁边看，事后只能靠日志回答"这笔数据进了哪张表"。
 	logx.Step("inbox", "选目标表", "source", source, "target", filepath.Base(target), "candidates", len(targets))
-	if workspace.Locked(target) {
+	if workspace.Locked(target) && opts.onPlan == nil {
 		log.Printf("目标表 %s 被 Excel 占用（存在锁文件），跳过本次", filepath.Base(target))
 		logx.Step("inbox", "exit", "source", source, "note", "目标表被 Excel 占用，跳过")
 		return nil
@@ -309,6 +329,19 @@ func (a *Agent) RunInboxFile(ctx context.Context, inboxFile string) error {
 	}
 
 	// 7) 执行 edits（改内存工作簿）
+	//
+	// 作业区链路到此为止：算已经算完（读取/短路/问脑/护栏/定位），
+	// 但**绝不落盘**——不备份、不 SaveAs、不记账、不移动 inbox 文件、不发通知。
+	// 清单存进待确认区，用户确认后由既有 /apply 执行。
+	if opts.onPlan != nil {
+		prop := a.buildInboxProposal(f, target, inboxFile, opts.zoneID, p, blocked, structures)
+		f.Close()
+		logx.Step("inbox", "只出清单", "source", source, "target", filepath.Base(target),
+			"items", len(prop.Items), "blocked", len(prop.Blocked), "zone", opts.zoneID)
+		opts.onPlan(prop)
+		return nil
+	}
+
 	results := xl.ApplyEdits(f, p.Edits)
 
 	// 8) 备份 + 写回（只有真正执行了 ok 的才保存）
