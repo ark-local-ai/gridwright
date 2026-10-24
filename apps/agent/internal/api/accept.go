@@ -17,7 +17,7 @@ import (
 //
 // 提案以前只能看、点不了——模型说"每天下班前体检一次"，用户点头了也没有下文。
 // 这里把它落成真的东西：
-//   - task + zoneId + 无 schedule → 立即提交一个作业区任务（排队、一次只跑一个）
+//   - task + zoneId + 无 schedule → 立即提交一个作业区任务（不同目标表可并行，同一本表排队）
 //   - task + schedule             → 一条**默认暂停**的定时任务
 //   - rule                        → 只标记已采纳；不自动落盘
 //   - tool_request                → 同上，只标记
@@ -74,7 +74,7 @@ func (s *Server) handleConversationAccept(w http.ResponseWriter, r *http.Request
 			return
 		}
 		resp["task"] = t
-		resp["note"] = "已加入任务队列（一次只跑一个，看板会显示进度）"
+		resp["note"] = "已加入任务队列（不同目标表可并行，同一本表排队）"
 		if t.DryRun {
 			resp["note"] = "已加入任务队列（试运行：只扫描与去重，不改任何文件）"
 		}

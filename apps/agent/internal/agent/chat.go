@@ -10,6 +10,7 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/convo"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
 	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
+	"github.com/ark-local-ai/ark/apps/agent/internal/skills"
 	"github.com/ark-local-ai/ark/apps/agent/internal/trace"
 )
 
@@ -42,6 +43,15 @@ func (a *Agent) ChatWithImages(ctx context.Context, userText string, files []str
 		"images", len(imgs), "history", len(history))
 	donePrompt := tr.Step("组装提示")
 	prompt := assembleChatPrompt(userText, files, history, zoneLines...)
+	// 装配进来的技能（SKILL.md）只注入说明正文；与任务无关的部分模型会忽略。
+	var skillN int
+	if a.Layout != nil {
+		skillList := skills.Load(a.Layout.Root)
+		skillN = len(skillList)
+		if block := skills.Block(skillList, 12000); block != "" {
+			prompt += "\n\n" + block
+		}
+	}
 	if len(imgs) > 0 {
 		// 明确告诉模型图里是什么，否则它可能只当装饰
 		prompt += fmt.Sprintf("\n\n（用户随消息附了 %d 张图，通常是截图或照片里的数据；请从中读数。）", len(imgs))
@@ -52,8 +62,8 @@ func (a *Agent) ChatWithImages(ctx context.Context, userText string, files []str
 	if logx.Enabled(slog.LevelDebug) {
 		logx.Block("会话提示词", prompt)
 	}
-	donePrompt(fmt.Sprintf("%d 字 · 历史 %d 条 · 工作区表 %d 张 · 附图 %d 张",
-		len([]rune(prompt)), len(history), len(files), len(imgs)))
+	donePrompt(fmt.Sprintf("%d 字 · 历史 %d 条 · 工作区表 %d 张 · 附图 %d 张 · 技能 %d 个",
+		len([]rune(prompt)), len(history), len(files), len(imgs), skillN))
 
 	doneBrain := tr.Step("调模型")
 	content, err := a.Brain.ChatJSONWithImages(ctx, prompt, imgs)

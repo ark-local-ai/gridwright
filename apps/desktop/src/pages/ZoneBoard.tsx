@@ -11,8 +11,9 @@ import "./zone.css";
  * 卡片本身就是运行入口：点「试运行」只扫描与去重（不动任何文件），
  * 点「运行」把新文件投递进 inbox 再交给既有 agent（规则/模型、备份、记账）。
  *
- * 一次只跑一个任务（后端 tasks.Queue 单 worker）。看板最多展示 6 个作业区；
- * 运行记录超过 6 条的部分在「历史工作」里，不会被丢掉。
+ * 并发按**目标表**：不同工作簿的区可以同时跑（两个对话各干各的），
+ * 同一本 xlsx 仍然串行（excelize 整本 SaveAs，并发会互相覆盖）。
+ * 看板最多展示 6 个作业区；运行记录超过 6 条的部分在「历史工作」里。
  */
 
 const MAX_CARDS = 6;
@@ -39,7 +40,7 @@ export default function ZoneBoard({ onOpenLedger, syncToken, onOpenChat, onOpenC
   onOpenInbox?: () => void;
 }) {
   const [zones, setZones] = useState<Zone[]>([]);
-  const [snap, setSnap] = useState<{ runningId: string; items: Task[]; queued: number }>({
+  const [snap, setSnap] = useState<{ runningId: string; runningIds?: string[]; items: Task[]; queued: number }>({
     runningId: "", items: [], queued: 0,
   });
   const [history, setHistory] = useState<Task[]>([]);
@@ -185,7 +186,12 @@ export default function ZoneBoard({ onOpenLedger, syncToken, onOpenChat, onOpenC
       <div className="dcard-h">
         <h3>作业区</h3>
         <span className="dcard-n">
-          {zones.length} 个 · {snap.queued > 0 ? `${snap.queued} 个排队` : "一次只跑一个"}
+          {zones.length} 个 · {(() => {
+            const running = snap.runningIds?.length ?? (snap.runningId ? 1 : 0);
+            if (running > 1) return `${running} 个在跑`;
+            if (snap.queued > 0) return `${snap.queued} 个排队`;
+            return "按目标表并发";
+          })()}
         </span>
         <button className="btn ghost sm" onClick={onOpenLedger}><IconNote size={13} />账目 / 回滚</button>
         <button className="btn ghost sm" onClick={() => setHistOpen(true)}><IconClock size={13} />历史工作</button>

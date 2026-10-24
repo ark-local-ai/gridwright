@@ -68,8 +68,9 @@ gridwright/
 │  │  │  ├─ trace/          # 单次运行每步轨迹，随响应回给界面
 │  │  │  ├─ workspace/      # 工作区约定（inbox/done/skipped/archive）+ 注册表
 │  │  │  ├─ zones/          # 作业区 zones.json（工作区内的派单作用域，不是新工作区）
+│  │  │  ├─ skills/         # Agent Skills 装配：读 SKILL.md，只注入说明、不执行脚本
 │  │  │  ├─ zoneingest/     # 作业区取件：列目录 / 去重（看 inbox+done）/ 复制进 inbox
-│  │  │  ├─ tasks/          # 任务队列 tasks.json：单 worker 串行、最多展示 6 条、历史可查
+│  │  │  ├─ tasks/          # 任务队列 tasks.json：按目标表并发（同一本表串行）、最多展示 6 条
 │  │  │  ├─ pathsafe/       # 路径白名单：自动监听/连接器只能碰已授权根目录
 │  │  │  ├─ filelock/       # 同一张表的进程内串行写锁（apply/回滚/inbox 共用）
 │  │  │  ├─ proc/           # 监视父进程，壳没了就退出，不留孤儿占端口

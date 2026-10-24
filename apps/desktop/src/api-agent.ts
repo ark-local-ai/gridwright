@@ -282,6 +282,8 @@ export interface Task {
 
 export interface TaskSnapshot {
   runningId: string;
+  /** 同时最多 4 个；不同目标表可并行，同一本表串行。 */
+  runningIds?: string[];
   items: Task[];
   queued: number;
 }
