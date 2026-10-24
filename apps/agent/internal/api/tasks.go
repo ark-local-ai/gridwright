@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ark-local-ai/ark/apps/agent/internal/agent"
-	"github.com/ark-local-ai/ark/apps/agent/internal/ledger"
 	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 	"github.com/ark-local-ai/ark/apps/agent/internal/tasks"
 	"github.com/ark-local-ai/ark/apps/agent/internal/workspace"
@@ -23,12 +21,15 @@ import (
 // 语义：
 //   - 点一次运行 / 对话里采纳一次 = 提交一个任务；队列**串行**，一次只跑一个。
 //   - dryRun（作业区 mode=dryRun 或显式要求）= 只扫描与去重，不投递、不处理。
-//   - apply = 把输入目录的新文件投递到 inbox，再逐个交给既有 agent 处理
-//     （认领锁、规则短路、备份、记账、移 done 全部复用，不另写一套）。
+//   - apply = 把输入目录的新文件投递到 inbox，然后**停下等人确认**，
+//     不在任务里调用 agent.ProcessInboxFile。
 //   - 看板最多展示 Snapshot 的 6 条；更多在 History 里查。
 //
-// 为什么不让 runner 直接写表：写表仍然只经过 agent/propose 的既有路径
-// （备份 + 指纹 + 记账）。runner 只负责“把文件送到入口”和汇总状态。
+// 为什么停在这里（而不是投递后自动处理）：规则命中会直接写表，
+// “改表必须人确认”。现有收件箱面板的「现在处理」就是那个确认动作——
+// 人点一下才走 agent 的既有路径（认领锁、规则短路、备份、指纹、记账、移 done）。
+// 未来若要做“合并待确认清单”，入口也应从这一步接：任务只负责投递与报数，
+// 处理统一由确认动作触发，不要在这里再长出一条自动处理分支。
 
 var errZoneNotFound = errors.New("zone 不存在")
 
@@ -179,12 +180,11 @@ func (s *Server) runZoneTask(ctx context.Context, layout *workspace.Layout, q *t
 			setCounts(q, t.ID, map[string]int{"candidates": len(names)})
 			return finish("ok", "", 0, 0, fmt.Sprintf("试运行：收件箱 %d 个文件，未处理", len(names)))
 		}
-		setCounts(q, t.ID, map[string]int{"candidates": len(names)})
-		okN, failN, firstErr := s.processInboxNames(ctx, layout, q, t, names)
-		setStep(q, t.ID, "process", statusOf(okN, failN), fmt.Sprintf("%d 成功 / %d 失败", okN, failN))
-		setStep(q, t.ID, "done", tasks.StepOK, "成功文件已移入 inbox/done")
-		return finish(statusOf(okN, failN), firstErr, okN, failN,
-			fmt.Sprintf("处理 %d 个：%d 成功，%d 失败", len(names), okN, failN))
+		// apply 也停下等确认：这里只报数，不处理 inbox。
+		setCounts(q, t.ID, map[string]int{"candidates": len(names), "pending": len(names)})
+		setStep(q, t.ID, "process", tasks.StepSkipped, fmt.Sprintf("待确认：%d 个文件在收件箱", len(names)))
+		setStep(q, t.ID, "done", tasks.StepSkipped, "确认处理后会自动移入 inbox/done")
+		return finish("ok", "", 0, 0, fmt.Sprintf("已投递 %d 个，等待你在收件箱确认", len(names)))
 	}
 	if z.Input.Type != zones.InputFolder {
 		setStep(q, t.ID, "scan", tasks.StepFailed, "暂不支持该输入类型："+z.Input.Type)
@@ -240,43 +240,11 @@ func (s *Server) runZoneTask(ctx context.Context, layout *workspace.Layout, q *t
 			names = append(names, c.Name)
 		}
 	}
-	setStep(q, t.ID, "process", tasks.StepRunning, "")
-	okN, failN, firstErr := s.processInboxNames(ctx, layout, q, t, names)
-	setStep(q, t.ID, "process", statusOf(okN, failN), fmt.Sprintf("%d 成功 / %d 失败", okN, failN))
-	if failN == 0 {
-		setStep(q, t.ID, "done", tasks.StepOK, "成功文件已移入 inbox/done")
-	} else {
-		setStep(q, t.ID, "done", tasks.StepSkipped, "失败文件留在收件箱，可在收件箱面板重试")
-	}
-	return finish(statusOf(okN, failN), firstErr, okN, failN,
-		fmt.Sprintf("投递 %d 个：%d 成功，%d 失败", len(names), okN, failN))
-}
-
-// processInboxNames 逐个处理投递进来的文件。失败不中断整批。
-func (s *Server) processInboxNames(ctx context.Context, layout *workspace.Layout, q *tasks.Queue, t *tasks.Task, names []string) (okN, failN int, firstErr string) {
-	led, err := ledger.Open(layout.Ledger)
-	if err != nil {
-		return 0, len(names), "打开账目失败：" + err.Error()
-	}
-	ag := agent.New(s.Cfg, layout, led, s.brainClient())
-	for i, name := range names {
-		if ctx.Err() != nil {
-			return okN, failN + (len(names) - i), "任务已取消"
-		}
-		claimed, perr := ag.ProcessInboxFile(ctx, name)
-		if perr != nil {
-			failN++
-			if firstErr == "" {
-				firstErr = perr.Error()
-			}
-			continue
-		}
-		if claimed {
-			okN++
-		}
-		setCounts(q, t.ID, map[string]int{"processed": okN, "failed": failN})
-	}
-	return okN, failN, firstErr
+	// 投递完成即止：不调用 agent.ProcessInboxFile，等人在收件箱面板点「现在处理」。
+	setCounts(q, t.ID, map[string]int{"delivered": len(names), "pending": len(names)})
+	setStep(q, t.ID, "process", tasks.StepSkipped, fmt.Sprintf("待确认：%d 个文件在收件箱", len(names)))
+	setStep(q, t.ID, "done", tasks.StepSkipped, "确认处理后会自动移入 inbox/done")
+	return finish("ok", "", 0, 0, fmt.Sprintf("已投递 %d 个，等待你在收件箱确认", len(names)))
 }
 
 func inboxNames(layout *workspace.Layout) ([]string, error) {

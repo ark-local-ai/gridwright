@@ -417,7 +417,7 @@ type ConvoMsg = {
   };
 };
 
-export function ChatPane({ onPlanReady, wsKey, syncToken, syncConvoId, externalRunning, externalLabel, runText, onRunConsumed, onTaskQueued }: {
+export function ChatPane({ onPlanReady, wsKey, syncToken, syncConvoId, externalRunning, externalLabel, runText, onRunConsumed, onTaskQueued, openConvoId, openConvoToken, prefill, prefillToken }: {
   onPlanReady: (p: Proposal, trace?: TraceData) => void;
   /** 当前工作区标识（用于把没发出去的草稿按工作区隔离存下来） */
   wsKey?: string;
@@ -435,6 +435,14 @@ export function ChatPane({ onPlanReady, wsKey, syncToken, syncConvoId, externalR
   onRunConsumed?: () => void;
   /** 采纳了一个作业区任务：上层据此刷新看板（不必等下一次轮询）。 */
   onTaskQueued?: () => void;
+  /** 从看板作业区卡片点进来：要打开的那个会话 id。 */
+  openConvoId?: string;
+  /** 递增时即使 id 相同也重新加载。 */
+  openConvoToken?: number;
+  /** 加载后填入输入框的文本（不自动发送）。 */
+  prefill?: string;
+  /** 递增时即使文本相同也重新填入。 */
+  prefillToken?: number;
 }) {
   const [convoId, setConvoId] = useState<string>("");
   const [msgs, setMsgs] = useState<ConvoMsg[]>([]);
@@ -629,6 +637,8 @@ export function ChatPane({ onPlanReady, wsKey, syncToken, syncConvoId, externalR
   useEffect(() => {
     if (restoredRef.current) return;
     restoredRef.current = true;
+    // 从作业区卡片指定了会话：显式目标优先，不要再被“上次会话”覆盖。
+    if (openConvoId) return;
     void (async () => {
       try {
         const items = (await agentApi.conversations()).items ?? [];
@@ -663,6 +673,42 @@ export function ChatPane({ onPlanReady, wsKey, syncToken, syncConvoId, externalR
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syncToken]);
+
+  // 从看板作业区卡片点进来：打开创建该任务的会话。
+  // ref 从 undefined 开始：抽屉是**打开时才挂载**的，若用当前 token 初始化，
+  // 第一次挂载就会被当成“首次”跳过，卡片跳转永远不生效。
+  const lastOpenRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (openConvoToken === undefined || openConvoToken === lastOpenRef.current) return;
+    lastOpenRef.current = openConvoToken;
+    const id = openConvoId;
+    if (!id) return;
+    void (async () => {
+      try {
+        const c = await agentApi.conversation(id);
+        setConvoId(c.id);
+        setMsgs(c.messages as ConvoMsg[]);
+        setErr("");
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e));
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openConvoToken]);
+
+  // 预填一句话到输入框（**不自动发送**）：人还要看一眼、改两个字再发。
+  // 同上：首次挂载带 token 时必须生效，不能跳过。
+  const lastPrefillRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (prefillToken === undefined || prefillToken === lastPrefillRef.current) return;
+    lastPrefillRef.current = prefillToken;
+    const t = (prefill ?? "").trim();
+    if (!t) return;
+    setInput(prefill ?? "");
+    // 焦点放到输入框：预填只是开头，用户接着要改
+    requestAnimationFrame(() => taRef.current?.focus());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillToken]);
 
   // 记住"当前在跟哪条记录说话"，供下次打开恢复，也用于列表里的标识。
   useEffect(() => {

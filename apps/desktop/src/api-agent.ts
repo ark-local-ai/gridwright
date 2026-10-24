@@ -267,6 +267,10 @@ export interface Task {
   conversationId?: string;
   status: "queued" | "running" | "ok" | "failed" | "canceled";
   dryRun: boolean;
+  /** 这次运行产出的清单 id（有待确认改动时非空）：卡片据此回看清单。 */
+  proposalIds?: string[];
+  /** 处理失败的文件（可重试）。 */
+  failedFiles?: string[];
   steps: TaskStep[];
   summary?: string;
   error?: string;
@@ -619,6 +623,8 @@ export const agentApi = {
   runZone: (zoneId: string, dryRun: boolean) =>
     post<{ ok: boolean; task: Task }>("/api/v1/tasks/run", { zoneId, dryRun }),
   cancelTask: (id: string) => post<{ ok: boolean }>("/api/v1/tasks/cancel", { id }),
+  /** 重试失败的文件：把这条任务重新排队（POST /api/v1/tasks/retry）。 */
+  retryTask: (id: string) => post<{ ok: boolean; task?: Task }>("/api/v1/tasks/retry", { id }),
   // 路径授权：作业区的输入目录必须先在这里登记（用户显式输入路径 = 一次授权）。
   grants: () => get<{ enabled: boolean; items: { root: string; source: string; mode: string; resolved: string; added: string }[] }>("/api/v1/grants"),
   saveGrant: (path: string, mode: "rw" | "read" = "read") =>
@@ -721,6 +727,9 @@ export const agentApi = {
     if (r?.proposal) r.proposal = normalizeProposal(r.proposal);
     return r;
   },
+  /** 回看一份已算好的清单（卡片「查看待确认」用；GET /api/v1/plan?id=）。 */
+  planGet: (id: string) =>
+    get<Proposal>(`/api/v1/plan?id=${encodeURIComponent(id)}`).then((p) => normalizeProposal(p)),
   apply: (id: string) =>
     post<{
       ok: boolean; applied: number; rejected: number;

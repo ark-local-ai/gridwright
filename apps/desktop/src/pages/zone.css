@@ -23,6 +23,12 @@
   border-radius: var(--r-panel);
   background: var(--surface);
   min-width: 0;
+  /* 卡片本身就是入口：点空白处回到创建它的对话。 */
+  cursor: pointer;
+}
+.zone-card:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
 .zone-card.live { border-color: color-mix(in srgb, var(--brand) 35%, var(--line)); }
 .zone-card.running { box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 12%, transparent); }
@@ -32,12 +38,53 @@
   font-size: var(--fs-xs); color: var(--ink); font-weight: var(--fw-title);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* 「来自对话」标记：说明这条卡片背后有一段可回去的对话。 */
+.zone-from {
+  flex: none; font-size: 10px; padding: 1px var(--sp-1);
+  border-radius: var(--r-ctl); border: 1px solid var(--line);
+  color: var(--text-3); white-space: nowrap;
+}
+
 .zone-mode {
   margin-left: auto; flex: none;
   font-size: 10px; padding: 1px var(--sp-1); border-radius: var(--r-ctl);
   color: var(--text-3); background: var(--surface-2);
 }
 .zone-mode.apply { color: var(--warn); }
+
+/* 卡片右上角小菜单：只有两个动作（编辑/删除），点开才出现。 */
+.zone-more-wrap { position: relative; flex: none; }
+.zone-more {
+  border: none; background: none; cursor: pointer;
+  padding: 0 var(--sp-1); line-height: 1;
+  font-size: var(--fs-xs); color: var(--text-3);
+  border-radius: var(--r-ctl);
+}
+.zone-more:hover, .zone-more:focus-visible { color: var(--ink); background: var(--surface-2); outline: none; }
+.zone-menu {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 3;
+  display: flex; flex-direction: column; min-width: 84px;
+  padding: var(--sp-1);
+  border: 1px solid var(--line); border-radius: var(--r-ctl);
+  background: var(--surface); box-shadow: 0 6px 20px rgb(0 0 0 / 12%);
+}
+.zone-menu-i {
+  border: none; background: none; cursor: pointer; text-align: left;
+  padding: var(--sp-1) var(--sp-2); border-radius: var(--r-ctl);
+  font-size: var(--fs-2xs); color: var(--text-1);
+}
+.zone-menu-i:hover { background: var(--surface-2); }
+.zone-menu-i.danger { color: var(--danger); }
+.zone-menu-i:disabled { opacity: .5; cursor: default; }
+
+/* 编辑模式的表单抬头 */
+.zone-form-title {
+  margin: 0; font-size: var(--fs-2xs); color: var(--text-2);
+  font-weight: var(--fw-title);
+}
+
+/* 历史工作搜索框：撑满剩余宽度，贴在抬头里 */
+.zh-search { width: auto; flex: 1 1 180px; min-width: 140px; }
 
 .zone-src {
   margin: 0; font-size: var(--fs-2xs); color: var(--text-3);
@@ -78,6 +125,17 @@
   background: var(--surface-2);
 }
 .zone-form .zone-wide { flex: 1 1 320px; }
+
+/* 授权是显式的：未勾选就保存不了，旁边写明权限范围与可撤销。 */
+.zone-grant {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--fs-2xs); color: var(--text-1); cursor: pointer;
+}
+.zone-grant input { accent-color: var(--brand); }
+.zone-grant-note {
+  flex: 1 1 320px; margin: 0;
+  font-size: 10px; color: var(--text-3);
+}
 
 .zone-hist { list-style: none; margin: 0; padding: 0; }
 .zone-hist-row {

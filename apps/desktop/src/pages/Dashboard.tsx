@@ -57,6 +57,8 @@ export default function Dashboard({ pickFolder, watchDrop }: {
   const [inboxCount, setInboxCount] = useState(0);
   // 对话里采纳了一个作业区任务时递增；ZoneBoard 收到后立刻重拉状态。
   const [zoneTick, setZoneTick] = useState(0);
+  // 从作业区卡片跳回“创建该任务的对话”，并预填一句可再次派单的话。
+  const [chatJump, setChatJump] = useState<{ convoId: string; prefill: string; token: number } | null>(null);
   const [tasksOpen, setTasksOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -410,7 +412,7 @@ export default function Dashboard({ pickFolder, watchDrop }: {
               <button className="cd-x" onClick={() => setChatOpen(false)} aria-label="关闭对话"><IconX size={14} /></button>
             </header>
             <div className="cd-body">
-              <ChatPane wsKey={wsPath} syncToken={chatSync} syncConvoId={proposal?.conversation} externalRunning={feedbackBusy || writeBusy} externalLabel={feedbackBusy ? "待确认面板正在重新算，请稍候…" : writeBusy ? "正在写入表格（备份 → 写入 → 记账）…" : undefined} runText={quickRun ?? undefined} onRunConsumed={() => setQuickRun(null)} onTaskQueued={() => setZoneTick((n) => n + 1)} onPlanReady={(p, tr) => { setProposal(p); setPlanTrace(tr ?? null); setProposalOpen(true); }} />
+              <ChatPane wsKey={wsPath} syncToken={chatSync} syncConvoId={proposal?.conversation} externalRunning={feedbackBusy || writeBusy} externalLabel={feedbackBusy ? "待确认面板正在重新算，请稍候…" : writeBusy ? "正在写入表格（备份 → 写入 → 记账）…" : undefined} runText={quickRun ?? undefined} onRunConsumed={() => setQuickRun(null)} onTaskQueued={() => setZoneTick((n) => n + 1)} openConvoId={chatJump?.convoId} openConvoToken={chatJump?.token} prefill={chatJump?.prefill} prefillToken={chatJump?.token} onPlanReady={(p, tr) => { setProposal(p); setPlanTrace(tr ?? null); setProposalOpen(true); }} />
             </div>
           </div>
         </>
@@ -540,7 +542,17 @@ export default function Dashboard({ pickFolder, watchDrop }: {
 
           {/* ⑥ 作业区：替换原来的「最近改动」整卡。
               看板只展示**对话创建**的任务；运行入口统一在对话里，卡片负责显示状态。 */}
-          <ZoneBoard onOpenLedger={() => setLedgerOpen(true)} syncToken={zoneTick} onOpenChat={() => setChatOpen(true)} />
+          <ZoneBoard
+            onOpenLedger={() => setLedgerOpen(true)}
+            syncToken={zoneTick}
+            onOpenChat={() => setChatOpen(true)}
+            onOpenProposal={(p) => { setProposal(p); setPlanTrace(null); setProposalOpen(true); }}
+            onOpenInbox={() => setInboxOpen(true)}
+            onOpenConversation={(convoId, prefill) => {
+              setChatJump({ convoId, prefill, token: Date.now() });
+              setChatOpen(true);
+            }}
+          />
         </div>
       </div>
 
