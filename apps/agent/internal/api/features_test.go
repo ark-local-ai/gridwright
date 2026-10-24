@@ -202,3 +202,44 @@ func TestZonesCRUDAndPlanRejectsUnknown(t *testing.T) {
 		t.Fatalf("删除 zone = %d：%s", rec.Code, rec.Body.String())
 	}
 }
+
+// 任务来源：对话采纳 = chat，手动接口 = manual。看板据此只展示 chat。
+func TestTaskSourceChatVsManual(t *testing.T) {
+	s := newTestServer(t)
+	zs := s.zonesStore()
+	if zs == nil {
+		t.Skip("作业区存储不可用")
+	}
+	z, err := zs.Put(zones.Zone{Name: "手工区", Input: zones.Input{Type: zones.InputManual}, Mode: zones.ModeDryRun})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tc, err := s.submitZoneTask(z.ID, true, "chat", "c_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tc.Source != "chat" || tc.ConversationID != "c_test" {
+		t.Fatalf("对话任务来源不对：%+v", tc)
+	}
+	tm, err := s.submitZoneTask(z.ID, true, "manual", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tm.Source != "manual" {
+		t.Fatalf("手动任务来源不对：%+v", tm)
+	}
+
+	q := s.tasksQueue()
+	// 等两个任务都离开队列（queue 单 worker，dryRun 很快）。
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		c, okc := q.Get(tc.ID)
+		m, okm := q.Get(tm.ID)
+		if okc && okm && (c.Status == "ok" || c.Status == "failed") && (m.Status == "ok" || m.Status == "failed") {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("任务未在预期时间内结束")
+}

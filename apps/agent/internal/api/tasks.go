@@ -93,7 +93,7 @@ func setCounts(q *tasks.Queue, id string, kv map[string]int) {
 
 // submitZoneTask 校验作业区并提交一个任务。dryRun 为 true 时强制演习；
 // 作业区自身 mode != apply 时也强制演习（不会因为按钮参数就变成真改）。
-func (s *Server) submitZoneTask(zoneID string, dryRun bool) (tasks.Task, error) {
+func (s *Server) submitZoneTask(zoneID string, dryRun bool, source, conversationID string) (tasks.Task, error) {
 	zs := s.zonesStore()
 	if zs == nil {
 		return tasks.Task{}, fmt.Errorf("作业区存储不可用")
@@ -112,11 +112,13 @@ func (s *Server) submitZoneTask(zoneID string, dryRun bool) (tasks.Task, error) 
 		title = "试运行：" + z.Name
 	}
 	t, err := q.Submit(tasks.Task{
-		ZoneID: z.ID,
-		Title:  title,
-		DryRun: dry,
-		Steps:  zoneTaskSteps(),
-		Counts: map[string]int{},
+		ZoneID:         z.ID,
+		Title:          title,
+		Source:         source,
+		ConversationID: conversationID,
+		DryRun:         dry,
+		Steps:          zoneTaskSteps(),
+		Counts:         map[string]int{},
 	})
 	if err != nil {
 		return tasks.Task{}, err
@@ -360,7 +362,7 @@ func (s *Server) handleTasksRun(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "缺少 zoneId")
 		return
 	}
-	t, err := s.submitZoneTask(req.ZoneID, req.DryRun)
+	t, err := s.submitZoneTask(req.ZoneID, req.DryRun, "manual", "")
 	if err != nil {
 		if errors.Is(err, errZoneNotFound) {
 			writeErr(w, http.StatusNotFound, "zone 不存在："+req.ZoneID)

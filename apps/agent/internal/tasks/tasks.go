@@ -84,18 +84,22 @@ type Step struct {
 
 // Task 是一条任务。Status 取 queued|running|ok|failed|canceled。
 type Task struct {
-	ID        string         `json:"id"`
-	ZoneID    string         `json:"zoneId"`
-	Title     string         `json:"title"`
-	Status    string         `json:"status"`
-	DryRun    bool           `json:"dryRun"`
-	Steps     []Step         `json:"steps"`
-	Summary   string         `json:"summary"`
-	Error     string         `json:"error"`
-	Counts    map[string]int `json:"counts"`
-	CreatedAt string         `json:"createdAt"`
-	StartedAt string         `json:"startedAt"`
-	EndedAt   string         `json:"endedAt"`
+	ID     string `json:"id"`
+	ZoneID string `json:"zoneId"`
+	Title  string `json:"title"`
+	// Source 标记任务从哪里来：chat（对话采纳）/ manual（接口/界面直跑）。
+	// 看板只展示 chat，避免“我没在对话里说过，怎么多了一次运行”。
+	Source         string         `json:"source,omitempty"`
+	ConversationID string         `json:"conversationId,omitempty"`
+	Status         string         `json:"status"`
+	DryRun         bool           `json:"dryRun"`
+	Steps          []Step         `json:"steps"`
+	Summary        string         `json:"summary"`
+	Error          string         `json:"error"`
+	Counts         map[string]int `json:"counts"`
+	CreatedAt      string         `json:"createdAt"`
+	StartedAt      string         `json:"startedAt"`
+	EndedAt        string         `json:"endedAt"`
 }
 
 // Snapshot 是给界面的一帧快照。Items 最多 6 条，运行中的排第一，其余按创建时间倒序。

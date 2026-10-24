@@ -56,7 +56,7 @@ func (s *Server) handleConversationAccept(w http.ResponseWriter, r *http.Request
 	switch {
 	case p.Kind == "task" && strings.TrimSpace(p.ZoneID) != "":
 		// 作业区任务：立即入队跑一次。dryRun 优先——只有明确 mode=apply 才真改。
-		t, terr := s.submitZoneTask(p.ZoneID, strings.EqualFold(p.Mode, "") || strings.EqualFold(p.Mode, "dryRun"))
+		t, terr := s.submitZoneTask(p.ZoneID, strings.EqualFold(p.Mode, "") || strings.EqualFold(p.Mode, "dryRun"), "chat", req.ConversationID)
 		if terr != nil {
 			if errors.Is(terr, errZoneNotFound) {
 				writeErr(w, http.StatusNotFound, "提案里的作业区不存在："+p.ZoneID)
