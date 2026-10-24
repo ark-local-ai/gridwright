@@ -75,7 +75,7 @@ func (r *recorder) order() []string {
 	return append([]string(nil), r.events...)
 }
 
-// TestSingleWorkerSerial 两个任务的时间区间不能重叠：一次只跑一个。
+// TestSingleWorkerSerial 同一目标表的两个任务不能重叠：同一本书串行。
 func TestSingleWorkerSerial(t *testing.T) {
 	rec := newRecorder()
 	q, err := New(t.TempDir(), func(ctx context.Context, task *Task) error {
@@ -89,11 +89,11 @@ func TestSingleWorkerSerial(t *testing.T) {
 	}
 	defer q.Close()
 
-	a, err := q.Submit(Task{ZoneID: "z1", Title: "甲"})
+	a, err := q.Submit(Task{ZoneID: "z1", Title: "甲", TargetKey: "发票.xlsx"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := q.Submit(Task{ZoneID: "z1", Title: "乙"})
+	b, err := q.Submit(Task{ZoneID: "z1", Title: "乙", TargetKey: "发票.xlsx"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestQueueOrder(t *testing.T) {
 
 	var ids []string
 	for i := 0; i < 3; i++ {
-		tk, err := q.Submit(Task{Title: "任务"})
+		tk, err := q.Submit(Task{Title: "任务", TargetKey: "同一本.xlsx"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -175,11 +175,11 @@ func TestCancelQueued(t *testing.T) {
 	}
 	defer q.Close()
 
-	first, err := q.Submit(Task{Title: "先跑"})
+	first, err := q.Submit(Task{Title: "先跑", TargetKey: "同一本.xlsx"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := q.Submit(Task{Title: "排队中"})
+	second, err := q.Submit(Task{Title: "排队中", TargetKey: "同一本.xlsx"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +255,7 @@ func TestSnapshotLimitAndRunningFirst(t *testing.T) {
 
 	var ids []string
 	for i := 0; i < 8; i++ {
-		tk, err := q.Submit(Task{Title: "任务"})
+		tk, err := q.Submit(Task{Title: "任务", TargetKey: "同一本.xlsx"})
 		if err != nil {
 			t.Fatal(err)
 		}
