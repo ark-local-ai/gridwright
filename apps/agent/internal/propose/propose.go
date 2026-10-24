@@ -82,6 +82,10 @@ type Proposal struct {
 	// Zone 是产生这份清单的作业区 id（空 = 工作区级指令）。
 	// 写进账目 zone 列，界面可“只看本区”。
 	Zone string `json:"zone,omitempty"`
+	// Sources 是产出这份清单的来源文件（绝对路径）。
+	// 作业区运行只出清单、不消费 inbox：用户确认后由 /apply 写，
+	// 所以得记下"清单是从哪份新数据算出来的"，否则事后无从追查。
+	Sources []string `json:"sources,omitempty"`
 	// 被挡下的条目（命中 forbid / 定位失败等），要让人看见，不静默
 	Blocked []Blocked `json:"blocked,omitempty"`
 	Created time.Time `json:"created"`
