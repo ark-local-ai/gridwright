@@ -11,6 +11,7 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
 	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 	"github.com/ark-local-ai/ark/apps/agent/internal/trace"
+	"github.com/ark-local-ai/ark/apps/agent/internal/zonecmd"
 	"github.com/ark-local-ai/ark/apps/agent/internal/zones"
 )
 
@@ -113,11 +114,6 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	logx.Step("api.chat", "enter", "conversation", req.ConversationID,
 		"chars", len([]rune(req.Message)), "images", len(req.Images), "zone", req.ZoneID)
 	cfg, layout, led, _ := s.cur()
-	if !cfg.BrainReady() {
-		logx.Step("api.chat", "exit", "err", "未配置模型")
-		writeErr(w, http.StatusBadRequest, "还没配置模型（脑）：请在设置里填 base_url 与 api_key 后就能对话了")
-		return
-	}
 	store, err := s.convoStore()
 	if err != nil {
 		logx.Step("api.chat", "exit", "conversation", req.ConversationID, "err", "打开会话存储失败："+err.Error())
@@ -140,6 +136,55 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	if _, err := store.Append(c.ID, convo.Message{Role: convo.RoleUser, Text: req.Message, Images: imgsForStore(req.Images)}); err != nil {
 		logx.Step("api.chat", "exit", "conversation", c.ID, "err", "存用户消息失败："+err.Error())
 		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// 「@区名 运行 / 试运行」走本地解析，**在检查模型之前**。
+	//
+	// 顺序是有意的：这句话的语义完全确定，不需要模型判断；而它恰恰是没配模型
+	// 时用户唯一能用的入口。放到 BrainReady 后面，就等于「想试运行，先配模型」，
+	// 把最该先跑通的事挡在门外。
+	if ref, dryRun, ok := zonecmd.Parse(req.Message); ok {
+		zlist := []zones.Zone{}
+		if st := s.zonesStore(); st != nil {
+			zlist = st.List()
+		}
+		z, hit := zonecmd.Match(zlist, ref)
+		if !hit {
+			msg := "没有匹配的作业区：" + ref
+			_, _ = store.Append(c.ID, convo.Message{Role: convo.RoleSystem, Text: msg})
+			logx.Step("chat", "@zone", "conversation", c.ID, "ref", ref, "err", "未找到")
+			writeErr(w, http.StatusNotFound, msg)
+			return
+		}
+		t, err := s.submitZoneTask(z.ID, dryRun, "chat", c.ID)
+		if err != nil {
+			_, _ = store.Append(c.ID, convo.Message{Role: convo.RoleSystem, Text: "出错：" + err.Error()})
+			logx.Step("chat", "@zone", "conversation", c.ID, "zone", z.Name, "err", err.Error())
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		// 回话写的是**真正生效**的模式：submitZoneTask 会把非 apply 的区强制成演习，
+		// 这里若照抄用户说的「运行」，界面就会显示一件没发生的事。
+		mode := "运行"
+		if t.DryRun {
+			mode = "试运行"
+		}
+		text := fmt.Sprintf("已加入任务队列：%s（%s）", z.Name, mode)
+		updated, err := store.Append(c.ID, convo.Message{Role: convo.RoleAgent, Text: text})
+		if err != nil {
+			logx.Step("chat", "@zone", "conversation", c.ID, "err", "存回话失败："+err.Error())
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		logx.Step("chat", "@zone", "conversation", c.ID, "zone", z.Name, "task", t.ID, "dryRun", t.DryRun)
+		writeJSON(w, http.StatusOK, map[string]any{"conversationId": c.ID, "conversation": updated, "task": t})
+		return
+	}
+
+	if !cfg.BrainReady() {
+		logx.Step("api.chat", "exit", "err", "未配置模型")
+		writeErr(w, http.StatusBadRequest, "还没配置模型（脑）：请在设置里填 base_url 与 api_key 后就能对话了")
 		return
 	}
 
