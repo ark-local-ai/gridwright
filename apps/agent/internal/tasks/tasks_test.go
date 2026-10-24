@@ -598,3 +598,93 @@ func TestRunnerErrorMarksFailed(t *testing.T) {
 		t.Fatalf("失败任务信息不对：%+v", got)
 	}
 }
+
+// TestSubmitIdempotentByKey 同一个 IdempotencyKey 只产生一条任务。
+//
+// 这条是「对话里连点两次采纳」的护栏：重复提交必须原样返回已有任务，
+// 既不新建、也不报错（报错会让界面以为失败，用户再点一次）。
+func TestSubmitIdempotentByKey(t *testing.T) {
+	q, err := New(t.TempDir(), okRunner(newRecorder()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer q.Close()
+
+	first, err := q.Submit(Task{
+		Title: "甲", IdempotencyKey: "conv:c1:idx:0",
+		Files: []string{"a.csv", "b.csv"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := q.Submit(Task{
+		Title: "乙", IdempotencyKey: "conv:c1:idx:0",
+		Files: []string{"z.csv"},
+	})
+	if err != nil {
+		t.Fatalf("重复提交不该报错：%v", err)
+	}
+	if second.ID != first.ID {
+		t.Fatalf("同 key 应返回已有任务 %s，得到 %s", first.ID, second.ID)
+	}
+	if second.Title != "甲" || len(second.Files) != 2 {
+		t.Fatalf("应返回已有任务的内容，得到 %+v", second)
+	}
+	if got, ok := q.FindByKey("conv:c1:idx:0"); !ok || got.ID != first.ID {
+		t.Fatalf("FindByKey 应找到 %s，得到 %+v ok=%v", first.ID, got, ok)
+	}
+	if _, ok := q.FindByKey("conv:c1:idx:9"); ok {
+		t.Fatal("不存在的 key 不该命中")
+	}
+	if n := len(q.History(0)); n != 1 {
+		t.Fatalf("同 key 只该有一条任务，实际 %d 条", n)
+	}
+
+	// 副本隔离：改返回值的切片不能影响队列里的任务。
+	second.Files[0] = "被改了"
+	if again, _ := q.Get(first.ID); again.Files[0] != "a.csv" {
+		t.Fatalf("Files 必须深拷贝，队列里被改成了 %v", again.Files)
+	}
+
+	// 空 key 不参与幂等：两条都应该建出来。
+	a, err := q.Submit(Task{Title: "空 key 1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := q.Submit(Task{Title: "空 key 2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.ID == b.ID {
+		t.Fatal("空 IdempotencyKey 不该去重")
+	}
+}
+
+// TestRunOneWritesBackProposalAndFailedFiles runner 直接赋值的列表必须落到盘上。
+func TestRunOneWritesBackProposalAndFailedFiles(t *testing.T) {
+	q, err := New(t.TempDir(), func(ctx context.Context, task *Task) error {
+		task.ProposalIDs = []string{"p1", "p2"}
+		task.FailedFiles = []string{"坏.csv"}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer q.Close()
+
+	tk, err := q.Submit(Task{Title: "写回"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "任务结束", func() bool {
+		x, _ := q.Get(tk.ID)
+		return x.Status == StatusOK
+	})
+	got, _ := q.Get(tk.ID)
+	if len(got.ProposalIDs) != 2 || got.ProposalIDs[0] != "p1" {
+		t.Fatalf("ProposalIDs 没写回：%v", got.ProposalIDs)
+	}
+	if len(got.FailedFiles) != 1 || got.FailedFiles[0] != "坏.csv" {
+		t.Fatalf("FailedFiles 没写回：%v", got.FailedFiles)
+	}
+}

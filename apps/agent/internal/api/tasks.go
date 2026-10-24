@@ -6,9 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/ark-local-ai/ark/apps/agent/internal/agent"
 	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
 	"github.com/ark-local-ai/ark/apps/agent/internal/tasks"
 	"github.com/ark-local-ai/ark/apps/agent/internal/workspace"
@@ -94,7 +97,9 @@ func setCounts(q *tasks.Queue, id string, kv map[string]int) {
 
 // submitZoneTask 校验作业区并提交一个任务。dryRun 为 true 时强制演习；
 // 作业区自身 mode != apply 时也强制演习（不会因为按钮参数就变成真改）。
-func (s *Server) submitZoneTask(zoneID string, dryRun bool, source, conversationID string) (tasks.Task, error) {
+//
+// opts 是可选的附加参数（文件范围、幂等键）；不传即保持原有行为。
+func (s *Server) submitZoneTask(zoneID string, dryRun bool, source, conversationID string, opts ...taskOpts) (tasks.Task, error) {
 	zs := s.zonesStore()
 	if zs == nil {
 		return tasks.Task{}, fmt.Errorf("作业区存储不可用")
@@ -112,7 +117,7 @@ func (s *Server) submitZoneTask(zoneID string, dryRun bool, source, conversation
 	if dry {
 		title = "试运行：" + z.Name
 	}
-	t, err := q.Submit(tasks.Task{
+	task := tasks.Task{
 		ZoneID:         z.ID,
 		Title:          title,
 		Source:         source,
@@ -120,13 +125,29 @@ func (s *Server) submitZoneTask(zoneID string, dryRun bool, source, conversation
 		DryRun:         dry,
 		Steps:          zoneTaskSteps(),
 		Counts:         map[string]int{},
-	})
+	}
+	if len(opts) > 0 {
+		task.Files = opts[0].Files
+		task.IdempotencyKey = opts[0].IdempotencyKey
+	}
+	t, err := q.Submit(task)
 	if err != nil {
 		return tasks.Task{}, err
 	}
 	// 状态先落到 zone 上，卡片在任务真正开始前就能显示“排队中”。
-	_ = zs.MarkStatus(z.ID, "queued", "")
+	// 幂等命中的旧任务可能已经结束了，别把区状态倒退成 queued。
+	if t.Status == tasks.StatusQueued {
+		_ = zs.MarkStatus(z.ID, "queued", "")
+	}
 	return t, nil
+}
+
+// taskOpts 是 submitZoneTask 的可选参数。
+//   - Files：只处理这些基名（重试失败文件时用）
+//   - IdempotencyKey：非空时同 key 的重复提交返回同一条任务
+type taskOpts struct {
+	Files          []string
+	IdempotencyKey string
 }
 
 // runZoneTask 在 tasks 的 worker 里执行。一次只跑一个任务由 Queue 保证。
@@ -201,11 +222,20 @@ func (s *Server) runZoneTask(ctx context.Context, layout *workspace.Layout, q *t
 		}
 	}
 
+	// 作业区 apply：投递到**暂存区**，为每份文件出待确认清单，然后停下等人确认。
+	// 不调用 agent.ProcessInboxFile、不记账、不移文件：写表只能由 /apply 触发。
+	staged := filepath.Join(layout.Inbox, "staged", t.ID)
+	if err := os.MkdirAll(staged, 0o755); err != nil {
+		setStep(q, t.ID, "scan", tasks.StepFailed, "创建暂存区失败")
+		return finish("failed", "创建暂存区失败："+err.Error(), 0, 0, "")
+	}
 	opt := zoneingest.Options{
 		SourceDir: z.Input.Path,
 		Pattern:   z.Input.Pattern,
-		InboxDir:  layout.Inbox,
+		InboxDir:  layout.Inbox, // 去重参照仍是 inbox/done
 		DoneDir:   layout.Done,
+		DestDir:   staged, // 实际复制到暂存区
+		Only:      t.Files,
 	}
 	res, err := zoneingest.Run(opt, true) // 先只扫描，拿到准确计数再决定是否投递
 	if err != nil {
@@ -233,18 +263,47 @@ func (s *Server) runZoneTask(ctx context.Context, layout *workspace.Layout, q *t
 		setStep(q, t.ID, "deliver", tasks.StepFailed, err.Error())
 		return finish("failed", err.Error(), 0, 0, "")
 	}
-	setStep(q, t.ID, "deliver", tasks.StepOK, fmt.Sprintf("%d 个进入收件箱", res.Delivered))
-	names := make([]string, 0, res.Delivered)
+	delivered := make([]zoneingest.Candidate, 0, res.Delivered)
 	for _, c := range res.Items {
 		if c.Reason == "已投递" {
-			names = append(names, c.Name)
+			delivered = append(delivered, c)
 		}
 	}
-	// 投递完成即止：不调用 agent.ProcessInboxFile，等人在收件箱面板点「现在处理」。
-	setCounts(q, t.ID, map[string]int{"delivered": len(names), "pending": len(names)})
-	setStep(q, t.ID, "process", tasks.StepSkipped, fmt.Sprintf("待确认：%d 个文件在收件箱", len(names)))
-	setStep(q, t.ID, "done", tasks.StepSkipped, "确认处理后会自动移入 inbox/done")
-	return finish("ok", "", 0, 0, fmt.Sprintf("已投递 %d 个，等待你在收件箱确认", len(names)))
+	setStep(q, t.ID, "deliver", tasks.StepOK, fmt.Sprintf("%d 个进入暂存区", len(delivered)))
+	setCounts(q, t.ID, map[string]int{"delivered": len(delivered)})
+
+	// 逐个算清单。用任务捕获的 layout（切换工作区后不能把文件算到新区里），
+	// 失败只记这一份（基名 + 第一条错误），不中断整批。
+	ag := agent.New(s.Cfg, layout, s.Ledger, s.brainClient())
+	proposalIDs := make([]string, 0, len(delivered))
+	failed := make([]string, 0)
+	firstErr := ""
+	for _, c := range delivered {
+		prop, perr := ag.PlanInboxFile(ctx, c.DuplicateOf, z.ID)
+		if perr != nil {
+			failed = append(failed, c.Name)
+			if firstErr == "" {
+				firstErr = fmt.Sprintf("%s：%v", c.Name, perr)
+			}
+			continue
+		}
+		proposalIDs = append(proposalIDs, s.proposals().Put(prop))
+	}
+	// runner 手里是副本；这里用 Update 立即写回，卡片马上能看到清单/失败数。
+	q.Update(t.ID, func(x *tasks.Task) {
+		x.ProposalIDs = proposalIDs
+		x.FailedFiles = failed
+	})
+	setCounts(q, t.ID, map[string]int{"proposals": len(proposalIDs), "failed": len(failed)})
+	setStep(q, t.ID, "process", statusOf(len(proposalIDs), len(failed)),
+		fmt.Sprintf("%d 份待确认清单", len(proposalIDs)))
+	setStep(q, t.ID, "done", tasks.StepSkipped, "等你在卡片确认")
+	summary := fmt.Sprintf("生成 %d 份待确认清单（%d 个失败）", len(proposalIDs), len(failed))
+	if len(proposalIDs) == 0 && len(failed) > 0 {
+		// 一份都没出来 → 整条任务算失败，错误文本给出第一份的原因（可重试）。
+		return finish("failed", firstErr, 0, len(failed), summary)
+	}
+	return finish("ok", "", 0, len(failed), summary)
 }
 
 func inboxNames(layout *workspace.Layout) ([]string, error) {

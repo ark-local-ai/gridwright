@@ -355,3 +355,58 @@ func mustScan(t *testing.T, opt Options) []Candidate {
 	}
 	return items
 }
+
+// TestRunDestDirAndOnly DestDir 决定复制到哪（扫描/去重仍在 inbox），Only 按基名过滤。
+//
+// 这两条是作业区 staged 投递与「只重试失败文件」的基础：不带 DestDir 时行为
+// 必须与以前完全一致，否则既有调用方（收件箱面板）会被悄悄改道。
+func TestRunDestDirAndOnly(t *testing.T) {
+	_, src, inbox, done := layout(t)
+	writeFile(t, src, "a.csv", "a")
+	writeFile(t, src, "b.csv", "b")
+	writeFile(t, src, "c.csv", "c")
+	dest := filepath.Join(inbox, "staged", "t_1")
+
+	opt := Options{SourceDir: src, InboxDir: inbox, DoneDir: done, DestDir: dest, Only: []string{"b.csv"}}
+	res, err := Run(opt, false)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if res.Matched != 1 || res.Delivered != 1 {
+		t.Fatalf("Only 应只命中 1 个并投递 1 个，得到 %+v", res)
+	}
+	if _, err := os.Stat(filepath.Join(dest, "b.csv")); err != nil {
+		t.Fatalf("b.csv 应复制到 DestDir：%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(inbox, "b.csv")); !os.IsNotExist(err) {
+		t.Fatalf("不该再投到 inbox 根：%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dest, "a.csv")); !os.IsNotExist(err) {
+		t.Fatalf("Only 之外的文件不该投递：%v", err)
+	}
+
+	// 演习：同样只扫这些文件，但一个都不复制。
+	dest2 := filepath.Join(inbox, "staged", "t_2")
+	dry, err := Run(Options{SourceDir: src, InboxDir: inbox, DoneDir: done, DestDir: dest2, Only: []string{"c.csv"}}, true)
+	if err != nil {
+		t.Fatalf("dryRun: %v", err)
+	}
+	if dry.Matched != 1 || dry.Delivered != 0 {
+		t.Fatalf("演习不该投递，得到 %+v", dry)
+	}
+	if _, err := os.Stat(dest2); !os.IsNotExist(err) {
+		t.Fatalf("演习不该创建目标目录：%v", err)
+	}
+
+	// 空 DestDir == inbox（既有行为不变）。
+	plain, err := Run(Options{SourceDir: src, InboxDir: inbox, DoneDir: done, Only: []string{"a.csv"}}, false)
+	if err != nil {
+		t.Fatalf("Run(空 DestDir): %v", err)
+	}
+	if plain.Delivered != 1 {
+		t.Fatalf("空 DestDir 应投到 inbox，得到 %+v", plain)
+	}
+	if _, err := os.Stat(filepath.Join(inbox, "a.csv")); err != nil {
+		t.Fatalf("空 DestDir 应投到 inbox 根：%v", err)
+	}
+}

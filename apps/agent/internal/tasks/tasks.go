@@ -89,17 +89,26 @@ type Task struct {
 	Title  string `json:"title"`
 	// Source 标记任务从哪里来：chat（对话采纳）/ manual（接口/界面直跑）。
 	// 看板只展示 chat，避免“我没在对话里说过，怎么多了一次运行”。
-	Source         string         `json:"source,omitempty"`
-	ConversationID string         `json:"conversationId,omitempty"`
-	Status         string         `json:"status"`
-	DryRun         bool           `json:"dryRun"`
-	Steps          []Step         `json:"steps"`
-	Summary        string         `json:"summary"`
-	Error          string         `json:"error"`
-	Counts         map[string]int `json:"counts"`
-	CreatedAt      string         `json:"createdAt"`
-	StartedAt      string         `json:"startedAt"`
-	EndedAt        string         `json:"endedAt"`
+	Source         string `json:"source,omitempty"`
+	ConversationID string `json:"conversationId,omitempty"`
+	// IdempotencyKey 非空时，同 key 的第二次 Submit 直接返回已有任务（不新建）。
+	// 对话采纳用 conv:<id>:idx:<n>，重试用 retry:<原任务 id>。
+	IdempotencyKey string `json:"idempotencyKey,omitempty"`
+	// Files 是这条任务要处理的范围（基名）；空 = 按输入目录/收件箱的默认范围。
+	Files []string `json:"files,omitempty"`
+	// FailedFiles 是本轮处理失败的文件（基名），供「重试失败 N 个」用。
+	FailedFiles []string `json:"failedFiles,omitempty"`
+	// ProposalIDs 是这条任务产出的待确认清单 id。
+	ProposalIDs []string       `json:"proposalIds,omitempty"`
+	Status      string         `json:"status"`
+	DryRun      bool           `json:"dryRun"`
+	Steps       []Step         `json:"steps"`
+	Summary     string         `json:"summary"`
+	Error       string         `json:"error"`
+	Counts      map[string]int `json:"counts"`
+	CreatedAt   string         `json:"createdAt"`
+	StartedAt   string         `json:"startedAt"`
+	EndedAt     string         `json:"endedAt"`
 }
 
 // Snapshot 是给界面的一帧快照。Items 最多 6 条，运行中的排第一，其余按创建时间倒序。
@@ -198,6 +207,13 @@ func (q *Queue) Submit(t Task) (Task, error) {
 	if q.closed {
 		return Task{}, errClosed
 	}
+	// 幂等：同一个 key 已经有一条任务（无论什么状态）就直接返回它。
+	// 用户在对话里连点两次采纳、或网络重放，都不该变成两次改表。
+	if t.IdempotencyKey != "" {
+		if existing, ok := q.findByKeyLocked(t.IdempotencyKey); ok {
+			return cloneTask(existing), nil
+		}
+	}
 	if t.ID == "" {
 		id, err := newID()
 		if err != nil {
@@ -230,6 +246,34 @@ func (q *Queue) Submit(t Task) (Task, error) {
 	}
 	q.signal()
 	return cloneTask(t), nil
+}
+
+// FindByKey 按幂等键找任务。同一个 key 理论上只有一条；万一有历史重复，
+// 返回最新提交的那条（seq 最大），保证调用方与「刚刚发生的事」对应。
+func (q *Queue) FindByKey(key string) (Task, bool) {
+	if key == "" {
+		return Task{}, false
+	}
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return q.findByKeyLocked(key)
+}
+
+// findByKeyLocked 是 FindByKey 的锁内实现。调用方必须持有 q.mu。
+func (q *Queue) findByKeyLocked(key string) (Task, bool) {
+	var best *taskEntry
+	for _, e := range q.tasks {
+		if e.task.IdempotencyKey != key {
+			continue
+		}
+		if best == nil || e.seq > best.seq {
+			best = e
+		}
+	}
+	if best == nil {
+		return Task{}, false
+	}
+	return cloneTask(best.task), true
 }
 
 // Cancel 取消一条任务：queued 直接置 canceled；running 则 cancel 掉 ctx，
@@ -465,6 +509,9 @@ func (q *Queue) runOne(e *taskEntry) {
 	stored.Steps = work.Steps
 	stored.Counts = work.Counts
 	stored.Summary = work.Summary
+	// 这两个列表只有 runner 知道（谁失败、出了哪几份清单）：不写回就丢了。
+	stored.ProposalIDs = work.ProposalIDs
+	stored.FailedFiles = work.FailedFiles
 	if work.Error != "" && err == nil {
 		stored.Error = work.Error
 	}
@@ -682,6 +729,15 @@ func cloneTask(t Task) Task {
 			m[k] = v
 		}
 		t.Counts = m
+	}
+	if t.Files != nil {
+		t.Files = append([]string(nil), t.Files...)
+	}
+	if t.FailedFiles != nil {
+		t.FailedFiles = append([]string(nil), t.FailedFiles...)
+	}
+	if t.ProposalIDs != nil {
+		t.ProposalIDs = append([]string(nil), t.ProposalIDs...)
 	}
 	return t
 }

@@ -18,12 +18,12 @@
 
 | 面板 | 组件 | 什么时候出现 |
 |---|---|---|
-| 待确认清单 | `pages/Pending.tsx` · `PendingList` | 有改动提案待确认 |
+| 待确认清单 | `pages/Pending.tsx` · `PendingList` | 有改动提案待确认；作业区运行产出的清单也走这里 |
 | 对话抽屉 | `pages/Pending.tsx` · `ChatPane` | 点顶栏的对话图标 |
 | 表格预览（整屏） | `pages/SheetView.tsx` | 点格子或问题条目 |
 | 账目 / 回滚 | `pages/LedgerPanel.tsx` | 折叠块“账目”里的查看；支持筛选与 CSV 导出 |
 | 收件箱队列 | `pages/InboxPanel.tsx` | 顶栏收件箱图标（有等待文件时带角标） |
-| 作业区卡片 | `pages/ZoneBoard.tsx` | 主看板底部（替代原「最近改动」整卡）；点卡片试运行/运行 |
+| 作业区卡片 | `pages/ZoneBoard.tsx` | 主看板底部；点卡片回到创建它的对话并预填「再跑一次」；运行只出待确认清单（点卡片上的「查看待确认」） |
 | 历史工作 | `pages/ZoneBoard.tsx` 内浮层 | 作业区卡头的「历史工作」 |
 | 定时任务 | `pages/TasksPanel.tsx` | 顶栏时钟图标 |
 | 规则（rules.yaml） | `pages/RulesPanel.tsx` | 顶栏规则图标 |

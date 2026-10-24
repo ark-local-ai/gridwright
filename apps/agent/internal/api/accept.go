@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -56,7 +57,9 @@ func (s *Server) handleConversationAccept(w http.ResponseWriter, r *http.Request
 	switch {
 	case p.Kind == "task" && strings.TrimSpace(p.ZoneID) != "":
 		// 作业区任务：立即入队跑一次。dryRun 优先——只有明确 mode=apply 才真改。
-		t, terr := s.submitZoneTask(p.ZoneID, strings.EqualFold(p.Mode, "") || strings.EqualFold(p.Mode, "dryRun"), "chat", req.ConversationID)
+		// 幂等键 = 会话 + 消息序号：同一个提案连点两次采纳，只会产生一条任务。
+		t, terr := s.submitZoneTask(p.ZoneID, strings.EqualFold(p.Mode, "") || strings.EqualFold(p.Mode, "dryRun"), "chat", req.ConversationID,
+			taskOpts{IdempotencyKey: fmt.Sprintf("conv:%s:idx:%d", req.ConversationID, req.Index)})
 		if terr != nil {
 			if errors.Is(terr, errZoneNotFound) {
 				writeErr(w, http.StatusNotFound, "提案里的作业区不存在："+p.ZoneID)

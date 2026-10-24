@@ -147,6 +147,17 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusConflict, err.Error())
 		return
 	}
+	// 作业区链路：清单来自 inbox/staged/<taskId> 的暂存文件。写表成功后它们
+	// 才算真的「处理过」，归档到 done（去重也靠 done 认得它们）；单文件失败
+	// 不影响已经落盘的改动，也不回滚清单。
+	for _, src := range prop.Sources {
+		if strings.TrimSpace(src) == "" {
+			continue
+		}
+		if err := layout.MoveToDone(src); err != nil {
+			log.Printf("[apply] 归档暂存文件失败 %s: %v", src, err)
+		}
+	}
 	store.Drop(req.ID) // 已应用，防重复
 	applied, rejected := 0, 0
 	touched := []string{}

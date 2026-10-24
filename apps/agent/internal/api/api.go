@@ -270,6 +270,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/tasks/history", s.handleTasksHistory)
 	mux.HandleFunc("/api/v1/tasks/run", s.handleTasksRun)
 	mux.HandleFunc("/api/v1/tasks/cancel", s.handleTasksCancel)
+	mux.HandleFunc("/api/v1/tasks/retry", s.handleTasksRetry)
 	// 收件箱队列（列出状态 / 手动处理 / 跳过）
 	mux.HandleFunc("/api/v1/inbox", s.handleInbox)
 	mux.HandleFunc("/api/v1/inbox/run", s.handleInboxRun)

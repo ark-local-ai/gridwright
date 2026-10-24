@@ -60,11 +60,20 @@ type Candidate struct {
 // Pattern 为空表示接受 .xlsx/.xlsm/.csv/.xls；否则按基名 glob 匹配
 // （path/filepath.Match，大小写不敏感）。InboxDir 必填，DoneDir 为空时
 // 默认取 <InboxDir>/done。MaxFiles <= 0 时默认 200。
+//
+// DestDir 是**实际复制到哪**（作业区的暂存区 inbox/staged/<taskId>）。
+// 去重仍以 InboxDir/DoneDir 为准：那里才记录「这个文件处理过没」。
+// 为空表示 DestDir == InboxDir（既有行为）。
+//
+// Only 按基名过滤（空 = 全部）。重试只重试失败文件就靠它：不去重扫整批，
+// 避免同一份数据被再投一次、再入一次账。
 type Options struct {
 	SourceDir string
 	Pattern   string
 	InboxDir  string
 	DoneDir   string
+	DestDir   string
+	Only      []string
 	MaxFiles  int
 }
 
@@ -127,7 +136,7 @@ func Run(opt Options, dryRun bool) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	_, inboxAbs, _, err := normalize(opt)
+	d, err := normalize(opt)
 	if err != nil {
 		return Result{}, err
 	}
@@ -147,7 +156,7 @@ func Run(opt Options, dryRun bool) (Result, error) {
 			res.Items = append(res.Items, c)
 			continue
 		}
-		dst, derr := Deliver(c.Path, inboxAbs)
+		dst, derr := Deliver(c.Path, d.dest)
 		if derr != nil {
 			c.Reason = "投递失败：" + derr.Error()
 			res.Items = append(res.Items, c)
@@ -165,14 +174,25 @@ func Run(opt Options, dryRun bool) (Result, error) {
 // scanDir 是 Scan/Run 共用的实现，额外返回目录项/命中计数。
 func scanDir(opt Options) ([]Candidate, scanStats, error) {
 	var stats scanStats
-	srcAbs, inboxAbs, doneAbs, err := normalize(opt)
+	d, err := normalize(opt)
 	if err != nil {
 		return nil, stats, err
 	}
+	srcAbs, inboxAbs, doneAbs := d.src, d.inbox, d.done
 	pattern := opt.Pattern
 	if pattern != "" {
 		if _, err := filepath.Match(pattern, ""); err != nil {
 			return nil, stats, fmt.Errorf("文件名匹配模式无效 %q: %w", pattern, err)
+		}
+	}
+	// Only 用折叠大小写比较：Windows 上文件名大小写不该决定「重试这一份」成不成立。
+	var only map[string]bool
+	if len(opt.Only) > 0 {
+		only = make(map[string]bool, len(opt.Only))
+		for _, n := range opt.Only {
+			if n = strings.TrimSpace(n); n != "" {
+				only[strings.ToLower(n)] = true
+			}
 		}
 	}
 
@@ -196,6 +216,9 @@ func scanDir(opt Options) ([]Candidate, scanStats, error) {
 		}
 		name := e.Name()
 		if !acceptName(name, pattern) {
+			continue
+		}
+		if only != nil && !only[strings.ToLower(name)] {
 			continue
 		}
 		info, ierr := e.Info()
@@ -233,31 +256,40 @@ func scanDir(opt Options) ([]Candidate, scanStats, error) {
 	return out, stats, nil
 }
 
-// normalize 把三个目录转成绝对路径并做安全校验。
-// 返回顺序：源目录、inbox、done。
-func normalize(opt Options) (string, string, string, error) {
+// dirs 是一次取件涉及的全部绝对路径。
+type dirs struct {
+	src   string // 扫描源目录
+	inbox string // 去重参照：还没处理的收件箱
+	done  string // 去重参照：已处理的归档
+	dest  string // 真正复制到哪（默认 == inbox）
+}
+
+// normalize 把源目录、inbox、done、投递目标转成绝对路径并做安全校验。
+// DestDir 为空时投递目标就是 inbox（既有行为）。
+func normalize(opt Options) (dirs, error) {
+	var zero dirs
 	if strings.TrimSpace(opt.SourceDir) == "" {
-		return "", "", "", errors.New("缺少源目录 SourceDir")
+		return zero, errors.New("缺少源目录 SourceDir")
 	}
 	if strings.TrimSpace(opt.InboxDir) == "" {
-		return "", "", "", errors.New("缺少收件箱目录 InboxDir")
+		return zero, errors.New("缺少收件箱目录 InboxDir")
 	}
 
 	srcAbs, err := filepath.Abs(opt.SourceDir)
 	if err != nil {
-		return "", "", "", fmt.Errorf("解析源目录路径: %w", err)
+		return zero, fmt.Errorf("解析源目录路径: %w", err)
 	}
 	info, err := os.Stat(srcAbs)
 	if err != nil {
-		return "", "", "", fmt.Errorf("源目录不可用 %s: %w", srcAbs, err)
+		return zero, fmt.Errorf("源目录不可用 %s: %w", srcAbs, err)
 	}
 	if !info.IsDir() {
-		return "", "", "", fmt.Errorf("源路径不是目录: %s", srcAbs)
+		return zero, fmt.Errorf("源路径不是目录: %s", srcAbs)
 	}
 
 	inboxAbs, err := filepath.Abs(opt.InboxDir)
 	if err != nil {
-		return "", "", "", fmt.Errorf("解析收件箱路径: %w", err)
+		return zero, fmt.Errorf("解析收件箱路径: %w", err)
 	}
 	doneAbs := opt.DoneDir
 	if strings.TrimSpace(doneAbs) == "" {
@@ -265,7 +297,15 @@ func normalize(opt Options) (string, string, string, error) {
 	} else {
 		doneAbs, err = filepath.Abs(doneAbs)
 		if err != nil {
-			return "", "", "", fmt.Errorf("解析 done 路径: %w", err)
+			return zero, fmt.Errorf("解析 done 路径: %w", err)
+		}
+	}
+	// 投递目标默认 == inbox；显式给 DestDir 时（作业区暂存区）单独解析。
+	destAbs := inboxAbs
+	if strings.TrimSpace(opt.DestDir) != "" {
+		destAbs, err = filepath.Abs(opt.DestDir)
+		if err != nil {
+			return zero, fmt.Errorf("解析投递目标路径: %w", err)
 		}
 	}
 
@@ -274,13 +314,13 @@ func normalize(opt Options) (string, string, string, error) {
 	rootAbs := filepath.Dir(inboxAbs)
 	switch {
 	case samePath(srcAbs, inboxAbs):
-		return "", "", "", fmt.Errorf("源目录不能是 inbox 自身: %s", srcAbs)
+		return zero, fmt.Errorf("源目录不能是 inbox 自身: %s", srcAbs)
 	case samePath(srcAbs, doneAbs):
-		return "", "", "", fmt.Errorf("源目录不能是 done 自身: %s", srcAbs)
+		return zero, fmt.Errorf("源目录不能是 done 自身: %s", srcAbs)
 	case samePath(srcAbs, rootAbs):
-		return "", "", "", fmt.Errorf("源目录不能是工作区根（会把自己的 inbox 当输入）: %s", srcAbs)
+		return zero, fmt.Errorf("源目录不能是工作区根（会把自己的 inbox 当输入）: %s", srcAbs)
 	}
-	return srcAbs, inboxAbs, doneAbs, nil
+	return dirs{src: srcAbs, inbox: inboxAbs, done: doneAbs, dest: destAbs}, nil
 }
 
 // samePath 比较两个已绝对化、已 Clean 的路径是否指向同一位置。
