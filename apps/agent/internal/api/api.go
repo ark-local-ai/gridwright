@@ -34,6 +34,7 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/ledger"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
 	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
+	"github.com/ark-local-ai/ark/apps/agent/internal/mcp"
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory"
 	"github.com/ark-local-ai/ark/apps/agent/internal/pathsafe"
 	"github.com/ark-local-ai/ark/apps/agent/internal/propose"
@@ -69,6 +70,12 @@ type Server struct {
 	convos *convo.Store      // 会话存储（conversations.json），随工作区切换重建；全局共享一份
 	zones  *zones.Store      // 作业区（zones.json），随工作区切换重建
 	tasks  *tasks.Queue      // 任务队列（tasks.json），一次只跑一个；随工作区切换重建
+
+	// MCP 工具注册表（<工作区>/mcp.json）。惰性打开、按 root 缓存（见 mcp.go）。
+	// 用一把独立的锁：拉起子进程要握手，可能十几秒，不能压在 mu 上堵住切工作区。
+	mcpMu   sync.Mutex
+	mcpReg  *mcp.Registry
+	mcpRoot string
 
 	// 只读结果缓存（见 cache.go）。cacheMu 与 mu 分开：缓存不该阻塞工作区切换。
 	cacheMu      sync.Mutex
@@ -281,6 +288,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/proposal/rows", s.handleProposalRows)
 	mux.HandleFunc("/api/v1/apply", s.handleApply)
 	mux.HandleFunc("/api/v1/chat", s.handleChat)
+	mux.HandleFunc("/api/v1/tools/mcp", s.handleMCPTools)
 	mux.HandleFunc("/api/v1/conversations", s.handleConversations)
 	mux.HandleFunc("/api/v1/conversation", s.handleConversation)
 	mux.HandleFunc("/api/v1/conversation/append", s.handleConversationAppend)

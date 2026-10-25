@@ -200,6 +200,8 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	// trace 收「这一步做了什么」，随响应回给界面（运行详情）。
 	ctx, tr := trace.New(r.Context(), "chat")
 	ag := agent.New(cfg, layout, led, s.brainClient())
+	// 装配好的 MCP 工具（没配 mcp.json 时为 nil：对话照常，只是模型无工具可调）。
+	ag.Tools = s.toolRunner()
 	imgs := make([]llm.ImageInput, 0, len(req.Images))
 	for _, d := range imgsForStore(req.Images) {
 		imgs = append(imgs, llm.ImageInput{DataURL: d})

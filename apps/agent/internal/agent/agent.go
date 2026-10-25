@@ -19,6 +19,7 @@ import (
 	"github.com/ark-local-ai/ark/apps/agent/internal/ledger"
 	"github.com/ark-local-ai/ark/apps/agent/internal/llm"
 	"github.com/ark-local-ai/ark/apps/agent/internal/logx"
+	"github.com/ark-local-ai/ark/apps/agent/internal/mcp"
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory"
 	"github.com/ark-local-ai/ark/apps/agent/internal/memory2"
 	"github.com/ark-local-ai/ark/apps/agent/internal/notify"
@@ -41,6 +42,14 @@ type Agent struct {
 	Ledger  *ledger.Ledger
 	Brain   *llm.Client
 	SampleN int
+
+	// Tools 是装配好的 MCP 工具（见 internal/mcp）。nil 表示没配 mcp.json 或
+	// 打开失败——对话照常可用，只是模型没有工具可调。
+	Tools mcp.Runner
+
+	// callModel 是「调模型一次」的接缝：生产路径留 nil（走 Brain），
+	// 单测替换它就能在没有模型的情况下验证多轮工具循环。
+	callModel func(ctx context.Context, prompt string, imgs []llm.ImageInput) (string, error)
 }
 
 // New 构造 agent。

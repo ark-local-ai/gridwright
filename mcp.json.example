@@ -1,0 +1,20 @@
+{
+  "$comment": "示例：把这个文件复制到【你的工作区根目录】并改名为 mcp.json 才生效（仓库根这份不参与构建，也不会被读取）。工作区根 = 你在界面里选的那个放表的文件夹。",
+  "servers": [
+    {
+      "$comment": "enabled=false 是一个「占位示例」：删掉它（或改成 true）并填好 command 才会真的拉起子进程。",
+      "name": "example-ocr",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-everything"],
+      "env": {},
+      "enabled": false
+    },
+    {
+      "$comment": "本机已有的可执行文件也可以直接写绝对路径；args / env 可省略。name 必须唯一，工具在对话里显示为 <name>.<tool>。",
+      "name": "filesystem",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
+      "enabled": false
+    }
+  ]
+}

@@ -75,6 +75,7 @@ gridwright/
 │  │  │  ├─ filelock/       # 同一张表的进程内串行写锁（apply/回滚/inbox 共用）
 │  │  │  ├─ proc/           # 监视父进程，壳没了就退出，不留孤儿占端口
 │  │  │  ├─ llm/            # 模型调用（请求/响应摘要日志，密钥脱敏）
+│  │  │  ├─ mcp/            # MCP 工具：读 <工作区>/mcp.json，stdio 拉起 server、列工具、调一个
 │  │  │  ├─ logx/           # 日志：slog → stdout、单时间戳、级别可调
 │  │  │  └─ webui/dist/     # 单文件版内嵌界面（构建时同步，非手改）
 │  │  └─ scripts/           # build-desktop.sh / build-single.sh
